@@ -2,64 +2,14 @@ local KavoLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHept
 local Window = KavoLib.CreateLib("datdaykits Premium Hub", "DarkTheme")
 
 local MainTab = Window:NewTab("Main")
+local MainTab = Window:NewTab("fram")
 local MainSection = MainTab:NewSection("Auto Steal Eggs")
+local MainSection = framTab:NewSection("Auto Fram Lever")
 
 getgenv().AutoSteal = false
-getgenv().TweenSpeed = 165
+getgenv().TweenSpeed = 65
 local LocalPlayer = game:GetService("Players").LocalPlayer
 
-local function startEggStealer()
-    local TweenService = game:GetService("TweenService")
-    
-    task.spawn(function()
-        while getgenv().AutoSteal do
-            local EggHolder = workspace:FindFirstChild("Eggs") 
-                or workspace:FindFirstChild("EggFolder") 
-                or workspace:FindFirstChild("SpawnedEggs")
-
-            local Character = LocalPlayer.Character
-            local HumanoidRootPart = Character and Character:FindFirstChild("HumanoidRootPart")
-
-            if HumanoidRootPart and EggHolder then
-                for _, egg in pairs(EggHolder:GetChildren()) do
-                    if not getgenv().AutoSteal then break end
-
-                    if egg:IsA("BasePart") or (egg:IsA("Model") and egg.PrimaryPart) then
-                        local targetCFrame = egg:IsA("BasePart") and egg.CFrame or egg.PrimaryPart.CFrame
-                        local distance = (HumanoidRootPart.Position - targetCFrame.Position).Magnitude
-
-                        local tweenInfo = TweenInfo.new(distance / getgenv().TweenSpeed, Enum.EasingStyle.Linear)
-                        local tween = TweenService:Create(HumanoidRootPart, tweenInfo, {CFrame = targetCFrame})
-
-                        tween:Play()
-                        tween.Completed:Wait()
-                    end
-                end
-            end
-            task.wait(0.1)
-        end
-    end)
-end
-
-local Players = game:GetService("Players")
-local eggFolder = workspace:WaitForChild("Eggs")
-
-for _, egg in pairs(eggFolder:GetChildren()) do
-    if egg:IsA("BasePart") then
-        egg.Touched:Connect(function(hit)
-            local character = hit.Parent
-            local player = Players:GetPlayerFromCharacter(character)
-            
-            if player then
-                -- Logic cộng trứng vào Inventory hoặc Leaderstats của người chơi
-                print(player.Name .. " đã nhặt trứng thành công!")
-                
-                -- Xóa trứng sau khi nhặt
-                egg:Destroy()
-            end
-        end)
-    end
-end
 MainSection:NewToggle("Auto Steal", "Tự động nhặt trứng", function(state)
     getgenv().AutoSteal = state
     if state then
@@ -68,6 +18,6 @@ MainSection:NewToggle("Auto Steal", "Tự động nhặt trứng", function(stat
 end)
 
 -- Phím tắt để Ẩn/Hiện Menu (mặc định là phím RightControl bên phải bàn phím)
-MainSection:NewKeybind("gameover", "f", Enum.KeyCode.RightControl, function()
+MainSection:NewKeybind("g", "f", Enum.KeyCode.RightControl, function()
     KavoLib:ToggleUI()
 end)
