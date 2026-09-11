@@ -1,0 +1,67 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local button = script.Parent
+local player = Players.LocalPlayer
+
+-- Tìm RemoteEvent xử lý click trên Server (nếu game dùng Server để cộng điểm)
+local clickEvent = ReplicatedStorage:FindFirstChild("ClickEvent")
+
+local isAutoClicking = false
+
+button.MouseButton1Click:Connect(function()
+    isAutoClicking = not isAutoClicking
+    
+    if isAutoClicking then
+        button.Text = "Auto Click: BẬT"
+        button.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    else
+        button.Text = "Auto Click: TẮT"
+        button.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    end
+    
+    -- Vòng lặp tự động nhấp
+    task.spawn(function()
+        while isAutoClicking do
+            if clickEvent then
+                clickEvent:FireServer()
+            end
+            
+            -- Bắt buộc có task.wait() để tùy chỉnh tốc độ bấm và tránh đơ game
+            task.wait(0.1) 
+        end
+    end)
+end)local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local button = script.Parent
+local player = Players.LocalPlayer
+
+-- Tìm RemoteEvent xử lý click trên Server (nếu game dùng Server để cộng điểm)
+local clickEvent = ReplicatedStorage:FindFirstChild("ClickEvent")
+
+local isAutoClicking = false
+
+button.MouseButton1Click:Connect(function()
+    isAutoClicking = not isAutoClicking
+    
+    if isAutoClicking then
+        button.Text = "Auto Click: BẬT"
+        button.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    else
+        button.Text = "Auto Click: TẮT"
+        button.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    end
+    
+    -- Vòng lặp tự động nhấp
+    task.spawn(function()
+        while isAutoClicking do
+            if clickEvent then
+                clickEvent:FireServer()
+            end
+            
+            -- Bắt buộc có task.wait() để tùy chỉnh tốc độ bấm và tránh đơ game
+            task.wait(0.1) 
+        end
+    end)
+end)
