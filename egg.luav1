@@ -8,6 +8,13 @@ getgenv().AutoSteal = false
 getgenv().TweenSpeed = 65
 local LocalPlayer = game:GetService("Players").LocalPlayer
 
+MainSection:NewToggle("Auto Steal", "Tự động nhặt trứng", function(state)
+    getgenv().AutoSteal = state
+    if state then
+        startEggStealer()
+    end
+end)
+
 -- Phím tắt để Ẩn/Hiện Menu (mặc định là phím RightControl bên phải bàn phím)
 MainSection:NewKeybind("g", "f", Enum.KeyCode.RightControl, function()
     KavoLib:ToggleUI()
