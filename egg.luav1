@@ -64,58 +64,25 @@ end)
 MainSection:NewKeybind("e", "g", Enum.KeyCode.RightControl, function()
     KavoLib:ToggleUI()
 end)
-
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local MarketplaceService = game:GetService("MarketplaceService")
+local autoStealEvent = ReplicatedStorage:WaitForChild("AutoStealEvent")
 
--- Tạo RemoteEvent nếu chưa có
-local stealEvent = ReplicatedStorage:FindFirstChild("AutoStealEvent") or Instance.new("RemoteEvent", ReplicatedStorage)
-stealEvent.Name = "AutoStealEvent"
+local isAutoStealing = true -- Bật/Tắt tính năng
 
-local GAME_PASS_ID = 123456789 -- Thay ID Game Pass của bạn vào đây
-
-stealEvent.OnServerEvent:Connect(function(player, egg)
-    -- 1. Kiểm tra điều kiện
-    if not egg or not egg:IsA("BasePart") and not (egg:IsA("Model") and egg.PrimaryPart) then return end
-    
-    local character = player.Character
-    local hrp = character and character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-
-    -- 2. Kiểm tra Game Pass (Mất Robux)
-    local hasPass = false
-    pcall(function()
-        hasPass = MarketplaceService:UserOwnsGamePassAsync(player.UserId, GAME_PASS_ID)
-    end)
-
-    if not hasPass then
-        MarketplaceService:PromptGamePassPurchase(player, GAME_PASS_ID)
-        return
+task.spawn(function()
+    while true do
+        if isAutoStealing then
+            -- Tìm các quả trứng trong Workspace
+            for _, obj in pairs(workspace:GetDescendants()) do
+                if not isAutoStealing then break end
+                
+                -- Tìm các vật thể có tên chứa chữ "Egg" hoặc "Trung"
+                if string.find(string.lower(obj.Name), "egg") or string.find(string.lower(obj.Name), "trung") then
+                    autoStealEvent:FireServer(obj)
+                    task.wait(0.1) -- Khoảng nghỉ giữa mỗi lần nhặt trứng
+                end
+            end
+        end
+        task.wait(0.5)
     end
-
-    -- 3. Tốc độ dịch chuyển TỨC THỜI (Lưu vị trí cũ -> Teleport -> Trở về)
-    local savedCFrame = hrp.CFrame
-    local targetCFrame = egg:IsA("BasePart") and egg.CFrame or egg.PrimaryPart.CFrame
-
-    -- Dịch chuyển tới trứng ngay lập tức (0 giây)
-    hrp.CFrame = targetCFrame + Vector3.new(0, 2, 0)
-
-    -- 4. Ép kích hoạt cơ chế nhặt trứng
-    -- Cách A: Nếu trứng dùng ProximityPrompt (Phím E)
-    local prompt = egg:FindFirstChildWhichIsA("ProximityPrompt", true)
-    if prompt then
-        fireproximityprompt(prompt)
-    end
-
-    -- Cách B: Gọi thẳng RemoteEvent nhặt trứng của game (nếu game bạn có Event riêng)
-    local giveEggEvent = ReplicatedStorage:FindFirstChild("GiveEgg") or ReplicatedStorage:FindFirstChild("ClaimEgg")
-    if giveEggEvent and giveEggEvent:IsA("RemoteEvent") then
-        giveEggEvent:FireServer(egg)
-    end
-
-    -- Dừng 0.1s ngắn để Server nhận thông tin
-    task.wait(0.1)
-
-    -- Quay về vị trí ban đầu tức thời
-    hrp.CFrame = savedCFrame
 end)
