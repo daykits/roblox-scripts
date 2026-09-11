@@ -1,57 +1,91 @@
 local KavoLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
 local Window = KavoLib.CreateLib("datdaykits Premium Hub", "DarkTheme")
 
-local MainTab = Window:NewTab("Main")
-local MainSection = MainTab:NewSection("Auto Steal Eggs")
-
-getgenv().AutoSteal = false
-getgenv().TweenSpeed = 65
+-- Khởi tạo các biến toàn cục tiêu chuẩn hệ thống
+_G.AutoSteal = false
+_G.TweenSpeed = 70
 local LocalPlayer = game:GetService("Players").LocalPlayer
-runningPlayers[player.UserId] = state
 
-if state then
+-- Thuật toán tự động tìm kiếm vị trí và nhặt mọi quả trứng trong game Steal An Egg
+local function startEggStealer()
+    local TweenService = game:GetService("TweenService")
+    
     task.spawn(function()
-        while runningPlayers[player.UserId] do
-            local character = player.Character
-            local hrp = character and character:FindFirstChild("HumanoidRootPart")
-
-            -- Tìm Base của người chơi
-            local playerBase = workspace:FindFirstChild("Bases") and workspace.Bases:FindFirstChild(player.Name)
-            local baseLocation = playerBase and (playerBase:FindFirstChild("SpawnPart") or playerBase.PrimaryPart)
-            local eggFolder = workspace:FindFirstChild("Eggs")
-
-            if hrp and baseLocation and eggFolder then
-                for _, egg in pairs(eggFolder:GetChildren()) do
-                    if not runningPlayers[player.UserId] then break end
-
-                    local targetPart = egg:IsA("BasePart") and egg or egg.PrimaryPart
-                    if targetPart then
-                        -- 1. Dịch chuyển tới quả trứng
-                        hrp.CFrame = targetPart.CFrame + Vector3.new(0, 2, 0)
+        while _G.AutoSteal do
+            local Character = LocalPlayer.Character
+            local RootPart = Character and Character:FindFirstChild("HumanoidRootPart")
+            
+            if RootPart then
+                -- Quét toàn bộ các đối tượng trong Workspace để tìm trứng dựa trên thuộc tính hình khối công khai
+                for _, obj in pairs(workspace:GetDescendants()) do
+                    if not _G.AutoSteal then break end
+                    
+                    -- Nhận diện quả trứng qua tên gọi thông dụng của tựa game này
+                    if obj.Name == "Egg" or obj.Name == "SpawnedEgg" or obj:Scroll("TouchInterest") or string.find(string.lower(obj.Name), "egg") then
+                        local targetPart = nil
+                        if obj:IsA("BasePart") then
+                            targetPart = obj
+                        elseif obj:IsA("Model") and obj.PrimaryPart then
+                            targetPart = obj.PrimaryPart
+                        elseif obj:IsA("Model") then
+                            targetPart = obj:FindFirstChildWhichIsA("BasePart")
+                        end
                         
-                        -- 2. Xử lý nhận trứng trên Server (Ví dụ: xóa trứng hoặc cộng thưởng)
-                        task.wait(0.05)
-
-                        -- 3. Dịch chuyển về Base ngay lập tức
-                        hrp.CFrame = baseLocation.CFrame + Vector3.new(0, 3, 0)
-
-                        task.wait(0.1) -- Nghỉ ngắn giữa các lần nhặt
+                        -- Nếu tìm thấy tọa độ quả trứng, tiến hành di chuyển mượt mà đến nhặt
+                        if targetPart and targetPart.Parent then
+                            local distance = (RootPart.Position - targetPart.Position).Magnitude
+                            
+                            -- Bỏ qua nếu khoảng cách quá xa (tránh bị lỗi kẹt map hoặc văng game)
+                            if distance > 1 and distance < 2000 then
+                                local duration = distance / _G.TweenSpeed
+                                local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
+                                local tween = TweenService:Create(RootPart, tweenInfo, {CFrame = targetPart.CFrame})
+                                tween:Play()
+                                tween.Completed:Wait()
+                                task.wait(0.1) -- Nghỉ ngắn để Server xử lý lệnh nhận trứng
+                            end
+                        end
                     end
                 end
             end
-            
-            task.wait(0.5) -- Bắt buộc có task.wait() để tránh làm đơ game
+            task.wait(0.5)
         end
     end)
 end
-MainSection:NewToggle("Auto Steal", "Tự động nhặt trứng", function(state)
-    getgenv().AutoSteal = state
+
+-- ==================== KHỞI TẠO MENU GIAO DIỆN (SỬA LỖI HIỂN THỊ) ====================
+-- Tạo Tab chính
+local MainTab = Window:NewTab("Main Features")
+-- Tạo Khung chứa chức năng bắt buộc bên trong Tab
+local MainSection = MainTab:NewSection("Egg Automation")
+
+-- 1. Công tắc Bật/Tắt Auto Steal Eggs (Hiện đầy đủ nút gạt On/Off)
+MainSection:NewToggle("Auto Steal Eggs", "Tự động bay đến nhặt sạch trứng xung quanh bản đồ", function(state)
+    _G.AutoSteal = state
     if state then
         startEggStealer()
     end
 end)
 
--- Phím tắt để Ẩn/Hiện Menu (mặc định là phím RightControl bên phải bàn phím)
-MainSection:NewKeybind("g", "f", Enum.KeyCode.RightControl, function()
-    KavoLib:ToggleUI()
+-- 2. Thanh trượt tăng giảm tốc độ nhặt trứng
+MainSection:NewSlider("Steal Speed", "Điều chỉnh tốc độ bay (Khuyên dùng: 60-80)", 150, 20, function(v)
+    _G.TweenSpeed = v
+end)
+
+-- Tạo Tab cài đặt nhân vật phụ
+local PlayerTab = Window:NewTab("Player Options")
+local PlayerSection = PlayerTab:NewSection("Character Hacks")
+
+-- 3. Thanh chỉnh tốc độ Chạy nhanh
+PlayerSection:NewSlider("WalkSpeed (Tốc độ chạy)", "Thay đổi tốc độ chạy của bạn", 200, 16, function(v)
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.WalkSpeed = v
+    end
+end)
+
+-- 4. Thanh chỉnh lực nhảy cao
+PlayerSection:NewSlider("JumpPower (Lực nhảy)", "Thay đổi độ cao khi nhảy", 300, 50, function(v)
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.JumpPower = v
+    end
 end)
