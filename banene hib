@@ -1,0 +1,97 @@
+local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/shlexware/Orion/main/source')))()
+local Window = OrionLib:MakeWindow({
+    Name = "Banana Cat Hub 🍌🐱", 
+    HidePremium = false, 
+    SaveConfig = true, 
+    ConfigFolder = "BananaCatHub"
+})
+
+-- Tab Tự động (Auto)
+local MainTab = Window:MakeTab({
+    Name = "Trang chính",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
+})
+
+MainTab:AddSection({
+    Name = "Tự động cày (Auto Farm)"
+})
+
+MainTab:AddToggle({
+    Name = "Bật Auto Attack",
+    Default = false,
+    Callback = function(Value)
+        _G.AutoAttack = Value
+        task.spawn(function()
+            while _G.AutoAttack do
+                task.wait(0.1)
+                -- Chèn mã logic đánh quái tại đây
+            end
+        end)
+    end    
+})
+
+MainTab:AddButton({
+    Name = "Nhận thưởng / Nhiệm vụ",
+    Callback = function()
+        OrionLib:MakeNotification({
+            Name = "Banana Cat Hub",
+            Content = "Đã thực hiện lệnh nhận thưởng!",
+            Image = "rbxassetid://4483345998",
+            Time = 3
+        })
+    end    
+})
+
+-- Tab Chỉ số nhân vật
+local PlayerTab = Window:MakeTab({
+    Name = "Nhân vật",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
+})
+
+PlayerTab:AddSlider({
+    Name = "Tốc độ di chuyển (WalkSpeed)",
+    Min = 16,
+    Max = 300,
+    Default = 16,
+    Color = Color3.fromRGB(255, 230, 0),
+    Increment = 1,
+    ValueName = "Speed",
+    Callback = function(Value)
+        if game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid") then
+            game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = Value
+        end
+    end    
+})
+
+PlayerTab:AddSlider({
+    Name = "Sức nhảy (JumpPower)",
+    Min = 50,
+    Max = 400,
+    Default = 50,
+    Color = Color3.fromRGB(255, 230, 0),
+    Increment = 1,
+    ValueName = "Jump",
+    Callback = function(Value)
+        if game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid") then
+            game.Players.LocalPlayer.Character.Humanoid.JumpPower = Value
+        end
+    end    
+})
+
+-- Tab Tiện ích
+local MiscTab = Window:MakeTab({
+    Name = "Cài đặt",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
+})
+
+MiscTab:AddButton({
+    Name = "Đóng Menu",
+    Callback = function()
+        OrionLib:Destroy()
+    end    
+})
+
+OrionLib:Init()
