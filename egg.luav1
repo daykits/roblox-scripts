@@ -1,105 +1,51 @@
-local KavoLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
-local Window = KavoLib.CreateLib("datdaykits Premium Hub", "DarkTheme")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local MainTab = Window:NewTab("Main")
-local MainSection = MainTab:NewSection("Auto Steal Eggs")
+-- Tạo RemoteEvent kết nối Client-Server
+local autoEvent = ReplicatedStorage:FindFirstChild("AutoCollectEvent") or Instance.new("RemoteEvent", ReplicatedStorage)
+autoEvent.Name = "AutoCollectEvent"
 
-getgenv().AutoSteal = false
-getgenv().TweenSpeed = 70
-local LocalPlayer = game:GetService("Players").LocalPlayer
+-- Bảng lưu trạng thái Bật/Tắt của từng người chơi
+local activePlayers = {}
 
-local function startEggStealer()
-    local TweenService = game:GetService("TweenService")
-    
-    task.spawn(function()
-        while getgenv().AutoSteal do
-            local Character = LocalPlayer.Character
-            local HumanoidRootPart = Character and Character:FindFirstChild("HumanoidRootPart")
+autoEvent.OnServerEvent:Connect(function(player, state)
+    activePlayers[player.UserId] = state
 
-            if HumanoidRootPart then
-                -- Quét toàn bộ workspace để tìm bất kỳ vật thể nào có tên chứa chữ "Egg"
-                for _, obj in pairs(workspace:GetDescendants()) do
-                    if not getgenv().AutoSteal then break end
+    if state then
+        task.spawn(function()
+            while activePlayers[player.UserId] do
+                local character = player.Character
+                local hrp = character and character:FindFirstChild("HumanoidRootPart")
+                
+                -- Tìm khu vực Base của người chơi (Ví dụ: Thư mục Bases chứa tên Player)
+                local playerBase = workspace:FindFirstChild("Bases") and workspace.Bases:FindFirstChild(player.Name)
+                local basePart = playerBase and playerBase:FindFirstChild("SpawnPart")
 
-                    -- Kiểm tra xem tên vật thể có chữ Egg (không phân biệt hoa thường)
-                    if string.find(string.lower(obj.Name), "egg") then
-                        local targetPart = nil
+                if hrp and basePart then
+                    local eggFolder = workspace:FindFirstChild("Eggs")
+                    if eggFolder then
+                        for _, egg in pairs(eggFolder:GetChildren()) do
+                            if not activePlayers[player.UserId] then break end
 
-                        if obj:IsA("BasePart") then
-                            targetPart = obj
-                        elseif obj:IsA("Model") and obj.PrimaryPart then
-                            targetPart = obj.PrimaryPart
-                        elseif obj:IsA("Model") then
-                            targetPart = obj:FindFirstChildWhichIsA("BasePart")
-                        end
+                            local eggPart = egg:IsA("BasePart") and egg or egg.PrimaryPart
+                            if eggPart then
+                                -- 1. Dịch chuyển đến vị trí quả trứng
+                                hrp.CFrame = eggPart.CFrame + Vector3.new(0, 2, 0)
+                                task.wait(0.1) -- Dừng ngắn để nhận diện nhặt trứng
 
-                        if targetPart then
-                            local distance = (HumanoidRootPart.Position - targetPart.Position).Magnitude
-                            
-                            -- Giới hạn khoảng cách hợp lý để tránh bị lỗi nhảy vị trí quá xa
-                            if distance > 2 and distance < 2000 then
-                                local tweenInfo = TweenInfo.new(distance / getgenv().TweenSpeed, Enum.EasingStyle.Linear)
-                                local tween = TweenService:Create(HumanoidRootPart, tweenInfo, {CFrame = targetPart.CFrame})
-
-                                tween:Play()
-                                tween.Completed:Wait()
-                                task.wait(0.2) -- Thời gian dừng lại 0.2s để game nhận diện đã nhặt trứng
+                                -- 2. Dịch chuyển lập tức về lại Base của người chơi
+                                hrp.CFrame = basePart.CFrame + Vector3.new(0, 3, 0)
+                                task.wait(0.3) -- Nghỉ trước khi nhặt quả tiếp theo
                             end
                         end
                     end
                 end
+                task.wait(0.5)
             end
-            task.wait(0.5)
-        end
-    end)
-end
-
-MainSection:NewToggle("Auto Steal", "Tự động nhặt trứng", function(state)
-    getgenv().AutoSteal = state
-    if state then
-        startEggStealer()
+        end)
     end
 end)
 
-MainSection:NewKeybind("e", "g", Enum.KeyCode.RightControl, function()
-    KavoLib:ToggleUI()
-end)
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local autoStealEvent = ReplicatedStorage:FindFirstChild("AutoStealEvent") or Instance.new("RemoteEvent", ReplicatedStorage)
-autoStealEvent.Name = "AutoStealEvent"
-
-autoStealEvent.OnServerEvent:Connect(function(player, egg)
-    if not egg or not egg.Parent then return end
-    
-    local character = player.Character
-    local hrp = character and character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-
-    -- Lấy vị trí CFrame của quả trứng
-    local targetCFrame = nil
-    if egg:IsA("BasePart") then
-        targetCFrame = egg.CFrame
-    elseif egg:IsA("Model") then
-        targetCFrame = egg:GetPivot()
-    end
-
-    if not targetCFrame then return end
-
-    -- 1. Lưu vị trí cũ
-    local savedCFrame = hrp.CFrame
-
-    -- 2. Dịch chuyển tức thời tới trứng
-    hrp.CFrame = targetCFrame + Vector3.new(0, 2, 0)
-
-    -- 3. Kích hoạt nút nhặt phím E (nếu trứng dùng ProximityPrompt)
-    local prompt = egg:FindFirstChildWhichIsA("ProximityPrompt", true)
-    if prompt then
-        fireproximityprompt(prompt)
-    end
-
-    -- 4. Chờ 0.05s để game ghi nhận nhặt thành công
-    task.wait(0.05)
-
-    -- 5. Trở về vị trí ban đầu lập tức
-    hrp.CFrame = savedCFrame
+-- Xóa dữ liệu khi người chơi thoát game
+game.Players.PlayerRemoving:Connect(function(player)
+    activePlayers[player.UserId] = nil
 end)
