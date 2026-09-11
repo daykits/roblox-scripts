@@ -64,29 +64,45 @@ end)
 MainSection:NewKeybind("e", "g", Enum.KeyCode.RightControl, function()
     KavoLib:ToggleUI()
 end)
-local PathfindingService = game:GetService("PathfindingService")
+local TweenService = game:GetService("TweenService")
 
-local function walkToTarget(character, targetPart)
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
+local function moveToTarget(character, targetPart)
     local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-    if not humanoid or not humanoidRootPart or not targetPart then return end
+    if not humanoidRootPart or not targetPart then return end
 
-    local path = PathfindingService:CreatePath({
-        AgentRadius = 2,
-        AgentHeight = 5,
-        AgentCanJump = true
+    local distance = (humanoidRootPart.Position - targetPart.Position).Magnitude
+    local speed = 16 -- Tốc độ di chuyển
+    local duration = distance / speed
+
+    local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
+    local tween = TweenService:Create(humanoidRootPart, tweenInfo, {
+        CFrame = targetPart.CFrame + Vector3.new(0, 2, 0) -- Nâng vị trí đích lên một chút để tránh kẹt đất
     })
 
-    path:ComputeAsync(humanoidRootPart.Position, targetPart.Position)
+    tween:Play()
+end
+-- Cơ chế xử lý tương tác khi nhân vật đến gần vật thể trong Roblox Studio
+local ProximityPrompt = script.Parent -- Gắn script vào ProximityPrompt của vật thể
 
-    if path.Status == Enum.PathStatus.Success then
-        local waypoints = path:GetWaypoints()
-        for _, waypoint in ipairs(waypoints) do
-            if waypoint.Action == Enum.PathWaypointAction.Jump then
-                humanoid.Jump = true
-            end
-            humanoid:MoveTo(waypoint.Position)
-            humanoid.MoveToFinished:Wait()
-        end
-    end
+-- Sự kiện kích hoạt khi người chơi hoàn thành tương tác (giữ phím E)
+ProximityPrompt.Triggered:Connect(function(player)
+    print(player.Name .. " đã tương tác thành công với vật thể!")
+    -- Thêm logic xử lý (ví dụ: cộng điểm, mở cửa, nhặt đồ...)
+end)
+-- Cơ chế lưu và quay trở lại vị trí ban đầu trong Roblox Studio
+local function moveAndReturn(character, targetPart)
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart or not targetPart then return end
+
+    -- 1. Lưu lại vị trí ban đầu của nhân vật
+    local originalCFrame = humanoidRootPart.CFrame
+
+    -- 2. Dịch chuyển nhân vật đến vị trí mục tiêu
+    humanoidRootPart.CFrame = targetPart.CFrame + Vector3.new(0, 3, 0)
+    
+    -- Tạm dừng một khoảng ngắn để xử lý logic (ví dụ: nhặt item, kiểm tra sự kiện)
+    task.wait(0.5)
+
+    -- 3. Trở về vị trí ban đầu
+    humanoidRootPart.CFrame = originalCFrame
 end
