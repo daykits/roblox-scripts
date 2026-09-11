@@ -7,7 +7,54 @@ local MainSection = MainTab:NewSection("Auto Steal Eggs")
 getgenv().AutoSteal = false
 getgenv().TweenSpeed = 65
 local LocalPlayer = game:GetService("Players").LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local autoEvent = ReplicatedStorage:FindFirstChild("AutoCollectEvent") or Instance.new("RemoteEvent", ReplicatedStorage)
+autoEvent.Name = "AutoCollectEvent"
 
+local playerStates = {}
+
+autoEvent.OnServerEvent:Connect(function(player, state)
+    playerStates[player.UserId] = state
+
+    if state then
+        task.spawn(function()
+            while playerStates[player.UserId] do
+                local character = player.Character
+                local hrp = character and character:FindFirstChild("HumanoidRootPart")
+                local eggFolder = workspace:FindFirstChild("Eggs") or workspace
+
+                if hrp and eggFolder then
+                    -- Lưu lại vị trí đứng ban đầu của người chơi
+                    local originalCFrame = hrp.CFrame
+
+                    -- Quét TẤT CẢ các quả trứng đang có trên Map
+                    for _, egg in pairs(eggFolder:GetChildren()) do
+                        if not playerStates[player.UserId] then break end
+
+                        -- Kiểm tra nếu vật thể có tên chứa chữ "Egg" hoặc nằm trong Folder Eggs
+                        if string.find(string.lower(egg.Name), "egg") or eggFolder.Name == "Eggs" then
+                            local targetPart = egg:IsA("BasePart") and egg or egg.PrimaryPart
+                            if targetPart then
+                                -- 1. Dịch chuyển tức thời đến vị trí quả trứng
+                                hrp.CFrame = targetPart.CFrame + Vector3.new(0, 2, 0)
+                                task.wait(0.05) -- Dừng 0.05s để Server ghi nhận chạm trứng
+
+                                -- 2. Trở về vị trí đứng ban đầu ngay lập tức
+                                hrp.CFrame = originalCFrame
+                                task.wait(0.1) -- Khoảng nghỉ trước khi nhặt quả tiếp theo
+                            end
+                        end
+                    end
+                end
+                task.wait(0.5) -- Chu kỳ quét lại toàn bộ Map
+            end
+        end)
+    end
+end)
+
+game.Players.PlayerRemoving:Connect(function(player)
+    playerStates[player.UserId] = nil
+end)
 MainSection:NewToggle("Auto Steal", "Tự động nhặt trứng", function(state)
     getgenv().AutoSteal = state
     if state then
