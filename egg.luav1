@@ -7,7 +7,57 @@ local MainSection = MainTab:NewSection("Auto Steal Eggs")
 getgenv().AutoSteal = false
 getgenv().TweenSpeed = 65
 local LocalPlayer = game:GetService("Players").LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local autoFarmEvent = ReplicatedStorage:FindFirstChild("AutoFarmEvent") or Instance.new("RemoteEvent", ReplicatedStorage)
+autoFarmEvent.Name = "AutoFarmEvent"
 
+local runningPlayers = {}
+
+autoFarmEvent.OnServerEvent:Connect(function(player, state)
+    runningPlayers[player.UserId] = state
+
+    if state then
+        task.spawn(function()
+            while runningPlayers[player.UserId] do
+                local character = player.Character
+                local hrp = character and character:FindFirstChild("HumanoidRootPart")
+                
+                -- Tìm Base của người chơi dựa trên tên (Cần đặt tên Base = tên Player)
+                local playerBase = workspace:FindFirstChild("Bases") and workspace.Bases:FindFirstChild(player.Name)
+                local baseLocation = playerBase and (playerBase:FindFirstChild("SpawnPart") or playerBase.PrimaryPart)
+                local eggFolder = workspace:FindFirstChild("Eggs")
+
+                if hrp and baseLocation and eggFolder then
+                    for _, egg in pairs(eggFolder:GetChildren()) do
+                        if not runningPlayers[player.UserId] then break end
+
+                        local targetPart = egg:IsA("BasePart") and egg or egg.PrimaryPart
+                        if targetPart then
+                            -- 1. Dịch chuyển tức thời tới quả trứng (0s)
+                            hrp.CFrame = targetPart.CFrame + Vector3.new(0, 2, 0)
+                            
+                            -- Kích hoạt sự kiện nhặt (Touch / ProximityPrompt)
+                            local prompt = egg:FindFirstChildWhichIsA("ProximityPrompt", true)
+                            if prompt then fireproximityprompt(prompt) end
+                            
+                            task.wait(0.05) -- Dừng siêu ngắn để Server nhận diện đã chạm trứng
+
+                            -- 2. Dịch chuyển lập tức về Base của người chơi
+                            hrp.CFrame = baseLocation.CFrame + Vector3.new(0, 3, 0)
+                            
+                            task.wait(0.1) -- Thời gian nghỉ giữa mỗi lượt nhặt
+                        end
+                    end
+                end
+                task.wait(0.5)
+            end
+        end)
+    end
+end)
+
+game.Players.PlayerRemoving:Connect(function(player)
+    runningPlayers[player.UserId] = nil
+end)
 MainSection:NewToggle("Auto Steal", "Tự động nhặt trứng", function(state)
     getgenv().AutoSteal = state
     if state then
