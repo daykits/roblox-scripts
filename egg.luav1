@@ -64,3 +64,29 @@ end)
 MainSection:NewKeybind("e", "g", Enum.KeyCode.RightControl, function()
     KavoLib:ToggleUI()
 end)
+local PathfindingService = game:GetService("PathfindingService")
+
+local function walkToTarget(character, targetPart)
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    if not humanoid or not humanoidRootPart or not targetPart then return end
+
+    local path = PathfindingService:CreatePath({
+        AgentRadius = 2,
+        AgentHeight = 5,
+        AgentCanJump = true
+    })
+
+    path:ComputeAsync(humanoidRootPart.Position, targetPart.Position)
+
+    if path.Status == Enum.PathStatus.Success then
+        local waypoints = path:GetWaypoints()
+        for _, waypoint in ipairs(waypoints) do
+            if waypoint.Action == Enum.PathWaypointAction.Jump then
+                humanoid.Jump = true
+            end
+            humanoid:MoveTo(waypoint.Position)
+            humanoid.MoveToFinished:Wait()
+        end
+    end
+end
