@@ -1,0 +1,66 @@
+local KavoLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
+local Window = KavoLib.CreateLib("datdaykits Premium Hub", "DarkTheme")
+
+local MainTab = Window:NewTab("Main")
+local MainSection = MainTab:NewSection("Auto Steal Eggs")
+
+getgenv().AutoSteal = false
+getgenv().TweenSpeed = 70
+local LocalPlayer = game:GetService("Players").LocalPlayer
+
+local function startEggStealer()
+    local TweenService = game:GetService("TweenService")
+    
+    task.spawn(function()
+        while getgenv().AutoSteal do
+            local Character = LocalPlayer.Character
+            local HumanoidRootPart = Character and Character:FindFirstChild("HumanoidRootPart")
+
+            if HumanoidRootPart then
+                -- Quét toàn bộ workspace để tìm bất kỳ vật thể nào có tên chứa chữ "Egg"
+                for _, obj in pairs(workspace:GetDescendants()) do
+                    if not getgenv().AutoSteal then break end
+
+                    -- Kiểm tra xem tên vật thể có chữ Egg (không phân biệt hoa thường)
+                    if string.find(string.lower(obj.Name), "egg") then
+                        local targetPart = nil
+
+                        if obj:IsA("BasePart") then
+                            targetPart = obj
+                        elseif obj:IsA("Model") and obj.PrimaryPart then
+                            targetPart = obj.PrimaryPart
+                        elseif obj:IsA("Model") then
+                            targetPart = obj:FindFirstChildWhichIsA("BasePart")
+                        end
+
+                        if targetPart then
+                            local distance = (HumanoidRootPart.Position - targetPart.Position).Magnitude
+                            
+                            -- Giới hạn khoảng cách hợp lý để tránh bị lỗi nhảy vị trí quá xa
+                            if distance > 2 and distance < 2000 then
+                                local tweenInfo = TweenInfo.new(distance / getgenv().TweenSpeed, Enum.EasingStyle.Linear)
+                                local tween = TweenService:Create(HumanoidRootPart, tweenInfo, {CFrame = targetPart.CFrame})
+
+                                tween:Play()
+                                tween.Completed:Wait()
+                                task.wait(0.2) -- Thời gian dừng lại 0.2s để game nhận diện đã nhặt trứng
+                            end
+                        end
+                    end
+                end
+            end
+            task.wait(0.5)
+        end
+    end)
+end
+
+MainSection:NewToggle("Auto Steal", "Tự động nhặt trứng", function(state)
+    getgenv().AutoSteal = state
+    if state then
+        startEggStealer()
+    end
+end)
+
+MainSection:NewKeybind("e", "g", Enum.KeyCode.RightControl, function()
+    KavoLib:ToggleUI()
+end)
