@@ -5,6 +5,7 @@ local MainTab = Window:NewTab("Main")
 local MainTab = Window:NewTab("fram")
 local MainSection = MainTab:NewSection("Auto Steal Eggs")
 local MainSection = framTab:NewSection("Auto Fram Lever")
+local FramTab = Window:NewTab("fram")
 
 getgenv().AutoSteal = false
 getgenv().TweenSpeed = 65
