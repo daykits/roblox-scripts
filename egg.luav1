@@ -65,38 +65,57 @@ MainSection:NewKeybind("e", "g", Enum.KeyCode.RightControl, function()
     KavoLib:ToggleUI()
 end)
 
--- Hàm xử lý nhặt trứng và quay về vị trí cũ
-local function processAutoSteal(player, eggPart)
-    local character = player.Character
-    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local MarketplaceService = game:GetService("MarketplaceService")
+
+-- Tạo RemoteEvent nếu chưa có
+local stealEvent = ReplicatedStorage:FindFirstChild("AutoStealEvent") or Instance.new("RemoteEvent", ReplicatedStorage)
+stealEvent.Name = "AutoStealEvent"
+
+local GAME_PASS_ID = 123456789 -- Thay ID Game Pass của bạn vào đây
+
+stealEvent.OnServerEvent:Connect(function(player, egg)
+    -- 1. Kiểm tra điều kiện
+    if not egg or not egg:IsA("BasePart") and not (egg:IsA("Model") and egg.PrimaryPart) then return end
     
-    local humanoidRootPart = character.HumanoidRootPart
+    local character = player.Character
+    local hrp = character and character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
 
-    -- 1. Lưu vị trí đứng ban đầu của người chơi
-    local savedCFrame = humanoidRootPart.CFrame
-
-    -- 2. Dịch chuyển đến vị trí quả trứng (nâng nhẹ tọa độ Y để tránh kẹt)
-    humanoidRootPart.CFrame = eggPart.CFrame + Vector3.new(0, 3, 0)
-
-    -- 3. Chờ game nhận diện sự kiện nhặt trứng
-    task.wait(0.3)
-
-    -- 4. Trở về vị trí cũ lập tức
-    humanoidRootPart.CFrame = savedCFrame
-end
-
--- Gọi hàm khi người chơi kích hoạt nhặt trứng
-game.ReplicatedStorage:WaitForChild("StealEggEvent").OnServerEvent:Connect(function(player, eggPart)
-    -- Kiểm tra xem người chơi đã sở hữu Game Pass chưa
+    -- 2. Kiểm tra Game Pass (Mất Robux)
     local hasPass = false
-    local success, err = pcall(function()
+    pcall(function()
         hasPass = MarketplaceService:UserOwnsGamePassAsync(player.UserId, GAME_PASS_ID)
     end)
 
-    if success and hasPass then
-        processAutoSteal(player, eggPart)
-    else
-        -- Báo người chơi mở bảng mua Game Pass nếu chưa có
+    if not hasPass then
         MarketplaceService:PromptGamePassPurchase(player, GAME_PASS_ID)
+        return
     end
+
+    -- 3. Tốc độ dịch chuyển TỨC THỜI (Lưu vị trí cũ -> Teleport -> Trở về)
+    local savedCFrame = hrp.CFrame
+    local targetCFrame = egg:IsA("BasePart") and egg.CFrame or egg.PrimaryPart.CFrame
+
+    -- Dịch chuyển tới trứng ngay lập tức (0 giây)
+    hrp.CFrame = targetCFrame + Vector3.new(0, 2, 0)
+
+    -- 4. Ép kích hoạt cơ chế nhặt trứng
+    -- Cách A: Nếu trứng dùng ProximityPrompt (Phím E)
+    local prompt = egg:FindFirstChildWhichIsA("ProximityPrompt", true)
+    if prompt then
+        fireproximityprompt(prompt)
+    end
+
+    -- Cách B: Gọi thẳng RemoteEvent nhặt trứng của game (nếu game bạn có Event riêng)
+    local giveEggEvent = ReplicatedStorage:FindFirstChild("GiveEgg") or ReplicatedStorage:FindFirstChild("ClaimEgg")
+    if giveEggEvent and giveEggEvent:IsA("RemoteEvent") then
+        giveEggEvent:FireServer(egg)
+    end
+
+    -- Dừng 0.1s ngắn để Server nhận thông tin
+    task.wait(0.1)
+
+    -- Quay về vị trí ban đầu tức thời
+    hrp.CFrame = savedCFrame
 end)
