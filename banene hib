@@ -1,4 +1,7 @@
-local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/shlexware/Orion/main/source')))()
+repeat task.wait() until game:IsLoaded()
+
+local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/jensonhirst/Orion/main/source')))()
+
 local Window = OrionLib:MakeWindow({
     Name = "Banana Cat Hub 🍌🐱", 
     HidePremium = false, 
@@ -6,7 +9,6 @@ local Window = OrionLib:MakeWindow({
     ConfigFolder = "BananaCatHub"
 })
 
--- Tab Tự động (Auto)
 local MainTab = Window:MakeTab({
     Name = "Trang chính",
     Icon = "rbxassetid://4483345998",
@@ -25,25 +27,11 @@ MainTab:AddToggle({
         task.spawn(function()
             while _G.AutoAttack do
                 task.wait(0.1)
-                -- Chèn mã logic đánh quái tại đây
             end
         end)
     end    
 })
 
-MainTab:AddButton({
-    Name = "Nhận thưởng / Nhiệm vụ",
-    Callback = function()
-        OrionLib:MakeNotification({
-            Name = "Banana Cat Hub",
-            Content = "Đã thực hiện lệnh nhận thưởng!",
-            Image = "rbxassetid://4483345998",
-            Time = 3
-        })
-    end    
-})
-
--- Tab Chỉ số nhân vật
 local PlayerTab = Window:MakeTab({
     Name = "Nhân vật",
     Icon = "rbxassetid://4483345998",
@@ -80,7 +68,6 @@ PlayerTab:AddSlider({
     end    
 })
 
--- Tab Tiện ích
 local MiscTab = Window:MakeTab({
     Name = "Cài đặt",
     Icon = "rbxassetid://4483345998",
@@ -88,7 +75,7 @@ local MiscTab = Window:MakeTab({
 })
 
 MiscTab:AddButton({
-    Name = "Đóng Menu",
+    Name = "Tắt Menu",
     Callback = function()
         OrionLib:Destroy()
     end    
