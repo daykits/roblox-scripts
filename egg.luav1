@@ -1,12 +1,11 @@
 local KavoLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
 local Window = KavoLib.CreateLib("datdaykits Premium Hub", "DarkTheme")
 
--- Khởi tạo các biến toàn cục tiêu chuẩn hệ thống
 _G.AutoSteal = false
-_G.TweenSpeed = 70
+_G.TweenSpeed = 80
 local LocalPlayer = game:GetService("Players").LocalPlayer
 
--- Thuật toán tự động tìm kiếm vị trí và nhặt mọi quả trứng trong game Steal An Egg
+-- Thuật toán cướp trứng siêu tốc dựa vào TouchInterest (Vùng chạm vật phẩm)
 local function startEggStealer()
     local TweenService = game:GetService("TweenService")
     
@@ -16,75 +15,64 @@ local function startEggStealer()
             local RootPart = Character and Character:FindFirstChild("HumanoidRootPart")
             
             if RootPart then
-                -- Quét toàn bộ các đối tượng trong Workspace để tìm trứng dựa trên thuộc tính hình khối công khai
+                -- Quét sâu vào hệ thống để tìm mọi thứ người chơi có thể chạm vào nhặt
                 for _, obj in pairs(workspace:GetDescendants()) do
                     if not _G.AutoSteal then break end
                     
-                    -- Nhận diện quả trứng qua tên gọi thông dụng của tựa game này
-                    if obj.Name == "Egg" or obj.Name == "SpawnedEgg" or obj:Scroll("TouchInterest") or string.find(string.lower(obj.Name), "egg") then
-                        local targetPart = nil
-                        if obj:IsA("BasePart") then
-                            targetPart = obj
-                        elseif obj:IsA("Model") and obj.PrimaryPart then
-                            targetPart = obj.PrimaryPart
-                        elseif obj:IsA("Model") then
-                            targetPart = obj:FindFirstChildWhichIsA("BasePart")
-                        end
+                    -- Nếu vật thể có chức năng "TouchInterest" (Vùng chạm để nhặt trứng/vật phẩm)
+                    if obj:IsA("TouchTransmitter") or obj.Name == "TouchInterest" then
+                        local eggPart = obj.Parent
                         
-                        -- Nếu tìm thấy tọa độ quả trứng, tiến hành di chuyển mượt mà đến nhặt
-                        if targetPart and targetPart.Parent then
-                            local distance = (RootPart.Position - targetPart.Position).Magnitude
+                        if eggPart homework and eggPart:IsA("BasePart") then
+                            local distance = (RootPart.Position - eggPart.Position).Magnitude
                             
-                            -- Bỏ qua nếu khoảng cách quá xa (tránh bị lỗi kẹt map hoặc văng game)
-                            if distance > 1 and distance < 2000 then
+                            -- Khoảng cách an toàn để cướp trứng mượt mà
+                            if distance > 2 and distance < 1500 then
                                 local duration = distance / _G.TweenSpeed
                                 local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
-                                local tween = TweenService:Create(RootPart, tweenInfo, {CFrame = targetPart.CFrame})
+                                local tween = TweenService:Create(RootPart, tweenInfo, {CFrame = eggPart.CFrame})
                                 tween:Play()
                                 tween.Completed:Wait()
-                                task.wait(0.1) -- Nghỉ ngắn để Server xử lý lệnh nhận trứng
+                                task.wait(0.05) -- Tốc độ nhặt cực nhanh
                             end
                         end
                     end
                 end
             end
-            task.wait(0.5)
+            task.wait(0.3)
         end
     end)
 end
 
--- ==================== KHỞI TẠO MENU GIAO DIỆN (SỬA LỖI HIỂN THỊ) ====================
--- Tạo Tab chính
+-- ==================== KHỞI TẠO MENU GIAO DIỆN ====================
 local MainTab = Window:NewTab("Main Features")
--- Tạo Khung chứa chức năng bắt buộc bên trong Tab
 local MainSection = MainTab:NewSection("Egg Automation")
 
--- 1. Công tắc Bật/Tắt Auto Steal Eggs (Hiện đầy đủ nút gạt On/Off)
-MainSection:NewToggle("Auto Steal Eggs", "Tự động bay đến nhặt sạch trứng xung quanh bản đồ", function(state)
+-- Công tắc cướp trứng
+MainSection:NewToggle("Auto Steal Eggs", "Tự động bay đến nhặt mọi loại trứng trên bản đồ", function(state)
     _G.AutoSteal = state
     if state then
         startEggStealer()
     end
 end)
 
--- 2. Thanh trượt tăng giảm tốc độ nhặt trứng
-MainSection:NewSlider("Steal Speed", "Điều chỉnh tốc độ bay (Khuyên dùng: 60-80)", 150, 20, function(v)
+-- Thanh chỉnh tốc độ cướp trứng
+MainSection:NewSlider("Steal Speed", "Tốc độ di chuyển", 150, 20, function(v)
     _G.TweenSpeed = v
 end)
 
--- Tạo Tab cài đặt nhân vật phụ
 local PlayerTab = Window:NewTab("Player Options")
 local PlayerSection = PlayerTab:NewSection("Character Hacks")
 
--- 3. Thanh chỉnh tốc độ Chạy nhanh
-PlayerSection:NewSlider("WalkSpeed (Tốc độ chạy)", "Thay đổi tốc độ chạy của bạn", 200, 16, function(v)
+-- Chạy nhanh
+PlayerSection:NewSlider("WalkSpeed (Tốc độ chạy)", "Thay đổi tốc độ chạy", 200, 16, function(v)
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
         LocalPlayer.Character.Humanoid.WalkSpeed = v
     end
 end)
 
--- 4. Thanh chỉnh lực nhảy cao
-PlayerSection:NewSlider("JumpPower (Lực nhảy)", "Thay đổi độ cao khi nhảy", 300, 50, function(v)
+-- Nhảy cao
+PlayerSection:NewSlider("JumpPower (Lực nhảy)", "Thay đổi lực nhảy", 300, 50, function(v)
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
         LocalPlayer.Character.Humanoid.JumpPower = v
     end
