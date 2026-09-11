@@ -65,24 +65,41 @@ MainSection:NewKeybind("e", "g", Enum.KeyCode.RightControl, function()
     KavoLib:ToggleUI()
 end)
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local autoStealEvent = ReplicatedStorage:WaitForChild("AutoStealEvent")
+local autoStealEvent = ReplicatedStorage:FindFirstChild("AutoStealEvent") or Instance.new("RemoteEvent", ReplicatedStorage)
+autoStealEvent.Name = "AutoStealEvent"
 
-local isAutoStealing = true -- Bật/Tắt tính năng
+autoStealEvent.OnServerEvent:Connect(function(player, egg)
+    if not egg or not egg.Parent then return end
+    
+    local character = player.Character
+    local hrp = character and character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
 
-task.spawn(function()
-    while true do
-        if isAutoStealing then
-            -- Tìm các quả trứng trong Workspace
-            for _, obj in pairs(workspace:GetDescendants()) do
-                if not isAutoStealing then break end
-                
-                -- Tìm các vật thể có tên chứa chữ "Egg" hoặc "Trung"
-                if string.find(string.lower(obj.Name), "egg") or string.find(string.lower(obj.Name), "trung") then
-                    autoStealEvent:FireServer(obj)
-                    task.wait(0.1) -- Khoảng nghỉ giữa mỗi lần nhặt trứng
-                end
-            end
-        end
-        task.wait(0.5)
+    -- Lấy vị trí CFrame của quả trứng
+    local targetCFrame = nil
+    if egg:IsA("BasePart") then
+        targetCFrame = egg.CFrame
+    elseif egg:IsA("Model") then
+        targetCFrame = egg:GetPivot()
     end
+
+    if not targetCFrame then return end
+
+    -- 1. Lưu vị trí cũ
+    local savedCFrame = hrp.CFrame
+
+    -- 2. Dịch chuyển tức thời tới trứng
+    hrp.CFrame = targetCFrame + Vector3.new(0, 2, 0)
+
+    -- 3. Kích hoạt nút nhặt phím E (nếu trứng dùng ProximityPrompt)
+    local prompt = egg:FindFirstChildWhichIsA("ProximityPrompt", true)
+    if prompt then
+        fireproximityprompt(prompt)
+    end
+
+    -- 4. Chờ 0.05s để game ghi nhận nhặt thành công
+    task.wait(0.05)
+
+    -- 5. Trở về vị trí ban đầu lập tức
+    hrp.CFrame = savedCFrame
 end)
