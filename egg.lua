@@ -1,47 +1,54 @@
-local OrionLib = loadstring(game:HttpGet(('https://githubusercontent.com')))()
-local Window = OrionLib:MakeWindow({Name = "datdaykits Hub", HidePremium = false, SaveConfig = true, ConfigFolder = "RobloxScriptConfig"})
+local KavoLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
+local Window = KavoLib.CreateLib("datdaykits Premium Hub", "DarkTheme")
+
+local MainTab = Window:NewTab("Main")
+local MainSection = MainTab:NewSection("Auto Steal Eggs")
+
 getgenv().AutoSteal = false
-getgenv().TweenSpeed = 50
-local function startTweenSteal()
+getgenv().TweenSpeed = 65
+local LocalPlayer = game:GetService("Players").LocalPlayer
+
+local function startEggStealer()
     local TweenService = game:GetService("TweenService")
-    local Players = game:GetService("Players")
-    local LocalPlayer = Players.LocalPlayer
-    local EggFolder = workspace:FindFirstChild("Eggs") or workspace 
+    
     task.spawn(function()
         while getgenv().AutoSteal do
+            local EggHolder = workspace:FindFirstChild("Eggs") 
+                or workspace:FindFirstChild("EggFolder") 
+                or workspace:FindFirstChild("SpawnedEggs")
+
             local Character = LocalPlayer.Character
             local HumanoidRootPart = Character and Character:FindFirstChild("HumanoidRootPart")
-            if HumanoidRootPart and EggFolder then
-                for _, egg in pairs(EggFolder:GetChildren()) do
-                    if getgenv().AutoSteal == false then break end
+
+            if HumanoidRootPart and EggHolder then
+                for _, egg in pairs(EggHolder:GetChildren()) do
+                    if not getgenv().AutoSteal then break end
+
                     if egg:IsA("BasePart") or (egg:IsA("Model") and egg.PrimaryPart) then
                         local targetCFrame = egg:IsA("BasePart") and egg.CFrame or egg.PrimaryPart.CFrame
                         local distance = (HumanoidRootPart.Position - targetCFrame.Position).Magnitude
-                        local duration = distance / getgenv().TweenSpeed
-                        local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
+
+                        local tweenInfo = TweenInfo.new(distance / getgenv().TweenSpeed, Enum.EasingStyle.Linear)
                         local tween = TweenService:Create(HumanoidRootPart, tweenInfo, {CFrame = targetCFrame})
+
                         tween:Play()
                         tween.Completed:Wait()
-                        task.wait(0.2)
                     end
                 end
             end
-            task.wait(0.5)
+            task.wait(0.1)
         end
     end)
 end
-local MainTab = Window:MakeTab({Name = "Main Hack", Icon = "rbxassetid://4483345998", Premium = false})
-MainTab:AddToggle({
-    Name = "Auto Collect Eggs (Tween)",
-    Default = false,
-    Callback = function(Value)
-        getgenv().AutoSteal = Value
-        if Value then startTweenSteal() end
-    end    
-})
-MainTab:AddSlider({
-    Name = "Tween Speed",
-    Min = 10, Max = 150, Default = 50, Color = Color3.fromRGB(255,255,255), Increment = 5, ValueName = "Speed",
-    Callback = function(Value) getgenv().TweenSpeed = Value end    
-})
-OrionLib:Init()
+
+MainSection:NewToggle("Auto Steal", "Tự động nhặt trứng", function(state)
+    getgenv().AutoSteal = state
+    if state then
+        startEggStealer()
+    end
+end)
+
+-- Phím tắt để Ẩn/Hiện Menu (mặc định là phím RightControl bên phải bàn phím)
+MainSection:NewKeybind("g", "f", Enum.KeyCode.RightControl, function()
+    KavoLib:ToggleUI()
+end)
