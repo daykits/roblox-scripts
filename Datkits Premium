@@ -5,7 +5,7 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Window = Rayfield:CreateWindow({
    Name = "Datkits Premium 🍌🐱 | Blox Fruits",
    LoadingTitle = "Datkits Premium",
-   LoadingSubtitle = "Auto Farm Võ + Fast Attack & Auto Chest",
+   LoadingSubtitle = "Fix 100% Auto Attack & Fast Attack",
    ConfigurationSaving = {
       Enabled = true,
       FolderName = "BananaCatConfig",
@@ -15,7 +15,7 @@ local Window = Rayfield:CreateWindow({
    KeySystem = false
 })
 
--- Anti-AFK (Chống văng game)
+-- Anti-AFK (Chống treo máy văng game)
 game:GetService("Players").LocalPlayer.Idled:Connect(function()
     game:GetService("VirtualUser"):Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
     task.wait(1)
@@ -23,57 +23,34 @@ game:GetService("Players").LocalPlayer.Idled:Connect(function()
 end)
 
 local MainTab = Window:CreateTab("Auto Farm", 4483345998)
-
 MainTab:CreateSection("Cài Đặt Tấn Công")
 
+_G.AutoFarm = false
 _G.FastAttack = false
 
-MainTab:CreateToggle({
-   Name = "Bật Fast Attack (Đánh Siêu Nhanh)",
-   CurrentValue = false,
-   Flag = "ToggleFastAttack",
-   Callback = function(Value)
-      _G.FastAttack = Value
-      task.spawn(function()
-          while _G.FastAttack do
-              task.wait()
-              pcall(function()
-                  local player = game.Players.LocalPlayer
-                  local character = player.Character
-                  if character then
-                      local tool = character:FindFirstChildOfClass("Tool")
-                      if tool then
-                          -- Spam đòn đánh 5 lần liên tiếp trong 1 khung hình
-                          for i = 1, 5 do
-                              tool:Activate()
-                              game:GetService("VirtualUser"):Button1Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-                              game:GetService("VirtualUser"):Button1Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-                          end
-                      end
-                  end
-              end)
-          end
-      end)
-   end,
-})
-
-MainTab:CreateSection("Tự Động Cày Quái Bằng Võ (Melee)")
-
-_G.AutoFarm = false
-
--- Hàm lọc và cầm Võ chính xác
+-- Hàm cầm Võ chuẩn (chỉ cầm 1 lần, không reset liên tục)
 local function EquipMeleeWeapon()
     local player = game.Players.LocalPlayer
     local char = player.Character
     if not char then return nil end
 
-    -- Đã cầm Võ trên tay
+    -- Nếu đã cầm đúng Võ trên tay thì giữ nguyên
     local currentTool = char:FindFirstChildOfClass("Tool")
-    if currentTool and (currentTool.ToolTip == "Melee" or currentTool:FindFirstChild("Combat") or currentTool.Name:find("Combat")) then
-        return currentTool
+    if currentTool then
+        if currentTool.ToolTip == "Melee" 
+        or currentTool:FindFirstChild("Combat") 
+        or currentTool.Name:find("Combat") 
+        or currentTool.Name:find("Step") 
+        or currentTool.Name:find("Karate") 
+        or currentTool.Name:find("Dragon") 
+        or currentTool.Name:find("Electric") 
+        or currentTool.Name:find("God") 
+        or currentTool.Name:find("Claw") then
+            return currentTool
+        end
     end
 
-    -- Tìm Võ trong Balo
+    -- Tìm và cầm Võ từ Balo (chỉ thực hiện khi chưa cầm)
     for _, tool in pairs(player.Backpack:GetChildren()) do
         if tool:IsA("Tool") then
             if tool.ToolTip == "Melee" 
@@ -86,6 +63,7 @@ local function EquipMeleeWeapon()
             or tool.Name:find("God") 
             or tool.Name:find("Claw") then
                 char.Humanoid:EquipTool(tool)
+                task.wait(0.1)
                 return tool
             end
         end
@@ -94,10 +72,54 @@ local function EquipMeleeWeapon()
     local firstTool = player.Backpack:FindFirstChildOfClass("Tool")
     if firstTool then
         char.Humanoid:EquipTool(firstTool)
+        task.wait(0.1)
         return firstTool
     end
-    return currentTool
 end
+
+-- Hàm thực thi đòn đánh đa tầng (VIM + VirtualUser + Remote)
+local VIM = game:GetService("VirtualInputManager")
+local VirtualUser = game:GetService("VirtualUser")
+
+local function ExecuteAttack()
+    pcall(function()
+        local char = game.Players.LocalPlayer.Character
+        if not char then return end
+        
+        local tool = char:FindFirstChildOfClass("Tool")
+        if tool then
+            -- 1. Kích hoạt trực tiếp Tool
+            tool:Activate()
+
+            -- 2. Mô phỏng Click chuột qua VirtualInputManager
+            VIM:SendMouseButtonEvent(500, 500, 0, true, game, 1)
+            VIM:SendMouseButtonEvent(500, 500, 0, false, game, 1)
+
+            -- 3. Click dự phòng qua VirtualUser
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton1(Vector2.new(500, 500))
+
+            -- 4. Gửi Remote Attack nếu game hỗ trợ
+            local net = game:GetService("ReplicatedStorage"):FindFirstChild("Modules") 
+                        and game.ReplicatedStorage.Modules:FindFirstChild("Net")
+            if net then
+                local regAttack = net:FindFirstChild("RE/RegisterAttack")
+                if regAttack then
+                    regAttack:FireServer()
+                end
+            end
+        end
+    end)
+end
+
+MainTab:CreateToggle({
+   Name = "Bật Fast Attack (Đánh Siêu Nhanh)",
+   CurrentValue = false,
+   Flag = "ToggleFastAttack",
+   Callback = function(Value)
+      _G.FastAttack = Value
+   end,
+})
 
 MainTab:CreateToggle({
    Name = "Bật Auto Farm bằng Võ (Melee)",
@@ -105,12 +127,13 @@ MainTab:CreateToggle({
    Flag = "ToggleFarmMelee",
    Callback = function(Value)
       _G.AutoFarm = Value
-      
-      -- Tự động Noclip chống dính quái
+
+      -- Vòng lặp 1: Luôn giữ Noclip và trang bị Võ
       task.spawn(function()
           while _G.AutoFarm do
-              task.wait()
+              task.wait(0.2)
               pcall(function()
+                  EquipMeleeWeapon()
                   if game.Players.LocalPlayer.Character then
                       for _, part in pairs(game.Players.LocalPlayer.Character:GetChildren()) do
                           if part:IsA("BasePart") then
@@ -122,7 +145,19 @@ MainTab:CreateToggle({
           end
       end)
 
-      -- Vòng lặp Farm
+      -- Vòng lặp 2: Tự động Tấn công liên tục
+      task.spawn(function()
+          while _G.AutoFarm do
+              if _G.FastAttack then
+                  task.wait(0.01) -- Đánh siêu nhanh
+              else
+                  task.wait(0.15) -- Đánh tốc độ thường
+              end
+              ExecuteAttack()
+          end
+      end)
+
+      -- Vòng lặp 3: Dịch chuyển áp sát quái
       task.spawn(function()
           while _G.AutoFarm do
               task.wait()
@@ -130,13 +165,8 @@ MainTab:CreateToggle({
                   local player = game.Players.LocalPlayer
                   local character = player.Character or player.CharacterAdded:Wait()
                   local hrp = character:FindFirstChild("HumanoidRootPart")
-                  
                   if not hrp then return end
 
-                  -- Cầm Võ
-                  EquipMeleeWeapon()
-
-                  -- Tìm quái gần nhất
                   local nearestMob = nil
                   local minDistance = math.huge
                   
@@ -152,26 +182,10 @@ MainTab:CreateToggle({
                       end
                   end
 
-                  -- Teleport & Đánh quái
                   if nearestMob then
-                      repeat
-                          task.wait()
-                          if not _G.AutoFarm or not nearestMob or not nearestMob:FindFirstChild("Humanoid") or nearestMob.Humanoid.Health <= 0 then break end
-                          
-                          hrp.CFrame = nearestMob.HumanoidRootPart.CFrame * CFrame.new(0, 4, 0) * CFrame.Angles(math.rad(-90), 0, 0)
-                          
-                          -- Nếu không bật Fast Attack thì đánh theo tốc độ thường
-                          if not _G.FastAttack then
-                              local equippedTool = character:FindFirstChildOfClass("Tool")
-                              if equippedTool then
-                                  equippedTool:Activate()
-                              end
-                              game:GetService("VirtualUser"):Button1Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-                              task.wait(0.05)
-                              game:GetService("VirtualUser"):Button1Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-                          end
-                          
-                      until not _G.AutoFarm or not nearestMob or nearestMob.Humanoid.Health <= 0
+                      -- Quay mặt và giữ cự ly 3 studs chính xác trước mặt quái
+                      local mobPos = nearestMob.HumanoidRootPart.Position
+                      hrp.CFrame = CFrame.new(mobPos + Vector3.new(0, 1, 3), mobPos)
                   end
               end)
           end
