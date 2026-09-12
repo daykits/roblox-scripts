@@ -5,7 +5,7 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Window = Rayfield:CreateWindow({
    Name = "Banana Cat Hub 🍌🐱 | Blox Fruits",
    LoadingTitle = "Banana Cat Hub",
-   LoadingSubtitle = "Fix Đơ Chuột & Fix Fast Attack 100%",
+   LoadingSubtitle = "Auto Quest Sea 1 + Fast Attack + Auto Chest",
    ConfigurationSaving = {
       Enabled = true,
       FolderName = "BananaCatConfig",
@@ -27,10 +27,10 @@ local MainTab = Window:CreateTab("Auto Farm", 4483345998)
 MainTab:CreateSection("Cài Đặt Tấn Công & Fast Attack")
 
 _G.AutoFarm = false
+_G.AutoQuest = false
 _G.FastAttack = true
-_G.FarmDistance = 5 -- Độ cao an toàn chuẩn (5 studs) vừa tầm võ
+_G.FarmDistance = 5 -- Độ cao an toàn có dame (5 studs)
 
--- Thanh trượt chỉnh độ cao
 MainTab:CreateSlider({
    Name = "Độ cao lơ lửng trên đầu quái",
    Range = {3, 10},
@@ -52,7 +52,76 @@ MainTab:CreateToggle({
    end,
 })
 
-MainTab:CreateSection("Tự Động Cày Quái Bằng Võ (Melee)")
+MainTab:CreateSection("Hệ Thống Cày Level Sea 1")
+
+-- Danh sách dữ liệu Quest Sea 1 theo Level
+local function GetSea1QuestData()
+    local level = game.Players.LocalPlayer.Data.Level.Value
+    local questName, questLevel, mobName, npcCFrame
+    
+    if level >= 1 and level <= 9 then
+        questName, questLevel, mobName = "BanditQuest", 1, "Bandit"
+        npcCFrame = CFrame.new(1059.37, 16.51, 1549.26)
+    elseif level >= 10 and level <= 14 then
+        questName, questLevel, mobName = "JungleQuest", 1, "Monkey"
+        npcCFrame = CFrame.new(-1598.08, 36.85, 153.38)
+    elseif level >= 15 and level <= 29 then
+        questName, questLevel, mobName = "JungleQuest", 2, "Gorilla"
+        npcCFrame = CFrame.new(-1598.08, 36.85, 153.38)
+    elseif level >= 30 and level <= 39 then
+        questName, questLevel, mobName = "BuggyQuest1", 1, "Pirate"
+        npcCFrame = CFrame.new(-1140.17, 4.75, 3827.41)
+    elseif level >= 40 and level <= 59 then
+        questName, questLevel, mobName = "BuggyQuest1", 2, "Brute"
+        npcCFrame = CFrame.new(-1140.17, 4.75, 3827.41)
+    elseif level >= 60 and level <= 89 then
+        questName, questLevel, mobName = "DesertQuest", 1, "Desert Bandit"
+        npcCFrame = CFrame.new(894.49, 6.44, 4384.58)
+    elseif level >= 90 and level <= 119 then
+        questName, questLevel, mobName = "SnowQuest", 1, "Snow Bandit"
+        npcCFrame = CFrame.new(1385.84, 87.27, -1298.61)
+    elseif level >= 120 and level <= 149 then
+        questName, questLevel, mobName = "MarineQuest2", 1, "Chief Petty Officer"
+        npcCFrame = CFrame.new(-5039.59, 28.65, 4324.78)
+    elseif level >= 150 and level <= 189 then
+        questName, questLevel, mobName = "SkyQuest", 1, "Sky Bandit"
+        npcCFrame = CFrame.new(-4839.53, 717.67, -2629.09)
+    elseif level >= 190 and level <= 224 then
+        questName, questLevel, mobName = "PrisonerQuest", 1, "Prisoner"
+        npcCFrame = CFrame.new(530.81, 1.66, 474.98)
+    elseif level >= 225 and level <= 299 then
+        questName, questLevel, mobName = "ColosseumQuest", 1, "Toga Warrior"
+        npcCFrame = CFrame.new(-1588.34, 7.39, -2986.48)
+    elseif level >= 300 and level <= 374 then
+        questName, questLevel, mobName = "MagmaQuest", 1, "Military Soldier"
+        npcCFrame = CFrame.new(-5313.37, 8.58, 8515.29)
+    elseif level >= 375 and level <= 449 then
+        questName, questLevel, mobName = "FishmanQuest", 1, "Fishman Warrior"
+        npcCFrame = CFrame.new(61163.85, 18.5, 1569.26)
+    elseif level >= 450 and level <= 524 then
+        questName, questLevel, mobName = "SkyQuest2", 1, "God's Guard"
+        npcCFrame = CFrame.new(-7861.34, 5545.49, -380.29)
+    elseif level >= 525 and level <= 624 then
+        questName, questLevel, mobName = "SkyQuest2", 2, "Shandian"
+        npcCFrame = CFrame.new(-7861.34, 5545.49, -380.29)
+    elseif level >= 625 then
+        questName, questLevel, mobName = "FountainQuest", 1, "Galley Pirate"
+        npcCFrame = CFrame.new(5259.82, 38.5, 4050.03)
+    end
+    return questName, questLevel, mobName, npcCFrame
+end
+
+-- Hàm kiểm tra xem nhân vật đã nhận Quest chưa
+local function HasQuest()
+    local player = game.Players.LocalPlayer
+    if player and player:FindFirstChild("PlayerGui") and player.PlayerGui:FindFirstChild("Main") then
+        local questGui = player.PlayerGui.Main:FindFirstChild("Quest")
+        if questGui and questGui.Visible then
+            return true
+        end
+    end
+    return false
+end
 
 -- Hàm trang bị Võ an toàn
 local function EquipMeleeWeapon()
@@ -94,11 +163,11 @@ local function EquipMeleeWeapon()
     end
 end
 
--- LUỒNG TẤN CÔNG ĐỘC LẬP (KHÔNG DÙNG VIRTUAL INPUT -> KHÔNG KHÓA CHUỘT)
+-- LUỒNG FAST ATTACK VÀ TRUYỀN DAME
 task.spawn(function()
     while true do
         task.wait(_G.FastAttack and 0.05 or 0.2)
-        if _G.AutoFarm then
+        if _G.AutoFarm or _G.AutoQuest then
             pcall(function()
                 local player = game.Players.LocalPlayer
                 local char = player.Character
@@ -106,19 +175,15 @@ task.spawn(function()
 
                 local tool = char:FindFirstChildOfClass("Tool")
                 if tool and tool:IsA("Tool") then
-                    -- Kích hoạt đòn đánh bằng vũ khí
                     tool:Activate()
 
-                    -- Gửi tín hiệu Remote Server an toàn (chỉ gửi khi có quái)
                     local rep = game:GetService("ReplicatedStorage")
                     local net = rep:FindFirstChild("Modules") and rep.Modules:FindFirstChild("Net")
                     if net then
                         local regAttack = net:FindFirstChild("RE/RegisterAttack")
                         local regHit = net:FindFirstChild("RE/RegisterHit")
                         
-                        if regAttack then 
-                            regAttack:FireServer(0) 
-                        end
+                        if regAttack then regAttack:FireServer(0) end
                         
                         if regHit and workspace:FindFirstChild("Enemies") then
                             for _, enemy in pairs(workspace.Enemies:GetChildren()) do
@@ -137,14 +202,96 @@ task.spawn(function()
     end
 end)
 
+-- TÍNH NĂNG AUTO QUEST SEA 1
 MainTab:CreateToggle({
-   Name = "Bật Auto Farm bằng Võ (Tự Đánh + Có Dame)",
+   Name = "Bật Auto Quest Sea 1 (Tự Nhận Quest + Cày Level)",
+   CurrentValue = false,
+   Flag = "ToggleAutoQuest",
+   Callback = function(Value)
+      _G.AutoQuest = Value
+
+      -- Luồng giữ Võ và Noclip
+      task.spawn(function()
+          while _G.AutoQuest do
+              task.wait(0.3)
+              pcall(function()
+                  EquipMeleeWeapon()
+                  local char = game.Players.LocalPlayer.Character
+                  if char then
+                      for _, part in pairs(char:GetChildren()) do
+                          if part:IsA("BasePart") then
+                              part.CanCollide = false
+                          end
+                      end
+                  end
+              end)
+          end
+      end)
+
+      -- Luồng Auto Nhận Quest và Đánh Quái Quest
+      task.spawn(function()
+          while _G.AutoQuest do
+              task.wait()
+              pcall(function()
+                  local player = game.Players.LocalPlayer
+                  local character = player.Character
+                  if not character then return end
+                  local hrp = character:FindFirstChild("HumanoidRootPart")
+                  if not hrp then return end
+
+                  local questName, questLevel, mobName, npcCFrame = GetSea1QuestData()
+
+                  -- BƯỚC 1: Nếu chưa có Quest -> Bay đến NPC lấy Quest
+                  if not HasQuest() then
+                      if npcCFrame then
+                          local distToNPC = (hrp.Position - npcCFrame.Position).Magnitude
+                          if distToNPC > 15 then
+                              hrp.CFrame = npcCFrame
+                          else
+                              -- Gửi lệnh nhận Quest đến Server
+                              game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("StartQuest", questName, questLevel)
+                              task.wait(0.5)
+                          end
+                      end
+                  -- BƯỚC 2: Nếu đã có Quest -> Tìm quái nhiệm vụ và đánh
+                  else
+                      local targetMob = nil
+                      local minDist = math.huge
+
+                      if workspace:FindFirstChild("Enemies") then
+                          for _, enemy in pairs(workspace.Enemies:GetChildren()) do
+                              if enemy and enemy.Name == mobName and enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 and enemy:FindFirstChild("HumanoidRootPart") then
+                                  local dist = (hrp.Position - enemy.HumanoidRootPart.Position).Magnitude
+                                  if dist < minDist then
+                                      minDist = dist
+                                      targetMob = enemy
+                                  end
+                              end
+                          end
+                      end
+
+                      if targetMob and targetMob:FindFirstChild("HumanoidRootPart") then
+                          local mobPos = targetMob.HumanoidRootPart.Position
+                          local height = _G.FarmDistance or 5
+                          
+                          -- Lơ lửng 5 studs trên đầu quái Quest
+                          hrp.CFrame = CFrame.new(mobPos + Vector3.new(0, height, 0), mobPos)
+                          targetMob.HumanoidRootPart.CanCollide = false
+                      end
+                  end
+              end)
+          end
+      end)
+   end,
+})
+
+MainTab:CreateToggle({
+   Name = "Bật Auto Farm Gần Nhất (Không Nhận Quest)",
    CurrentValue = false,
    Flag = "ToggleFarmMelee",
    Callback = function(Value)
       _G.AutoFarm = Value
 
-      -- Luồng 1: Trang bị Võ & Bật Noclip
       task.spawn(function()
           while _G.AutoFarm do
               task.wait(0.3)
@@ -162,7 +309,6 @@ MainTab:CreateToggle({
           end
       end)
 
-      -- Luồng 2: Tìm quái & Dịch chuyển lơ lửng trên đầu
       task.spawn(function()
           while _G.AutoFarm do
               task.wait()
@@ -191,11 +337,7 @@ MainTab:CreateToggle({
                   if nearestMob and nearestMob:FindFirstChild("HumanoidRootPart") then
                       local mobPos = nearestMob.HumanoidRootPart.Position
                       local height = _G.FarmDistance or 5
-                      
-                      -- Đặt vị trí lơ lửng 5 studs và xoay mặt hướng xuống quái
                       hrp.CFrame = CFrame.new(mobPos + Vector3.new(0, height, 0), mobPos)
-                      
-                      -- Tắt va chạm của quái tránh đẩy nhân vật
                       nearestMob.HumanoidRootPart.CanCollide = false
                   end
               end)
