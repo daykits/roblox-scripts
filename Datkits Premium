@@ -1,42 +1,209 @@
 repeat task.wait() until game:IsLoaded()
 
--- Sửa link thư viện RedzLib chính chủ (Fix lỗi 404)
-local RedzLib
-local success, _ = pcall(function()
-    RedzLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/realredz/RedzLibV5/main/Source.lua"))()
-end)
-
--- Dự phòng nếu github bị chặn
-if not success or not RedzLib then
-    RedzLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Orion/main/source"))()
-end
-
-local Window = RedzLib:MakeWindow({
-    Title = "REDZ HUB 🍓 | Blox Fruits [Fixed]",
-    SubTitle = "Auto Farm Level & Bring Mobs",
-    SaveFolder = "RedzHubConfig"
-})
-
--- Biến Hệ Thống
+-- Lấy các Service Roblox
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CoreGui = game:GetService("CoreGui")
 
+-- Biến hệ thống
 _G.AutoFarm = false
 _G.BringMob = true
 _G.FastAttack = true
 _G.AutoStats = false
-_G.SelectStat = "Melee"
+_G.AutoStatsDef = false
 _G.AutoRandomFruit = false
 _G.AutoStoreFruit = false
 _G.FarmDistance = 11
 
--- Xác Định Sea
+-- Xác định Sea
 local PlaceId = game.PlaceId
 local Sea1 = (PlaceId == 2753915549)
 local Sea2 = (PlaceId == 4442272183)
 local Sea3 = (PlaceId == 7449423635)
+
+--------------------------------------------------------------------------------
+-- TẠO GIAO DIỆN NATIVE (KHÔNG DÙNG LINK NGOÀI - KHÔNG BAO GIỜ 404)
+--------------------------------------------------------------------------------
+if CoreGui:FindFirstChild("RedzHubNative") then
+    CoreGui.RedzHubNative:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "RedzHubNative"
+ScreenGui.ResetOnSpawn = false
+pcall(function() ScreenGui.Parent = CoreGui end)
+if not ScreenGui.Parent then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+
+-- Frame Chính
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 480, 0, 320)
+MainFrame.Position = UDim2.new(0.5, -240, 0.5, -160)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = MainFrame
+
+-- Tiêu đề Menu
+local Title = Instance.new("TextLabel")
+Title.Name = "Title"
+Title.Size = UDim2.new(1, -40, 0, 40)
+Title.Position = UDim2.new(0, 15, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "REDZ HUB 🍓 | Blox Fruits [Native UI]"
+Title.TextColor3 = Color3.fromRGB(255, 75, 75)
+Title.TextSize = 18
+Title.Font = Enum.Font.SourceSansBold
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = MainFrame
+
+-- Nút Bật/Tắt Menu (Góc trái màn hình)
+local ToggleGuiBtn = Instance.new("TextButton")
+ToggleGuiBtn.Name = "ToggleGuiBtn"
+ToggleGuiBtn.Size = UDim2.new(0, 90, 0, 32)
+ToggleGuiBtn.Position = UDim2.new(0, 15, 0, 15)
+ToggleGuiBtn.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
+ToggleGuiBtn.Text = "REDZ HUB"
+ToggleGuiBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleGuiBtn.Font = Enum.Font.SourceSansBold
+ToggleGuiBtn.TextSize = 14
+ToggleGuiBtn.Parent = ScreenGui
+
+local BtnCorner = Instance.new("UICorner")
+BtnCorner.CornerRadius = UDim.new(0, 6)
+BtnCorner.Parent = ToggleGuiBtn
+
+ToggleGuiBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = not MainFrame.Visible
+end)
+
+-- Khung Tab
+local TabContainer = Instance.new("Frame")
+TabContainer.Size = UDim2.new(0, 120, 1, -50)
+TabContainer.Position = UDim2.new(0, 10, 0, 45)
+TabContainer.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+TabContainer.Parent = MainFrame
+
+local TabCorner = Instance.new("UICorner")
+TabCorner.CornerRadius = UDim.new(0, 8)
+TabCorner.Parent = TabContainer
+
+local ContentContainer = Instance.new("Frame")
+ContentContainer.Size = UDim2.new(1, -145, 1, -55)
+ContentContainer.Position = UDim2.new(0, 135, 0, 45)
+ContentContainer.BackgroundTransparency = 1
+ContentContainer.Parent = MainFrame
+
+local Tabs = {}
+
+local function CreateTab(name)
+    local TabBtn = Instance.new("TextButton")
+    TabBtn.Size = UDim2.new(1, -10, 0, 35)
+    TabBtn.Position = UDim2.new(0, 5, 0, (#Tabs * 40) + 5)
+    TabBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+    TabBtn.Text = name
+    TabBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    TabBtn.Font = Enum.Font.SourceSansBold
+    TabBtn.TextSize = 14
+    TabBtn.Parent = TabContainer
+    
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 6)
+    Corner.Parent = TabBtn
+
+    local TabPage = Instance.new("ScrollingFrame")
+    TabPage.Size = UDim2.new(1, 0, 1, 0)
+    TabPage.BackgroundTransparency = 1
+    TabPage.ScrollBarThickness = 4
+    TabPage.Visible = false
+    TabPage.Parent = ContentContainer
+
+    local UIList = Instance.new("UIListLayout")
+    UIList.SortOrder = Enum.SortOrder.LayoutOrder
+    UIList.Padding = UDim.new(0, 8)
+    UIList.Parent = TabPage
+
+    TabBtn.MouseButton1Click:Connect(function()
+        for _, t in pairs(Tabs) do
+            t.Page.Visible = false
+            t.Btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+            t.Btn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+        end
+        TabPage.Visible = true
+        TabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        TabBtn.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
+    end)
+
+    if #Tabs == 0 then
+        TabPage.Visible = true
+        TabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        TabBtn.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
+    end
+
+    local tabObj = {Page = TabPage, Btn = TabBtn}
+    table.insert(Tabs, tabObj)
+    return tabObj
+end
+
+local function AddToggle(tab, text, default, callback)
+    local Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(1, -10, 0, 36)
+    Frame.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+    Frame.Parent = tab.Page
+
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 6)
+    Corner.Parent = Frame
+
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(1, -60, 1, 0)
+    Label.Position = UDim2.new(0, 10, 0, 0)
+    Label.BackgroundTransparency = 1
+    Label.Text = text
+    Label.TextColor3 = Color3.fromRGB(220, 220, 220)
+    Label.Font = Enum.Font.SourceSans
+    Label.TextSize = 14
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = Frame
+
+    local Btn = Instance.new("TextButton")
+    Btn.Size = UDim2.new(0, 45, 0, 22)
+    Btn.Position = UDim2.new(1, -50, 0.5, -11)
+    Btn.BackgroundColor3 = default and Color3.fromRGB(40, 180, 90) or Color3.fromRGB(80, 80, 90)
+    Btn.Text = default and "ON" or "OFF"
+    Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Btn.Font = Enum.Font.SourceSansBold
+    Btn.TextSize = 12
+    Btn.Parent = Frame
+
+    local BtnCorner = Instance.new("UICorner")
+    BtnCorner.CornerRadius = UDim.new(0, 4)
+    BtnCorner.Parent = Btn
+
+    local state = default
+    Btn.MouseButton1Click:Connect(function()
+        state = not state
+        Btn.Text = state and "ON" or "OFF"
+        Btn.BackgroundColor3 = state and Color3.fromRGB(40, 180, 90) or Color3.fromRGB(80, 80, 90)
+        callback(state)
+    end)
+end
+
+-- TẠO CÁC TAB CHÍNH
+local MainTab = CreateTab("Main Farm")
+local StatsTab = CreateTab("Auto Stats")
+local FruitTab = CreateTab("Fruit / Shop")
+
+--------------------------------------------------------------------------------
+-- CHỨC NĂNG LOGIC GAME
+--------------------------------------------------------------------------------
 
 -- Anti-AFK
 LocalPlayer.Idled:Connect(function()
@@ -45,7 +212,7 @@ LocalPlayer.Idled:Connect(function()
     game:GetService("VirtualUser"):Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
 end)
 
--- Noclip An Toàn
+-- Noclip
 RunService.Stepped:Connect(function()
     if _G.AutoFarm then
         local char = LocalPlayer.Character
@@ -59,9 +226,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
---------------------------------------------------------------------------------
--- DI CHUYỂN BẰNG BODYVELOCITY (KHÔNG KHÓA PHÍM)
---------------------------------------------------------------------------------
+-- Di chuyển Bay (BodyVelocity)
 local function StopFly()
     local char = LocalPlayer.Character
     if char then
@@ -82,7 +247,6 @@ local function FlyTo(targetCFrame)
     if hum then hum.PlatformStand = false end
 
     local dist = (hrp.Position - targetCFrame.Position).Magnitude
-
     if dist <= 10 then
         StopFly()
         hrp.CFrame = targetCFrame
@@ -101,9 +265,7 @@ local function FlyTo(targetCFrame)
     hrp.CFrame = CFrame.new(hrp.Position, targetCFrame.Position)
 end
 
---------------------------------------------------------------------------------
--- GOM QUÁI (BRING MOBS)
---------------------------------------------------------------------------------
+-- Gom quái
 local function BringMobs(mobName, targetPos)
     if not _G.BringMob then return end
     pcall(function()
@@ -122,9 +284,7 @@ local function BringMobs(mobName, targetPos)
     end)
 end
 
---------------------------------------------------------------------------------
--- FAST ATTACK & TỰ CẦM VŨ KHÍ
---------------------------------------------------------------------------------
+-- Auto Equip & Fast Attack
 local function EquipTool()
     local char = LocalPlayer.Character
     if not char then return end
@@ -168,9 +328,7 @@ task.spawn(function()
     end
 end)
 
---------------------------------------------------------------------------------
--- DỮ LIỆU QUEST BLOX FRUITS
---------------------------------------------------------------------------------
+-- Quest Data
 local function HasQuest()
     if LocalPlayer:FindFirstChild("PlayerGui") and LocalPlayer.PlayerGui:FindFirstChild("Main") then
         local questGui = LocalPlayer.PlayerGui.Main:FindFirstChild("Quest")
@@ -245,161 +403,117 @@ local function GetNearestEnemy(mobName)
 end
 
 --------------------------------------------------------------------------------
--- MENU GIAO DIỆN
+-- GẮN NÚT VÀO GIAO DIỆN
 --------------------------------------------------------------------------------
-local MainTab = Window:MakeTab({"Main Farm", "home"})
-local StatsTab = Window:MakeTab({"Auto Stats", "signal"})
-local FruitTab = Window:MakeTab({"Fruit / Shop", "cherry"})
 
--- TAB MAIN
-MainTab:AddSection({"Auto Farm Level"})
+AddToggle(MainTab, "Auto Farm Level (1 -> 2550)", false, function(Value)
+    _G.AutoFarm = Value
+    if not Value then StopFly() end
 
-MainTab:AddToggle({
-    Name = "Auto Farm Level (1 -> 2550)",
-    Default = false,
-    Callback = function(Value)
-        _G.AutoFarm = Value
-        if not Value then StopFly() end
+    task.spawn(function()
+        local targetMob = nil
+        while _G.AutoFarm do
+            task.wait(0.05)
+            pcall(function()
+                local questName, questLevel, mobName, npcCFrame, mobCFrame = GetQuestData()
+                if not questName then return end
 
-        task.spawn(function()
-            local targetMob = nil
-            while _G.AutoFarm do
-                task.wait(0.05)
-                pcall(function()
-                    local questName, questLevel, mobName, npcCFrame, mobCFrame = GetQuestData()
-                    if not questName then return end
+                local char = LocalPlayer.Character
+                if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+                local hrp = char.HumanoidRootPart
 
-                    local char = LocalPlayer.Character
-                    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-                    local hrp = char.HumanoidRootPart
+                if not HasQuest() then
+                    targetMob = nil
+                    if (hrp.Position - npcCFrame.Position).Magnitude > 12 then
+                        FlyTo(npcCFrame)
+                    else
+                        StopFly()
+                        hrp.CFrame = npcCFrame
+                        ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", questName, questLevel)
+                        task.wait(0.5)
+                    end
+                else
+                    if not (targetMob and targetMob.Parent and targetMob:FindFirstChild("Humanoid") and targetMob.Humanoid.Health > 0) then
+                        targetMob = GetNearestEnemy(mobName)
+                    end
 
-                    if not HasQuest() then
-                        targetMob = nil
-                        if (hrp.Position - npcCFrame.Position).Magnitude > 12 then
-                            FlyTo(npcCFrame)
+                    if targetMob and targetMob:FindFirstChild("HumanoidRootPart") then
+                        local mobPos = targetMob.HumanoidRootPart.Position
+                        local targetCFrame = CFrame.new(mobPos + Vector3.new(0, _G.FarmDistance, 0), mobPos)
+
+                        BringMobs(mobName, mobPos)
+
+                        if (hrp.Position - mobPos).Magnitude > 12 then
+                            FlyTo(targetCFrame)
                         else
                             StopFly()
-                            hrp.CFrame = npcCFrame
-                            ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", questName, questLevel)
-                            task.wait(0.5)
+                            hrp.CFrame = targetCFrame
                         end
                     else
-                        if not (targetMob and targetMob.Parent and targetMob:FindFirstChild("Humanoid") and targetMob.Humanoid.Health > 0) then
-                            targetMob = GetNearestEnemy(mobName)
-                        end
-
-                        if targetMob and targetMob:FindFirstChild("HumanoidRootPart") then
-                            local mobPos = targetMob.HumanoidRootPart.Position
-                            local targetCFrame = CFrame.new(mobPos + Vector3.new(0, _G.FarmDistance, 0), mobPos)
-
-                            BringMobs(mobName, mobPos)
-
-                            if (hrp.Position - mobPos).Magnitude > 12 then
-                                FlyTo(targetCFrame)
-                            else
-                                StopFly()
-                                hrp.CFrame = targetCFrame
-                            end
-                        else
-                            if mobCFrame then FlyTo(mobCFrame) end
-                        end
+                        if mobCFrame then FlyTo(mobCFrame) end
                     end
-                end)
-            end
-        end)
-    end
-})
+                end
+            end)
+        end
+    end)
+end)
 
-MainTab:AddToggle({
-    Name = "Bật Gom Quái (Bring Mob)",
-    Default = true,
-    Callback = function(Value)
-        _G.BringMob = Value
-    end
-})
+AddToggle(MainTab, "Gom Quái (Bring Mobs)", true, function(Value)
+    _G.BringMob = Value
+end)
 
-MainTab:AddToggle({
-    Name = "Fast Attack (Tấn Công Siêu Tốc)",
-    Default = true,
-    Callback = function(Value)
-        _G.FastAttack = Value
-    end
-})
+AddToggle(MainTab, "Fast Attack (Đánh Nhanh)", true, function(Value)
+    _G.FastAttack = Value
+end)
 
-MainTab:AddSlider({
-    Name = "Khoảng Cách Đứng Trực Quái",
-    Min = 8,
-    Max = 20,
-    Increase = 1,
-    Default = 11,
-    Callback = function(Value)
-        _G.FarmDistance = Value
-    end
-})
+AddToggle(StatsTab, "Auto Cộng Điểm Melee", false, function(Value)
+    _G.AutoStats = Value
+    task.spawn(function()
+        while _G.AutoStats do
+            task.wait(0.3)
+            pcall(function()
+                ReplicatedStorage.Remotes.CommF_:InvokeServer("AddPoint", "Melee", 3)
+            end)
+        end
+    end)
+end)
 
--- TAB STATS
-StatsTab:AddSection({"Auto Cộng Điểm Chỉ Số"})
+AddToggle(StatsTab, "Auto Cộng Điểm Defense", false, function(Value)
+    _G.AutoStatsDef = Value
+    task.spawn(function()
+        while _G.AutoStatsDef do
+            task.wait(0.3)
+            pcall(function()
+                ReplicatedStorage.Remotes.CommF_:InvokeServer("AddPoint", "Defense", 3)
+            end)
+        end
+    end)
+end)
 
-StatsTab:AddDropdown({
-    Name = "Chọn Chỉ Số Cộng",
-    Options = {"Melee", "Defense", "Sword", "Demon Fruit"},
-    Default = "Melee",
-    Callback = function(Option)
-        _G.SelectStat = Option
-    end
-})
+AddToggle(FruitTab, "Auto Random Fruit (Random Trái)", false, function(Value)
+    _G.AutoRandomFruit = Value
+    task.spawn(function()
+        while _G.AutoRandomFruit do
+            task.wait(1)
+            pcall(function()
+                ReplicatedStorage.Remotes.CommF_:InvokeServer("Cousin", "Buy")
+            end)
+        end
+    end)
+end)
 
-StatsTab:AddToggle({
-    Name = "Bật Auto Cộng Điểm",
-    Default = false,
-    Callback = function(Value)
-        _G.AutoStats = Value
-        task.spawn(function()
-            while _G.AutoStats do
-                task.wait(0.3)
-                pcall(function()
-                    ReplicatedStorage.Remotes.CommF_:InvokeServer("AddPoint", _G.SelectStat, 3)
-                end)
-            end
-        end)
-    end
-})
-
--- TAB FRUIT
-FruitTab:AddSection({"Trái Ác Quỷ"})
-
-FruitTab:AddToggle({
-    Name = "Auto Random Fruit (Mua Trái Ngẫu Nhiên)",
-    Default = false,
-    Callback = function(Value)
-        _G.AutoRandomFruit = Value
-        task.spawn(function()
-            while _G.AutoRandomFruit do
-                task.wait(1)
-                pcall(function()
-                    ReplicatedStorage.Remotes.CommF_:InvokeServer("Cousin", "Buy")
-                end)
-            end
-        end)
-    end
-})
-
-FruitTab:AddToggle({
-    Name = "Auto Store Fruit (Tự Cất Trái Vào Kho)",
-    Default = false,
-    Callback = function(Value)
-        _G.AutoStoreFruit = Value
-        task.spawn(function()
-            while _G.AutoStoreFruit do
-                task.wait(1)
-                pcall(function()
-                    for _, tool in pairs(LocalPlayer.Backpack:GetChildren()) do
-                        if tool:IsA("Tool") and string.find(tool.Name, "Fruit") then
-                            ReplicatedStorage.Remotes.CommF_:InvokeServer("StoreFruit", tool.Name, tool)
-                        end
+AddToggle(FruitTab, "Auto Store Fruit (Tự Cất Trái)", false, function(Value)
+    _G.AutoStoreFruit = Value
+    task.spawn(function()
+        while _G.AutoStoreFruit do
+            task.wait(1)
+            pcall(function()
+                for _, tool in pairs(LocalPlayer.Backpack:GetChildren()) do
+                    if tool:IsA("Tool") and string.find(tool.Name, "Fruit") then
+                        ReplicatedStorage.Remotes.CommF_:InvokeServer("StoreFruit", tool.Name, tool)
                     end
-                end)
-            end
-        end)
-    end
-})
+                end
+            end)
+        end
+    end)
+end)
