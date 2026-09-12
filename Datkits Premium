@@ -3,9 +3,9 @@ repeat task.wait() until game:IsLoaded()
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Datkits Premium 🍌🐱 | Blox Fruits",
-   LoadingTitle = "Datkits Premium",
-   LoadingSubtitle = "Auto Farm Trên Đầu Quái + Fast Attack",
+   Name = "Banana Cat Hub 🍌🐱 | Blox Fruits",
+   LoadingTitle = "Banana Cat Hub",
+   LoadingSubtitle = "Fix Auto Chest (Nhặt Từng Rương)",
    ConfigurationSaving = {
       Enabled = true,
       FolderName = "BananaCatConfig",
@@ -15,7 +15,7 @@ local Window = Rayfield:CreateWindow({
    KeySystem = false
 })
 
--- Anti-AFK (Chống văng game)
+-- Anti-AFK (Chống treo máy văng game)
 game:GetService("Players").LocalPlayer.Idled:Connect(function()
     game:GetService("VirtualUser"):Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
     task.wait(1)
@@ -28,9 +28,8 @@ MainTab:CreateSection("Cài Đặt Vị Trí & Tấn Công")
 
 _G.AutoFarm = false
 _G.FastAttack = false
-_G.FarmDistance = 11 -- Độ cao mặc định trên đầu quái (studs)
+_G.FarmDistance = 11
 
--- Thanh trượt chỉnh độ cao lơ lửng trên đầu quái
 MainTab:CreateSlider({
    Name = "Độ cao lơ lửng trên đầu quái",
    Range = {5, 25},
@@ -54,7 +53,6 @@ MainTab:CreateToggle({
 
 MainTab:CreateSection("Tự Động Cày Quái Bằng Võ (Melee)")
 
--- Hàm cầm Võ chuẩn (không reset liên tục)
 local function EquipMeleeWeapon()
     local player = game.Players.LocalPlayer
     local char = player.Character
@@ -101,7 +99,6 @@ local function EquipMeleeWeapon()
     end
 end
 
--- Hàm thực thi đòn đánh
 local VIM = game:GetService("VirtualInputManager")
 local VirtualUser = game:GetService("VirtualUser")
 
@@ -135,7 +132,6 @@ MainTab:CreateToggle({
    Callback = function(Value)
       _G.AutoFarm = Value
 
-      -- Luồng 1: Noclip & Giữ Võ
       task.spawn(function()
           while _G.AutoFarm do
               task.wait(0.2)
@@ -152,7 +148,6 @@ MainTab:CreateToggle({
           end
       end)
 
-      -- Luồng 2: Tấn công
       task.spawn(function()
           while _G.AutoFarm do
               if _G.FastAttack then
@@ -164,7 +159,6 @@ MainTab:CreateToggle({
           end
       end)
 
-      -- Luồng 3: Dịch chuyển đứng TRÊN ĐẦU quái
       task.spawn(function()
           while _G.AutoFarm do
               task.wait()
@@ -192,8 +186,6 @@ MainTab:CreateToggle({
                   if nearestMob then
                       local mobPos = nearestMob.HumanoidRootPart.Position
                       local height = _G.FarmDistance or 11
-                      
-                      -- Đặt nhân vật ở độ cao [height] studs TRÊN ĐẦU quái và XOAY MẶT HƯỚNG THẲNG XUỐNG
                       hrp.CFrame = CFrame.new(mobPos + Vector3.new(0, height, 0)) * CFrame.Angles(math.rad(-90), 0, 0)
                   end
               end)
@@ -202,16 +194,28 @@ MainTab:CreateToggle({
    end,
 })
 
-MainTab:CreateSection("Tự Động Nhặt Rương")
+MainTab:CreateSection("Tự Động Nhặt Rương (Từng Cái)")
 
 _G.AutoChest = false
 
+-- Hàm lấy danh sách tất cả rương hiện có
+local function GetChests()
+    local chests = {}
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v:IsA("Part") and v.Name:find("Chest") and v:FindFirstChild("TouchInterest") then
+            table.insert(chests, v)
+        end
+    end
+    return chests
+end
+
 MainTab:CreateToggle({
-   Name = "Bật Auto Chest (Gom Rương Beli)",
+   Name = "Bật Auto Chest (Nhặt Từng Rương Mộ)",
    CurrentValue = false,
    Flag = "ToggleChest",
    Callback = function(Value)
       _G.AutoChest = Value
+      
       task.spawn(function()
           while _G.AutoChest do
               task.wait(0.1)
@@ -220,22 +224,50 @@ MainTab:CreateToggle({
                   local character = player.Character or player.CharacterAdded:Wait()
                   local hrp = character:FindFirstChild("HumanoidRootPart")
                   
-                  if hrp then
-                      for _, v in pairs(workspace:GetDescendants()) do
-                          if not _G.AutoChest then break end
-                          if v:IsA("Part") and v.Name:find("Chest") and v:FindFirstChild("TouchInterest") then
-                              repeat
-                                  task.wait(0.05)
-                                  if not _G.AutoChest or not v or not v.Parent or not v:FindFirstChild("TouchInterest") then break end
-                                  hrp.CFrame = v.CFrame
-                                  if firetouchinterest then
-                                      firetouchinterest(hrp, v, 0)
-                                      task.wait(0.05)
-                                      firetouchinterest(hrp, v, 1)
-                                  end
-                              until not v or not v.Parent or not v:FindFirstChild("TouchInterest") or not _G.AutoChest
-                          end
+                  if not hrp then return end
+
+                  -- Bật Noclip khi đi gom rương
+                  for _, part in pairs(character:GetChildren()) do
+                      if part:IsA("BasePart") then
+                          part.CanCollide = false
                       end
+                  end
+
+                  local chests = GetChests()
+
+                  if #chests > 0 then
+                      -- Sắp xếp rương theo vị trí từ GẦN NHẤT đến XA NHẤT
+                      table.sort(chests, function(a, b)
+                          return (hrp.Position - a.Position).Magnitude < (hrp.Position - b.Position).Magnitude
+                      end)
+
+                      -- Lấy chiếc rương gần nhất
+                      local targetChest = chests[1]
+
+                      if targetChest and targetChest:FindFirstChild("TouchInterest") then
+                          local timeout = 0
+                          
+                          -- Dịch chuyển và giữ ở rương cho đến khi rương biến mất (đã nhặt xong)
+                          repeat
+                              task.wait(0.05)
+                              timeout = timeout + 0.05
+                              if not _G.AutoChest or not targetChest or not targetChest.Parent or not targetChest:FindFirstChild("TouchInterest") then break end
+
+                              hrp.CFrame = targetChest.CFrame
+
+                              if firetouchinterest then
+                                  firetouchinterest(hrp, targetChest, 0)
+                                  task.wait(0.02)
+                                  firetouchinterest(hrp, targetChest, 1)
+                              end
+                          until not targetChest or not targetChest.Parent or not targetChest:FindFirstChild("TouchInterest") or timeout > 2 or not _G.AutoChest
+                          
+                          -- Khoảng nghỉ ngắn 0.1s trước khi nhảy sang rương tiếp theo
+                          task.wait(0.1)
+                      end
+                  else
+                      -- Hết rương trên map, chờ 2 giây trước khi quét lại
+                      task.wait(2)
                   end
               end)
           end
