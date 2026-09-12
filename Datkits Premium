@@ -5,7 +5,7 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Window = Rayfield:CreateWindow({
    Name = "Banana Cat Hub 🍌🐱 | Blox Fruits",
    LoadingTitle = "Banana Cat Hub",
-   LoadingSubtitle = "Fix Fast Attack & Auto Farm Dame 100%",
+   LoadingSubtitle = "Fix Đơ Chuột & Fix Fast Attack 100%",
    ConfigurationSaving = {
       Enabled = true,
       FolderName = "BananaCatConfig",
@@ -15,7 +15,7 @@ local Window = Rayfield:CreateWindow({
    KeySystem = false
 })
 
--- Anti-AFK (Chống văng game)
+-- Anti-AFK (Chống treo máy văng game)
 game:GetService("Players").LocalPlayer.Idled:Connect(function()
     game:GetService("VirtualUser"):Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
     task.wait(1)
@@ -28,7 +28,7 @@ MainTab:CreateSection("Cài Đặt Tấn Công & Fast Attack")
 
 _G.AutoFarm = false
 _G.FastAttack = true
-_G.FarmDistance = 5.5 -- Khoảng cách chuẩn nhất để võ trúng Hitbox quái
+_G.FarmDistance = 5 -- Độ cao an toàn chuẩn (5 studs) vừa tầm võ
 
 -- Thanh trượt chỉnh độ cao
 MainTab:CreateSlider({
@@ -36,7 +36,7 @@ MainTab:CreateSlider({
    Range = {3, 10},
    Increment = 0.5,
    Suffix = "Studs",
-   CurrentValue = 5.5,
+   CurrentValue = 5,
    Flag = "FarmDistSlider",
    Callback = function(Value)
       _G.FarmDistance = Value
@@ -54,7 +54,7 @@ MainTab:CreateToggle({
 
 MainTab:CreateSection("Tự Động Cày Quái Bằng Võ (Melee)")
 
--- Hàm trang bị Võ
+-- Hàm trang bị Võ an toàn
 local function EquipMeleeWeapon()
     local player = game.Players.LocalPlayer
     local char = player.Character
@@ -92,37 +92,26 @@ local function EquipMeleeWeapon()
             end
         end
     end
-
-    local firstTool = player.Backpack:FindFirstChildOfClass("Tool")
-    if firstTool then
-        char.Humanoid:EquipTool(firstTool)
-        task.wait(0.1)
-        return firstTool
-    end
 end
 
--- LUỒNG FAST ATTACK ĐỘC LẬP (Siêu Tốc Độ + Ép Dame Server)
-local VIM = game:GetService("VirtualInputManager")
-
+-- LUỒNG TẤN CÔNG ĐỘC LẬP (KHÔNG DÙNG VIRTUAL INPUT -> KHÔNG KHÓA CHUỘT)
 task.spawn(function()
     while true do
-        task.wait()
-        if _G.FastAttack or _G.AutoFarm then
+        task.wait(_G.FastAttack and 0.05 or 0.2)
+        if _G.AutoFarm then
             pcall(function()
                 local player = game.Players.LocalPlayer
                 local char = player.Character
                 if not char or not char:FindFirstChild("HumanoidRootPart") then return end
 
                 local tool = char:FindFirstChildOfClass("Tool")
-                if tool then
-                    -- 1. Vung đòn liên tục
+                if tool and tool:IsA("Tool") then
+                    -- Kích hoạt đòn đánh bằng vũ khí
                     tool:Activate()
-                    VIM:SendMouseButtonEvent(500, 500, 0, true, game, 1)
-                    VIM:SendMouseButtonEvent(500, 500, 0, false, game, 1)
 
-                    -- 2. Gửi Remote Attack / RegisterHit cho tất cả quái trong bán kính 30 studs
-                    local net = game:GetService("ReplicatedStorage"):FindFirstChild("Modules") 
-                                and game.ReplicatedStorage.Modules:FindFirstChild("Net")
+                    -- Gửi tín hiệu Remote Server an toàn (chỉ gửi khi có quái)
+                    local rep = game:GetService("ReplicatedStorage")
+                    local net = rep:FindFirstChild("Modules") and rep.Modules:FindFirstChild("Net")
                     if net then
                         local regAttack = net:FindFirstChild("RE/RegisterAttack")
                         local regHit = net:FindFirstChild("RE/RegisterHit")
@@ -133,7 +122,7 @@ task.spawn(function()
                         
                         if regHit and workspace:FindFirstChild("Enemies") then
                             for _, enemy in pairs(workspace.Enemies:GetChildren()) do
-                                if enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 and enemy:FindFirstChild("HumanoidRootPart") then
+                                if enemy and enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 and enemy:FindFirstChild("HumanoidRootPart") then
                                     local dist = (char.HumanoidRootPart.Position - enemy.HumanoidRootPart.Position).Magnitude
                                     if dist <= 30 then
                                         regHit:FireServer(enemy.HumanoidRootPart, {enemy})
@@ -155,14 +144,15 @@ MainTab:CreateToggle({
    Callback = function(Value)
       _G.AutoFarm = Value
 
-      -- Luồng 1: Tự động Cầm Võ & Bật Noclip
+      -- Luồng 1: Trang bị Võ & Bật Noclip
       task.spawn(function()
           while _G.AutoFarm do
-              task.wait(0.2)
+              task.wait(0.3)
               pcall(function()
                   EquipMeleeWeapon()
-                  if game.Players.LocalPlayer.Character then
-                      for _, part in pairs(game.Players.LocalPlayer.Character:GetChildren()) do
+                  local char = game.Players.LocalPlayer.Character
+                  if char then
+                      for _, part in pairs(char:GetChildren()) do
                           if part:IsA("BasePart") then
                               part.CanCollide = false
                           end
@@ -172,13 +162,14 @@ MainTab:CreateToggle({
           end
       end)
 
-      -- Luồng 2: Tìm Quái và Giữ Vị Trí Lơ Lửng Chuẩn
+      -- Luồng 2: Tìm quái & Dịch chuyển lơ lửng trên đầu
       task.spawn(function()
           while _G.AutoFarm do
               task.wait()
               pcall(function()
                   local player = game.Players.LocalPlayer
-                  local character = player.Character or player.CharacterAdded:Wait()
+                  local character = player.Character
+                  if not character then return end
                   local hrp = character:FindFirstChild("HumanoidRootPart")
                   if not hrp then return end
 
@@ -187,7 +178,7 @@ MainTab:CreateToggle({
                   
                   if workspace:FindFirstChild("Enemies") then
                       for _, enemy in pairs(workspace.Enemies:GetChildren()) do
-                          if enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 and enemy:FindFirstChild("HumanoidRootPart") then
+                          if enemy and enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 and enemy:FindFirstChild("HumanoidRootPart") then
                               local dist = (hrp.Position - enemy.HumanoidRootPart.Position).Magnitude
                               if dist < minDistance then
                                   minDistance = dist
@@ -197,16 +188,15 @@ MainTab:CreateToggle({
                       end
                   end
 
-                  if nearestMob then
+                  if nearestMob and nearestMob:FindFirstChild("HumanoidRootPart") then
                       local mobPos = nearestMob.HumanoidRootPart.Position
-                      local height = _G.FarmDistance or 5.5
+                      local height = _G.FarmDistance or 5
                       
-                      -- Đứng trên đầu quái 5.5 studs và xoay mặt xuống quái
+                      -- Đặt vị trí lơ lửng 5 studs và xoay mặt hướng xuống quái
                       hrp.CFrame = CFrame.new(mobPos + Vector3.new(0, height, 0), mobPos)
                       
-                      -- Khóa quái không bị văng
+                      -- Tắt va chạm của quái tránh đẩy nhân vật
                       nearestMob.HumanoidRootPart.CanCollide = false
-                      nearestMob.HumanoidRootPart.Velocity = Vector3.new(0,0,0)
                   end
               end)
           end
@@ -240,9 +230,9 @@ MainTab:CreateToggle({
               task.wait(0.1)
               pcall(function()
                   local player = game.Players.LocalPlayer
-                  local character = player.Character or player.CharacterAdded:Wait()
+                  local character = player.Character
+                  if not character then return end
                   local hrp = character:FindFirstChild("HumanoidRootPart")
-                  
                   if not hrp then return end
 
                   local chests = GetChests()
