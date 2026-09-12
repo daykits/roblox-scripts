@@ -7,28 +7,23 @@ local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
--- Xác định Sea hiện tại
 local PlaceId = game.PlaceId
 local Sea1 = (PlaceId == 2753915549)
 local Sea2 = (PlaceId == 4442272183)
 local Sea3 = (PlaceId == 7449423635)
 
 local Window = Rayfield:CreateWindow({
-   Name = "Banana Cat Hub 🍌🐱 | Multi-Sea Auto Farm",
-   LoadingTitle = "Banana Cat Hub Blox Fruits",
-   LoadingSubtitle = "Auto Level 2550 | Mastery | Boss & Elite Hunter",
-   ConfigurationSaving = { Enabled = true, FolderName = "BananaCatConfig", FileName = "Config" },
+   Name = "Banana Cat Hub 🍌🐱 | Fix Freeze Bug",
+   LoadingTitle = "Banana Cat Hub",
+   LoadingSubtitle = "Đã sửa lỗi liệt phím & đứng hình",
+   ConfigurationSaving = { Enabled = false },
    Discord = { Enabled = false },
    KeySystem = false
 })
 
--- Biến Toàn Cục (Globals)
 _G.AutoFarmLevel = false
 _G.AutoFarmMastery = false
-_G.MasteryWeapon = "Melee" -- "Melee", "Sword", "Blox Fruit"
-_G.AutoElite = false
-_G.AutoBoss = false
-_G.SelectBoss = ""
+_G.MasteryWeapon = "Melee"
 _G.FastAttack = true
 _G.FarmDistance = 11
 _G.TweenSpeed = 250
@@ -40,9 +35,9 @@ LocalPlayer.Idled:Connect(function()
     game:GetService("VirtualUser"):Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
 end)
 
--- Noclip xuyên vật thể khi cày
+-- Noclip xuyên vật thể
 RunService.Stepped:Connect(function()
-    if _G.AutoFarmLevel or _G.AutoFarmMastery or _G.AutoElite or _G.AutoBoss then
+    if _G.AutoFarmLevel or _G.AutoFarmMastery then
         local char = LocalPlayer.Character
         if char then
             for _, part in pairs(char:GetChildren()) do
@@ -55,7 +50,7 @@ RunService.Stepped:Connect(function()
 end)
 
 --------------------------------------------------------------------------------
--- HỆ THỐNG DI CHUYỂN TWEEN MƯỢT
+-- HỆ THỐNG DI CHUYỂN TWEEN & MỞ KHÓA NHÂN VẬT (FIXED)
 --------------------------------------------------------------------------------
 local currentTween = nil
 local currentTweenTarget = nil
@@ -66,6 +61,12 @@ local function StopTween()
         currentTween = nil
     end
     currentTweenTarget = nil
+    
+    -- Giải phóng nhân vật, không cho PlatformStand bị kẹt
+    if LocalPlayer.Character then
+        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if hum then hum.PlatformStand = false end
+    end
 end
 
 local function TweenTo(targetCFrame, speed)
@@ -76,7 +77,6 @@ local function TweenTo(targetCFrame, speed)
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hrp or not hum then return end
 
-    hum.PlatformStand = true
     local distance = (hrp.Position - targetCFrame.Position).Magnitude
 
     if distance <= 12 then
@@ -94,6 +94,7 @@ local function TweenTo(targetCFrame, speed)
         return
     end
 
+    hum.PlatformStand = true
     local bv = hrp:FindFirstChild("FarmFlyBV")
     if bv then bv.MaxForce = Vector3.new(0, 0, 0) end
 
@@ -102,6 +103,7 @@ local function TweenTo(targetCFrame, speed)
     end
 
     StopTween()
+    hum.PlatformStand = true
     currentTweenTarget = targetCFrame.Position
     local duration = distance / speed
     local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
@@ -122,7 +124,7 @@ local function ResetPhysics()
 end
 
 --------------------------------------------------------------------------------
--- VŨ KHÍ & TẤN CÔNG (FAST ATTACK)
+-- TỰ CẦM VŨ KHÍ & ĐÁNH (FIXED)
 --------------------------------------------------------------------------------
 local function EquipWeapon(category)
     local char = LocalPlayer.Character
@@ -149,11 +151,10 @@ local function EquipWeapon(category)
     end
 end
 
--- Vòng lặp Fast Attack
 task.spawn(function()
     while true do
-        task.wait(_G.FastAttack and 0.03 or 0.2)
-        if _G.AutoFarmLevel or _G.AutoFarmMastery or _G.AutoElite or _G.AutoBoss then
+        task.wait(_G.FastAttack and 0.05 or 0.2)
+        if _G.AutoFarmLevel or _G.AutoFarmMastery then
             pcall(function()
                 local char = LocalPlayer.Character
                 if not char or not char:FindFirstChild("HumanoidRootPart") then return end
@@ -161,9 +162,7 @@ task.spawn(function()
                 local tool = char:FindFirstChildOfClass("Tool")
                 if tool then
                     tool:Activate()
-                    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-                    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
-
+                    
                     local net = game:GetService("ReplicatedStorage"):FindFirstChild("Modules") and game:GetService("ReplicatedStorage").Modules:FindFirstChild("Net")
                     if net then
                         if net:FindFirstChild("RE/RegisterAttack") then net["RE/RegisterAttack"]:FireServer(0) end
@@ -184,7 +183,7 @@ task.spawn(function()
 end)
 
 --------------------------------------------------------------------------------
--- LOGIC DỮ LIỆU QUEST & QUÁI (LEVEL 1 -> 2550)
+-- HỆ THỐNG QUEST
 --------------------------------------------------------------------------------
 local function HasQuest()
     if LocalPlayer:FindFirstChild("PlayerGui") and LocalPlayer.PlayerGui:FindFirstChild("Main") then
@@ -196,7 +195,6 @@ end
 
 local function GetQuestData()
     local level = LocalPlayer.Data.Level.Value
-    
     if Sea1 then
         if level >= 1 and level <= 9 then return "BanditQuest", 1, "Bandit", CFrame.new(1059.37, 16.51, 1549.26), CFrame.new(1145.5, 30.0, 1634.8)
         elseif level >= 10 and level <= 14 then return "JungleQuest", 1, "Monkey", CFrame.new(-1598.08, 36.85, 153.38), CFrame.new(-1610.2, 50.0, 145.5)
@@ -214,25 +212,6 @@ local function GetQuestData()
         elseif level >= 450 and level <= 524 then return "SkyQuest2", 1, "God's Guard", CFrame.new(-7861.34, 5545.49, -380.29), CFrame.new(-7725.1, 5620.0, -440.3)
         elseif level >= 525 and level <= 624 then return "SkyQuest2", 2, "Shandian", CFrame.new(-7861.34, 5545.49, -380.29), CFrame.new(-7850.5, 5620.0, -220.8)
         elseif level >= 625 and level <= 699 then return "FountainQuest", 1, "Galley Pirate", CFrame.new(5259.82, 38.5, 4050.03), CFrame.new(5580.4, 90.0, 3990.2)
-        end
-    elseif Sea2 then
-        if level >= 700 and level <= 774 then return "Area1Quest", 1, "Raider", CFrame.new(-429.54, 72.99, 1836.78), CFrame.new(-800.0, 90.0, 1600.0)
-        elseif level >= 775 and level <= 874 then return "Area1Quest", 2, "Mercenary", CFrame.new(-429.54, 72.99, 1836.78), CFrame.new(-950.0, 90.0, 1400.0)
-        elseif level >= 875 and level <= 999 then return "Area2Quest", 1, "Swan Pirate", CFrame.new(638.43, 72.99, 918.28), CFrame.new(850.0, 90.0, 1100.0)
-        elseif level >= 1000 and level <= 1124 then return "IceSideQuest", 1, "Snow Trooper", CFrame.new(602.8, 40.1, -5372.2), CFrame.new(550.0, 60.0, -5500.0)
-        elseif level >= 1125 and level <= 1249 then return "FireSideQuest", 1, "Magma Ninja", CFrame.new(-6127.3, 15.9, -5040.2), CFrame.new(-5400.0, 60.0, -5200.0)
-        elseif level >= 1250 and level <= 1349 then return "ShipQuest1", 1, "Ship Deckhand", CFrame.new(923.2, 125.1, 32885.2), CFrame.new(1100.0, 140.0, 33000.0)
-        elseif level >= 1350 and level <= 1499 then return "FrostQuest", 1, "Arctic Warrior", CFrame.new(5667.6, 28.1, -6486.0), CFrame.new(6000.0, 50.0, -6200.0)
-        end
-    elseif Sea3 then
-        if level >= 1500 and level <= 1574 then return "PiratePortQuest", 1, "Pirate Millionaire", CFrame.new(-290.0, 44.0, 5580.0), CFrame.new(-380.0, 70.0, 5650.0)
-        elseif level >= 1575 and level <= 1699 then return "AmazonQuest", 1, "Dragon Crew Warrior", CFrame.new(5832.0, 51.0, -1100.0), CFrame.new(6300.0, 70.0, -1200.0)
-        elseif level >= 1700 and level <= 1824 then return "MarineTreeQuest", 1, "Marine Commodore", CFrame.new(2180.0, 29.0, -6740.0), CFrame.new(2400.0, 60.0, -6800.0)
-        elseif level >= 1825 and level <= 1974 then return "DeepForestIslandQuest", 1, "Jungle Pirate", CFrame.new(-13230.0, 330.0, -7620.0), CFrame.new(-13500.0, 350.0, -7800.0)
-        elseif level >= 1975 and level <= 2074 then return "HauntedQuest1", 1, "Reborn Skeleton", CFrame.new(-9480.0, 142.0, 5520.0), CFrame.new(-8800.0, 160.0, 6000.0)
-        elseif level >= 2075 and level <= 2199 then return "PeanutQuest", 1, "Peanut Scout", CFrame.new(-2120.0, 38.0, -10200.0), CFrame.new(-2000.0, 60.0, -10400.0)
-        elseif level >= 2200 and level <= 2449 then return "IceCreamQuest1", 1, "Ice Cream Chef", CFrame.new(-820.0, 65.0, -10960.0), CFrame.new(-600.0, 80.0, -11100.0)
-        elseif level >= 2450 then return "ChocolatQuest1", 1, "Cocoa Warrior", CFrame.new(230.0, 25.0, -12200.0), CFrame.new(400.0, 50.0, -12400.0)
         end
     end
     return nil
@@ -261,43 +240,33 @@ local function GetNearestEnemy(mobName)
 end
 
 --------------------------------------------------------------------------------
--- GIAO DIỆN RAYFIELD UI & TÍNH NĂNG
+-- TAB ĐIỀU KHIỂN & SỬA LỖI ĐỨNG DỰNG
 --------------------------------------------------------------------------------
-
--- TAB 1: AUTO FARM LEVEL
 local MainTab = Window:CreateTab("Auto Farm Level", 4483345998)
 
-MainTab:CreateSection("Cài Đặt Farm")
+MainTab:CreateSection("Sửa Lỗi Đứng Hình")
 
-MainTab:CreateSlider({
-   Name = "Độ cao lơ lửng trên quái",
-   Range = {8, 20},
-   Increment = 1,
-   Suffix = "Studs",
-   CurrentValue = 11,
-   Flag = "FarmDist",
-   Callback = function(Value) _G.FarmDistance = Value end,
+MainTab:CreateButton({
+   Name = "⚠️ Mở Khóa Nhân Vật (Nút Cấp Cứu Khi Bị Kẹt)",
+   Callback = function()
+       ResetPhysics()
+   end,
 })
 
 MainTab:CreateToggle({
-   Name = "Bật Fast Attack (Đánh Nhanh)",
-   CurrentValue = true,
-   Flag = "FastAttackToggle",
-   Callback = function(Value) _G.FastAttack = Value end,
-})
-
-MainTab:CreateToggle({
-   Name = "Bật Auto Farm Level (1 -> 2550)",
+   Name = "Bật Auto Farm Level",
    CurrentValue = false,
    Flag = "AutoFarmToggle",
    Callback = function(Value)
       _G.AutoFarmLevel = Value
-      if not Value then ResetPhysics() end
+      if not Value then 
+          ResetPhysics() 
+      end
 
       task.spawn(function()
           local targetMob = nil
           while _G.AutoFarmLevel do
-              task.wait(0.05)
+              task.wait(0.08)
               pcall(function()
                   EquipWeapon("Melee")
                   local questName, questLevel, mobName, npcCFrame, mobCFrame = GetQuestData()
@@ -337,131 +306,5 @@ MainTab:CreateToggle({
               end)
           end
       end)
-   end,
-})
-
--- TAB 2: FARM MASTERY
-local MasteryTab = Window:CreateTab("Farm Mastery", 4483345998)
-
-MasteryTab:CreateDropdown({
-   Name = "Chọn Vũ Khí Cày Thông Thạo",
-   Options = {"Melee", "Sword", "Blox Fruit"},
-   CurrentOption = {"Melee"},
-   Flag = "MasteryWeaponDropdown",
-   Callback = function(Option)
-      _G.MasteryWeapon = Option[1]
-   end,
-})
-
-MasteryTab:CreateToggle({
-   Name = "Bật Auto Farm Mastery",
-   CurrentValue = false,
-   Flag = "MasteryToggle",
-   Callback = function(Value)
-      _G.AutoFarmMastery = Value
-      if not Value then ResetPhysics() end
-
-      task.spawn(function()
-          local targetMob = nil
-          while _G.AutoFarmMastery do
-              task.wait(0.05)
-              pcall(function()
-                  EquipWeapon(_G.MasteryWeapon)
-
-                  if not (targetMob and targetMob.Parent and targetMob:FindFirstChild("Humanoid") and targetMob.Humanoid.Health > 0) then
-                      targetMob = GetNearestEnemy()
-                  end
-
-                  if targetMob and targetMob:FindFirstChild("HumanoidRootPart") then
-                      local mobPos = targetMob.HumanoidRootPart.Position
-                      local targetCFrame = CFrame.new(mobPos + Vector3.new(0, _G.FarmDistance, 0), mobPos)
-
-                      if (LocalPlayer.Character.HumanoidRootPart.Position - mobPos).Magnitude > 12 then
-                          TweenTo(targetCFrame, 250)
-                      else
-                          StopTween()
-                          LocalPlayer.Character.HumanoidRootPart.CFrame = targetCFrame
-                      end
-                  end
-              end)
-          end
-      end)
-   end,
-})
-
--- TAB 3: BOSS & ELITE HUNTER
-local BossTab = Window:CreateTab("Boss & Elite Hunter", 4483345998)
-
-BossTab:CreateSection("Auto Elite Hunter (Sea 3 Only)")
-
-BossTab:CreateToggle({
-   Name = "Bật Auto Elite Hunter",
-   CurrentValue = false,
-   Flag = "EliteToggle",
-   Callback = function(Value)
-      _G.AutoElite = Value
-      if not Value then ResetPhysics() end
-
-      task.spawn(function()
-          while _G.AutoElite do
-              task.wait(0.1)
-              pcall(function()
-                  EquipWeapon("Melee")
-                  local eliteNames = {"Deandra", "Diablo", "Urban", "Titus"}
-                  local targetElite = nil
-
-                  for _, name in pairs(eliteNames) do
-                      targetElite = GetNearestEnemy(name)
-                      if targetElite then break end
-                  end
-
-                  if not HasQuest() then
-                      game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("EliteHunter")
-                      task.wait(0.5)
-                  end
-
-                  if targetElite and targetElite:FindFirstChild("HumanoidRootPart") then
-                      local mobPos = targetElite.HumanoidRootPart.Position
-                      local targetCFrame = CFrame.new(mobPos + Vector3.new(0, _G.FarmDistance, 0), mobPos)
-
-                      if (LocalPlayer.Character.HumanoidRootPart.Position - mobPos).Magnitude > 12 then
-                          TweenTo(targetCFrame, 250)
-                      else
-                          StopTween()
-                          LocalPlayer.Character.HumanoidRootPart.CFrame = targetCFrame
-                      end
-                  end
-              end)
-          end
-      end)
-   end,
-})
-
--- TAB 4: CÀI ĐẶT NHÂN VẬT
-local PlayerTab = Window:CreateTab("Cài Đặt", 4483345998)
-
-PlayerTab:CreateSlider({
-   Name = "Tốc độ di chuyển Bay (Tween Speed)",
-   Range = {150, 350},
-   Increment = 10,
-   Suffix = "Speed",
-   CurrentValue = 250,
-   Flag = "TweenSpeedSlider",
-   Callback = function(Value)
-      _G.TweenSpeed = Value
-   end,
-})
-
-PlayerTab:CreateSlider({
-   Name = "WalkSpeed Nhân Vật",
-   Range = {16, 250},
-   Increment = 1,
-   Suffix = "Speed",
-   CurrentValue = 16,
-   Flag = "WalkSpeedSlider",
-   Callback = function(Value)
-      if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-          LocalPlayer.Character.Humanoid.WalkSpeed = Value
-      end
    end,
 })
