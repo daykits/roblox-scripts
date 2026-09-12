@@ -5,7 +5,7 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Window = Rayfield:CreateWindow({
    Name = "Banana Cat Hub 🍌🐱 | Blox Fruits",
    LoadingTitle = "Banana Cat Hub",
-   LoadingSubtitle = "Fix Auto Chest Di Chuyển Mượt + Fast Attack",
+   LoadingSubtitle = "Fix Fast Attack & Auto Farm Dame 100%",
    ConfigurationSaving = {
       Enabled = true,
       FolderName = "BananaCatConfig",
@@ -15,7 +15,7 @@ local Window = Rayfield:CreateWindow({
    KeySystem = false
 })
 
--- Anti-AFK (Chống treo máy văng game)
+-- Anti-AFK (Chống văng game)
 game:GetService("Players").LocalPlayer.Idled:Connect(function()
     game:GetService("VirtualUser"):Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
     task.wait(1)
@@ -24,19 +24,19 @@ end)
 
 local MainTab = Window:CreateTab("Auto Farm", 4483345998)
 
-MainTab:CreateSection("Cài Đặt Vị Trí & Tấn Công")
+MainTab:CreateSection("Cài Đặt Tấn Công & Fast Attack")
 
 _G.AutoFarm = false
-_G.FastAttack = false
-_G.FarmDistance = 6.5 -- Độ cao chuẩn có dame 100%
+_G.FastAttack = true
+_G.FarmDistance = 5.5 -- Khoảng cách chuẩn nhất để võ trúng Hitbox quái
 
 -- Thanh trượt chỉnh độ cao
 MainTab:CreateSlider({
    Name = "Độ cao lơ lửng trên đầu quái",
-   Range = {4, 12},
+   Range = {3, 10},
    Increment = 0.5,
    Suffix = "Studs",
-   CurrentValue = 6.5,
+   CurrentValue = 5.5,
    Flag = "FarmDistSlider",
    Callback = function(Value)
       _G.FarmDistance = Value
@@ -45,7 +45,7 @@ MainTab:CreateSlider({
 
 MainTab:CreateToggle({
    Name = "Bật Fast Attack (Đánh Siêu Nhanh)",
-   CurrentValue = false,
+   CurrentValue = true,
    Flag = "ToggleFastAttack",
    Callback = function(Value)
       _G.FastAttack = Value
@@ -54,7 +54,7 @@ MainTab:CreateToggle({
 
 MainTab:CreateSection("Tự Động Cày Quái Bằng Võ (Melee)")
 
--- Hàm trang bị Võ chuẩn
+-- Hàm trang bị Võ
 local function EquipMeleeWeapon()
     local player = game.Players.LocalPlayer
     local char = player.Character
@@ -101,44 +101,61 @@ local function EquipMeleeWeapon()
     end
 end
 
--- Hàm thực thi đòn đánh và truyền Dame
+-- LUỒNG FAST ATTACK ĐỘC LẬP (Siêu Tốc Độ + Ép Dame Server)
 local VIM = game:GetService("VirtualInputManager")
 
-local function AttackAndRegisterDame(targetMob)
-    pcall(function()
-        local player = game.Players.LocalPlayer
-        local char = player.Character
-        if not char then return end
-        
-        local tool = char:FindFirstChildOfClass("Tool")
-        if tool then
-            tool:Activate()
-            VIM:SendMouseButtonEvent(500, 500, 0, true, game, 1)
-            VIM:SendMouseButtonEvent(500, 500, 0, false, game, 1)
-            
-            local net = game:GetService("ReplicatedStorage"):FindFirstChild("Modules") 
-                        and game.ReplicatedStorage.Modules:FindFirstChild("Net")
-            if net then
-                local regAttack = net:FindFirstChild("RE/RegisterAttack")
-                local regHit = net:FindFirstChild("RE/RegisterHit")
-                
-                if regAttack then regAttack:FireServer(0.1) end
-                if regHit and targetMob and targetMob:FindFirstChild("HumanoidRootPart") then
-                    regHit:FireServer(targetMob.HumanoidRootPart, {targetMob})
+task.spawn(function()
+    while true do
+        task.wait()
+        if _G.FastAttack or _G.AutoFarm then
+            pcall(function()
+                local player = game.Players.LocalPlayer
+                local char = player.Character
+                if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+
+                local tool = char:FindFirstChildOfClass("Tool")
+                if tool then
+                    -- 1. Vung đòn liên tục
+                    tool:Activate()
+                    VIM:SendMouseButtonEvent(500, 500, 0, true, game, 1)
+                    VIM:SendMouseButtonEvent(500, 500, 0, false, game, 1)
+
+                    -- 2. Gửi Remote Attack / RegisterHit cho tất cả quái trong bán kính 30 studs
+                    local net = game:GetService("ReplicatedStorage"):FindFirstChild("Modules") 
+                                and game.ReplicatedStorage.Modules:FindFirstChild("Net")
+                    if net then
+                        local regAttack = net:FindFirstChild("RE/RegisterAttack")
+                        local regHit = net:FindFirstChild("RE/RegisterHit")
+                        
+                        if regAttack then 
+                            regAttack:FireServer(0) 
+                        end
+                        
+                        if regHit and workspace:FindFirstChild("Enemies") then
+                            for _, enemy in pairs(workspace.Enemies:GetChildren()) do
+                                if enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 and enemy:FindFirstChild("HumanoidRootPart") then
+                                    local dist = (char.HumanoidRootPart.Position - enemy.HumanoidRootPart.Position).Magnitude
+                                    if dist <= 30 then
+                                        regHit:FireServer(enemy.HumanoidRootPart, {enemy})
+                                    end
+                                end
+                            end
+                        end
+                    end
                 end
-            end
+            end)
         end
-    end)
-end
+    end
+end)
 
 MainTab:CreateToggle({
-   Name = "Bật Auto Farm bằng Võ (Có Dame 100%)",
+   Name = "Bật Auto Farm bằng Võ (Tự Đánh + Có Dame)",
    CurrentValue = false,
    Flag = "ToggleFarmMelee",
    Callback = function(Value)
       _G.AutoFarm = Value
 
-      -- Luồng 1: Giữ Noclip & Trang bị Võ
+      -- Luồng 1: Tự động Cầm Võ & Bật Noclip
       task.spawn(function()
           while _G.AutoFarm do
               task.wait(0.2)
@@ -155,38 +172,7 @@ MainTab:CreateToggle({
           end
       end)
 
-      -- Luồng 2: Tấn công
-      task.spawn(function()
-          while _G.AutoFarm do
-              if _G.FastAttack then
-                  task.wait(0.01)
-              else
-                  task.wait(0.15)
-              end
-              
-              local player = game.Players.LocalPlayer
-              local char = player.Character
-              if char and char:FindFirstChild("HumanoidRootPart") then
-                  local hrp = char.HumanoidRootPart
-                  local nearestMob = nil
-                  local minDist = math.huge
-                  if workspace:FindFirstChild("Enemies") then
-                      for _, enemy in pairs(workspace.Enemies:GetChildren()) do
-                          if enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 and enemy:FindFirstChild("HumanoidRootPart") then
-                              local dist = (hrp.Position - enemy.HumanoidRootPart.Position).Magnitude
-                              if dist < minDist then
-                                  minDist = dist
-                                  nearestMob = enemy
-                              end
-                          end
-                      end
-                  end
-                  AttackAndRegisterDame(nearestMob)
-              end
-          end
-      end)
-
-      -- Luồng 3: Giữ vị trí lơ lửng an toàn (6.5 studs)
+      -- Luồng 2: Tìm Quái và Giữ Vị Trí Lơ Lửng Chuẩn
       task.spawn(function()
           while _G.AutoFarm do
               task.wait()
@@ -213,9 +199,12 @@ MainTab:CreateToggle({
 
                   if nearestMob then
                       local mobPos = nearestMob.HumanoidRootPart.Position
-                      local height = _G.FarmDistance or 6.5
+                      local height = _G.FarmDistance or 5.5
                       
+                      -- Đứng trên đầu quái 5.5 studs và xoay mặt xuống quái
                       hrp.CFrame = CFrame.new(mobPos + Vector3.new(0, height, 0), mobPos)
+                      
+                      -- Khóa quái không bị văng
                       nearestMob.HumanoidRootPart.CanCollide = false
                       nearestMob.HumanoidRootPart.Velocity = Vector3.new(0,0,0)
                   end
@@ -259,7 +248,6 @@ MainTab:CreateToggle({
                   local chests = GetChests()
 
                   if #chests > 0 then
-                      -- Sắp xếp rương từ gần nhất đến xa nhất
                       table.sort(chests, function(a, b)
                           return (hrp.Position - a.Position).Magnitude < (hrp.Position - b.Position).Magnitude
                       end)
@@ -267,15 +255,13 @@ MainTab:CreateToggle({
                       local targetChest = chests[1]
 
                       if targetChest and targetChest:FindFirstChild("TouchInterest") then
-                          local speed = 300 -- Tốc độ bay di chuyển (studs/giây)
+                          local speed = 300
                           local distance = (hrp.Position - targetChest.Position).Magnitude
                           local duration = distance / speed
 
-                          -- Tạo hiệu ứng di chuyển mượt (Tween)
                           local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
                           local tween = game:GetService("TweenService"):Create(hrp, tweenInfo, {CFrame = targetChest.CFrame})
                           
-                          -- Tạo BodyVelocity giữ nhân vật không bị rơi bởi trọng lực khi di chuyển
                           local bv = Instance.new("BodyVelocity")
                           bv.Name = "ChestFlyBV"
                           bv.MaxForce = Vector3.new(1e9, 1e9, 1e9)
@@ -284,13 +270,11 @@ MainTab:CreateToggle({
 
                           tween:Play()
 
-                          -- Vòng lặp chờ trong lúc di chuyển đến rương
                           local elapsed = 0
                           repeat
                               task.wait(0.05)
                               elapsed = elapsed + 0.05
                               
-                              -- Bật Noclip xuyên vật cản trong quá trình di chuyển
                               if character then
                                   for _, part in pairs(character:GetChildren()) do
                                       if part:IsA("BasePart") then
@@ -300,11 +284,9 @@ MainTab:CreateToggle({
                               end
                           until elapsed >= duration or not _G.AutoChest or not targetChest or not targetChest.Parent or not targetChest:FindFirstChild("TouchInterest")
 
-                          -- Dừng Tween & Xóa BodyVelocity sau khi đến rương
                           if tween then tween:Cancel() end
                           if bv then bv:Destroy() end
 
-                          -- Nhặt rương khi đã tiếp cận
                           if _G.AutoChest and targetChest and targetChest:FindFirstChild("TouchInterest") then
                               hrp.CFrame = targetChest.CFrame
                               if firetouchinterest then
@@ -321,7 +303,6 @@ MainTab:CreateToggle({
               end)
           end
 
-          -- Dọn dẹp BodyVelocity nếu tắt tính năng Auto Chest
           if game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
               local hrp = game.Players.LocalPlayer.Character.HumanoidRootPart
               for _, v in pairs(hrp:GetChildren()) do
