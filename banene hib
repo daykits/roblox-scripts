@@ -1,21 +1,24 @@
 repeat task.wait() until game:IsLoaded()
 
--- Thư viện Redz UI V5
-local RedzLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/realredz/RedzLibV5/main/Source.lua"))()
+-- Nguồn Rayfield Library ổn định (Máy chủ Sirius)
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
-local Window = RedzLib:MakeWindow({
-  Title = "Banana Cat Hub 🍌🐱 | Blox Fruits",
-  SubTitle = "Auto Farm & Auto Chest",
-  SaveFolder = "BananaCatConfig"
+local Window = Rayfield:CreateWindow({
+   Name = "Banana Cat Hub 🍌🐱 | Blox Fruits",
+   LoadingTitle = "Banana Cat Hub",
+   LoadingSubtitle = "Auto Farm & Auto Chest",
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = "BananaCatConfig",
+      FileName = "Config"
+   },
+   Discord = {
+      Enabled = false
+   },
+   KeySystem = false
 })
 
--- Nút thu nhỏ menu trên màn hình
-Window:AddMinimizeButton({
-  Button = { Image = "rbxassetid://4483345998", BackgroundTransparency = 0 },
-  Corner = { CornerRadius = UDim.new(0, 6) }
-})
-
--- Anti-AFK (Chống treo máy văng game)
+-- Anti-AFK (Chống văng game)
 game:GetService("Players").LocalPlayer.Idled:Connect(function()
     game:GetService("VirtualUser"):Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
     task.wait(1)
@@ -23,120 +26,119 @@ game:GetService("Players").LocalPlayer.Idled:Connect(function()
 end)
 
 -- TAB AUTO FARM & AUTO CHEST
-local MainTab = Window:MakeTab({"Auto Farm", "swords"})
+local MainTab = Window:CreateTab("Auto Farm", 4483345998)
 
-MainTab:AddSection({"Tự Động Cày Quái"})
+MainTab:CreateSection("Tự Động Cày Quái")
 
 _G.AutoFarm = false
 
-MainTab:AddToggle({
-  Name = "Bật Auto Farm Quái Gần Nhất",
-  Default = false,
-  Callback = function(Value)
-    _G.AutoFarm = Value
-    task.spawn(function()
-        while _G.AutoFarm do
-            task.wait()
-            pcall(function()
-                local player = game.Players.LocalPlayer
-                local character = player.Character or player.CharacterAdded:Wait()
-                
-                -- Trang bị vũ khí
-                for _, tool in pairs(player.Backpack:GetChildren()) do
-                    if tool:IsA("Tool") then
-                        character.Humanoid:EquipTool(tool)
-                        break
-                    end
-                end
-                
-                -- Dò tìm quái
-                local nearestMob = nil
-                local minDistance = math.huge
-                
-                if workspace:FindFirstChild("Enemies") then
-                    for _, enemy in pairs(workspace.Enemies:GetChildren()) do
-                        if enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 and enemy:FindFirstChild("HumanoidRootPart") then
-                            local dist = (character.HumanoidRootPart.Position - enemy.HumanoidRootPart.Position).Magnitude
-                            if dist < minDistance then
-                                minDistance = dist
-                                nearestMob = enemy
-                            end
-                        end
-                    end
-                end
-                
-                -- Đánh quái
-                if nearestMob then
-                    repeat
-                        task.wait()
-                        if not _G.AutoFarm or not nearestMob or not nearestMob:FindFirstChild("Humanoid") or nearestMob.Humanoid.Health <= 0 then break end
-                        character.HumanoidRootPart.CFrame = nearestMob.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0) * CFrame.Angles(math.rad(-90), 0, 0)
-                        game:GetService("VirtualUser"):CaptureController()
-                        game:GetService("VirtualUser"):ClickButton1(Vector2.new(500, 500))
-                    until not _G.AutoFarm or not nearestMob or nearestMob.Humanoid.Health <= 0
-                end
-            end)
-        end
-    end)
-  end
+MainTab:CreateToggle({
+   Name = "Bật Auto Farm Quái Gần Nhất",
+   CurrentValue = false,
+   Flag = "ToggleFarm",
+   Callback = function(Value)
+      _G.AutoFarm = Value
+      task.spawn(function()
+          while _G.AutoFarm do
+              task.wait()
+              pcall(function()
+                  local player = game.Players.LocalPlayer
+                  local character = player.Character or player.CharacterAdded:Wait()
+                  
+                  -- Trang bị vũ khí
+                  for _, tool in pairs(player.Backpack:GetChildren()) do
+                      if tool:IsA("Tool") then
+                          character.Humanoid:EquipTool(tool)
+                          break
+                      end
+                  end
+                  
+                  -- Tìm quái gần nhất
+                  local nearestMob = nil
+                  local minDistance = math.huge
+                  
+                  if workspace:FindFirstChild("Enemies") then
+                      for _, enemy in pairs(workspace.Enemies:GetChildren()) do
+                          if enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 and enemy:FindFirstChild("HumanoidRootPart") then
+                              local dist = (character.HumanoidRootPart.Position - enemy.HumanoidRootPart.Position).Magnitude
+                              if dist < minDistance then
+                                  minDistance = dist
+                                  nearestMob = enemy
+                              end
+                          end
+                      end
+                  end
+                  
+                  -- Đánh quái
+                  if nearestMob then
+                      repeat
+                          task.wait()
+                          if not _G.AutoFarm or not nearestMob or not nearestMob:FindFirstChild("Humanoid") or nearestMob.Humanoid.Health <= 0 then break end
+                          character.HumanoidRootPart.CFrame = nearestMob.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0) * CFrame.Angles(math.rad(-90), 0, 0)
+                          game:GetService("VirtualUser"):CaptureController()
+                          game:GetService("VirtualUser"):ClickButton1(Vector2.new(500, 500))
+                      until not _G.AutoFarm or not nearestMob or nearestMob.Humanoid.Health <= 0
+                  end
+              end)
+          end
+      end)
+   end,
 })
 
-MainTab:AddSection({"Tự Động Nhặt Rương (Auto Chest)"})
+MainTab:CreateSection("Tự Động Nhặt Rương")
 
 _G.AutoChest = false
 
-MainTab:AddToggle({
-  Name = "Bật Auto Chest (Gom Rương Beli)",
-  Default = false,
-  Callback = function(Value)
-    _G.AutoChest = Value
-    task.spawn(function()
-        while _G.AutoChest do
-            task.wait(0.1)
-            pcall(function()
-                local player = game.Players.LocalPlayer
-                local character = player.Character or player.CharacterAdded:Wait()
-                local hrp = character:FindFirstChild("HumanoidRootPart")
-                
-                if hrp then
-                    for _, v in pairs(workspace:GetDescendants()) do
-                        if not _G.AutoChest then break end
-                        
-                        -- Nhận diện tất cả loại rương (Chest1, Chest2, Chest3)
-                        if v:IsA("Part") and v.Name:find("Chest") and v:FindFirstChild("TouchInterest") then
-                            repeat
-                                task.wait(0.05)
-                                if not _G.AutoChest or not v or not v.Parent or not v:FindFirstChild("TouchInterest") then break end
-                                
-                                -- Dịch chuyển tới rương và chạm nhặt
-                                hrp.CFrame = v.CFrame
-                                if firetouchinterest then
-                                    firetouchinterest(hrp, v, 0)
-                                    task.wait(0.05)
-                                    firetouchinterest(hrp, v, 1)
-                                end
-                            until not v or not v.Parent or not v:FindFirstChild("TouchInterest") or not _G.AutoChest
-                        end
-                    end
-                end
-            end)
-        end
-    end)
-  end
+MainTab:CreateToggle({
+   Name = "Bật Auto Chest (Gom Rương Beli)",
+   CurrentValue = false,
+   Flag = "ToggleChest",
+   Callback = function(Value)
+      _G.AutoChest = Value
+      task.spawn(function()
+          while _G.AutoChest do
+              task.wait(0.1)
+              pcall(function()
+                  local player = game.Players.LocalPlayer
+                  local character = player.Character or player.CharacterAdded:Wait()
+                  local hrp = character:FindFirstChild("HumanoidRootPart")
+                  
+                  if hrp then
+                      for _, v in pairs(workspace:GetDescendants()) do
+                          if not _G.AutoChest then break end
+                          if v:IsA("Part") and v.Name:find("Chest") and v:FindFirstChild("TouchInterest") then
+                              repeat
+                                  task.wait(0.05)
+                                  if not _G.AutoChest or not v or not v.Parent or not v:FindFirstChild("TouchInterest") then break end
+                                  hrp.CFrame = v.CFrame
+                                  if firetouchinterest then
+                                      firetouchinterest(hrp, v, 0)
+                                      task.wait(0.05)
+                                      firetouchinterest(hrp, v, 1)
+                                  end
+                              until not v or not v.Parent or not v:FindFirstChild("TouchInterest") or not _G.AutoChest
+                          end
+                      end
+                  end
+              end)
+          end
+      end)
+   end,
 })
 
 -- TAB NHÂN VẬT
-local PlayerTab = Window:MakeTab({"Nhân Vật", "user"})
+local PlayerTab = Window:CreateTab("Nhân Vật", 4483345998)
 
-PlayerTab:AddSlider({
-  Name = "Tốc độ di chuyển (WalkSpeed)",
-  Min = 16,
-  Max = 300,
-  Increase = 1,
-  Default = 16,
-  Callback = function(Value)
-    if game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid") then
-        game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = Value
-    end
-  end
+PlayerTab:CreateSlider({
+   Name = "Tốc độ di chuyển (WalkSpeed)",
+   Range = {16, 300},
+   Increment = 1,
+   Suffix = "Speed",
+   CurrentValue = 16,
+   Flag = "SliderSpeed",
+   Callback = function(Value)
+      if game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid") then
+          game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = Value
+      end
+   end,
 })
