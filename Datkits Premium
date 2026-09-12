@@ -139,27 +139,19 @@ local function HasQuest()
     return false
 end
 
--- Hàm trang bị Võ an toàn
+-- Hàm trang bị Vũ Khí / Võ an toàn
 local function EquipMeleeWeapon()
     local player = game.Players.LocalPlayer
     local char = player.Character
-    if not char then return nil end
+    if not char or not char:FindFirstChild("Humanoid") then return nil end
 
+    -- Nếu đã cầm vũ khí trên tay thì sử dụng vũ khí đó
     local currentTool = char:FindFirstChildOfClass("Tool")
     if currentTool then
-        if currentTool.ToolTip == "Melee" 
-        or currentTool:FindFirstChild("Combat") 
-        or currentTool.Name:find("Combat") 
-        or currentTool.Name:find("Step") 
-        or currentTool.Name:find("Karate") 
-        or currentTool.Name:find("Dragon") 
-        or currentTool.Name:find("Electric") 
-        or currentTool.Name:find("God") 
-        or currentTool.Name:find("Claw") then
-            return currentTool
-        end
+        return currentTool
     end
 
+    -- Tìm Võ / Melee trong Backpack
     for _, tool in pairs(player.Backpack:GetChildren()) do
         if tool:IsA("Tool") then
             if tool.ToolTip == "Melee" 
@@ -176,6 +168,14 @@ local function EquipMeleeWeapon()
                 return tool
             end
         end
+    end
+
+    -- Nếu không tìm thấy Võ, tự động lấy vũ khí bất kỳ trong Balo (Kiếm, Trái...)
+    local anyTool = player.Backpack:FindFirstChildOfClass("Tool")
+    if anyTool then
+        char.Humanoid:EquipTool(anyTool)
+        task.wait(0.1)
+        return anyTool
     end
 end
 
@@ -241,10 +241,13 @@ local function TweenTo(targetCFrame, speed)
     end
 end
 
--- LUỒNG FAST ATTACK (ĐÁNH SIÊU NHANH)
+-- LUỒNG TẤN CÔNG SIÊU MẠNH (FAST ATTACK + SIMULATE CLICK)
+local VIM = game:GetService("VirtualInputManager")
+local VirtualUser = game:GetService("VirtualUser")
+
 task.spawn(function()
     while true do
-        task.wait(_G.FastAttack and 0.05 or 0.2)
+        task.wait(_G.FastAttack and 0.03 or 0.15)
         if _G.AutoFarm or _G.AutoQuest then
             pcall(function()
                 local player = game.Players.LocalPlayer
@@ -252,9 +255,17 @@ task.spawn(function()
                 if not char or not char:FindFirstChild("HumanoidRootPart") then return end
 
                 local tool = char:FindFirstChildOfClass("Tool")
-                if tool and tool:IsA("Tool") then
+                if tool then
+                    -- 1. Kích hoạt vũ khí
                     tool:Activate()
 
+                    -- 2. Giả lập Click Chuột Trái (Đảm bảo 100% đánh trúng quái)
+                    VIM:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+                    VIM:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+                    VirtualUser:CaptureController()
+                    VirtualUser:ClickButton1(Vector2.new(500, 500))
+
+                    -- 3. Gửi Remote Đánh (Fast Attack Blox Fruits)
                     local rep = game:GetService("ReplicatedStorage")
                     local net = rep:FindFirstChild("Modules") and rep.Modules:FindFirstChild("Net")
                     if net then
@@ -267,7 +278,8 @@ task.spawn(function()
                             for _, enemy in pairs(workspace.Enemies:GetChildren()) do
                                 if enemy and enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 and enemy:FindFirstChild("HumanoidRootPart") then
                                     local dist = (char.HumanoidRootPart.Position - enemy.HumanoidRootPart.Position).Magnitude
-                                    if dist <= 35 then
+                                    if dist <= 40 then
+                                        regHit:FireServer(enemy.HumanoidRootPart, {{enemy, enemy.HumanoidRootPart}})
                                         regHit:FireServer(enemy.HumanoidRootPart, {enemy})
                                     end
                                 end
