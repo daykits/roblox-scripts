@@ -1,12 +1,11 @@
 repeat task.wait() until game:IsLoaded()
 
--- Nguồn Rayfield Library ổn định (Máy chủ Sirius)
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Banana Cat Hub 🍌🐱 | Blox Fruits",
+   Name = "Datkits Premium💢 | Blox Fruits",
    LoadingTitle = "Banana Cat Hub",
-   LoadingSubtitle = "Auto Farm & Auto Chest",
+   LoadingSubtitle = "Auto Farm Võ (Melee) & Auto Chest",
    ConfigurationSaving = {
       Enabled = true,
       FolderName = "BananaCatConfig",
@@ -25,17 +24,16 @@ game:GetService("Players").LocalPlayer.Idled:Connect(function()
     game:GetService("VirtualUser"):Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
 end)
 
--- TAB AUTO FARM & AUTO CHEST
 local MainTab = Window:CreateTab("Auto Farm", 4483345998)
 
-MainTab:CreateSection("Tự Động Cày Quái")
+MainTab:CreateSection("Tự Động Cày Quái Bằng Võ (Melee)")
 
 _G.AutoFarm = false
 
 MainTab:CreateToggle({
-   Name = "Bật Auto Farm Quái Gần Nhất",
+   Name = "Bật Auto Farm bằng Võ (Melee)",
    CurrentValue = false,
-   Flag = "ToggleFarm",
+   Flag = "ToggleFarmMelee",
    Callback = function(Value)
       _G.AutoFarm = Value
       task.spawn(function()
@@ -45,11 +43,14 @@ MainTab:CreateToggle({
                   local player = game.Players.LocalPlayer
                   local character = player.Character or player.CharacterAdded:Wait()
                   
-                  -- Trang bị vũ khí
-                  for _, tool in pairs(player.Backpack:GetChildren()) do
-                      if tool:IsA("Tool") then
-                          character.Humanoid:EquipTool(tool)
-                          break
+                  -- Lọc và chỉ cầm vũ khí Võ (Melee)
+                  local currentTool = character:FindFirstChildOfClass("Tool")
+                  if not currentTool or currentTool.ToolTip ~= "Melee" then
+                      for _, tool in pairs(player.Backpack:GetChildren()) do
+                          if tool:IsA("Tool") and tool.ToolTip == "Melee" then
+                              character.Humanoid:EquipTool(tool)
+                              break
+                          end
                       end
                   end
                   
