@@ -9,7 +9,7 @@ local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.
 
 local Window = Fluent:CreateWindow({
     Title = "Datkits Premium | Blox Fruits",
-    SubTitle = "Fluent UI • Fast Attack Redz Style • Sea 1+2",
+    SubTitle = "Fluent UI • Fast Attack Redz • Optimized Mob Finder",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
     Acrylic = true,
@@ -154,6 +154,76 @@ local function HasQuest()
 end
 
 -------------------------------------------------
+-- HÀM TÌM QUÁI TỐI ƯU (ĐÃ THÊM)
+-------------------------------------------------
+local lastScanTime = 0
+local cachedTarget = nil
+local cachedMobName = nil
+
+local function FindBestMob(mobName, maxDistance)
+    maxDistance = maxDistance or 350
+    local char = GetCharacter()
+    if not char then return nil end
+
+    local hrp = char.HumanoidRootPart
+    local currentTime = tick()
+
+    -- Cache 0.35s giảm lag
+    if cachedTarget and cachedTarget.Parent and cachedTarget:FindFirstChild("Humanoid")
+       and cachedTarget.Humanoid.Health > 0
+       and cachedMobName == mobName
+       and (currentTime - lastScanTime) < 0.35 then
+
+        local dist = (hrp.Position - cachedTarget.HumanoidRootPart.Position).Magnitude
+        if dist <= maxDistance then
+            return cachedTarget
+        end
+    end
+
+    local bestMob = nil
+    local shortestDistance = maxDistance
+    local enemiesFolder = workspace:FindFirstChild("Enemies")
+    if not enemiesFolder then return nil end
+
+    local lowerMobName = mobName:lower()
+
+    for _, enemy in pairs(enemiesFolder:GetChildren()) do
+        if enemy:IsA("Model")
+        and enemy:FindFirstChild("Humanoid")
+        and enemy.Humanoid.Health > 0
+        and enemy:FindFirstChild("HumanoidRootPart") then
+
+            local enemyName = enemy.Name:lower()
+
+            local isCorrectMob =
+                enemyName:find(lowerMobName)
+                or (lowerMobName == "raider" and (enemyName:find("raider") or enemyName:find("kẻ tập kích")))
+                or (lowerMobName == "mercenary" and (enemyName:find("mercenary") or enemyName:find("lính đánh thuê")))
+                or (lowerMobName == "swan pirate" and enemyName:find("swan"))
+                or (lowerMobName == "factory staff" and enemyName:find("factory"))
+                or (lowerMobName == "marine lieutenant" and enemyName:find("lieutenant"))
+                or (lowerMobName == "marine captain" and enemyName:find("captain"))
+                or (lowerMobName == "zombie" and enemyName:find("zombie"))
+                or (lowerMobName == "vampire" and enemyName:find("vampire"))
+
+            if isCorrectMob then
+                local distance = (hrp.Position - enemy.HumanoidRootPart.Position).Magnitude
+                if distance < shortestDistance then
+                    shortestDistance = distance
+                    bestMob = enemy
+                end
+            end
+        end
+    end
+
+    cachedTarget = bestMob
+    cachedMobName = mobName
+    lastScanTime = currentTime
+
+    return bestMob
+end
+
+-------------------------------------------------
 -- QUEST DATA
 -------------------------------------------------
 local function GetQuestData()
@@ -203,7 +273,7 @@ local function GetQuestData()
 end
 
 -------------------------------------------------
--- FAST ATTACK KIỂU REDZ (CẢI TIẾN)
+-- FAST ATTACK REDZ STYLE
 -------------------------------------------------
 local function GetClosestHits()
     local hits = {}
@@ -231,10 +301,8 @@ task.spawn(function()
                 local tool = char:FindFirstChildOfClass("Tool")
                 if not tool then return end
 
-                -- Activate tool
                 tool:Activate()
 
-                -- Redz style: RegisterAttack
                 local modules = ReplicatedStorage:FindFirstChild("Modules")
                 if modules then
                     local net = modules:FindFirstChild("Net")
@@ -243,10 +311,9 @@ task.spawn(function()
                         local regHit = net:FindFirstChild("RE/RegisterHit")
 
                         if regAttack then
-                            regAttack:FireServer(0.1)
+                            regAttack:FireServer(0.05)
                         end
 
-                        -- LeftClickRemote (nếu có - kiểu Redz)
                         if tool:FindFirstChild("LeftClickRemote") then
                             local hits = GetClosestHits()
                             if #hits > 0 then
@@ -257,7 +324,6 @@ task.spawn(function()
                             end
                         end
 
-                        -- RegisterHit
                         if regHit then
                             local hits = GetClosestHits()
                             for _, data in pairs(hits) do
@@ -276,7 +342,7 @@ end)
 -------------------------------------------------
 -- TAB AUTO FARM
 -------------------------------------------------
-local MainSection = Tabs.Main:AddSection("Cài đặt")
+Tabs.Main:AddSection("Cài đặt")
 
 Tabs.Main:AddSlider("FarmDistance", {
     Title = "Độ cao lơ lửng",
@@ -305,70 +371,71 @@ Tabs.Main:AddToggle("AutoQuestToggle", {
     Default = false,
     Callback = function(Value)
         getgenv().AutoQuest = Value
+
         if not Value then
             ResetCharacterState()
+            Fluent:Notify({Title = "Auto Quest", Content = "Đã TẮT", Duration = 3})
             return
         end
 
+        Fluent:Notify({Title = "Auto Quest", Content = "Đã BẬT", Duration = 3})
+
+        -- Giữ vũ khí
         task.spawn(function()
             while getgenv().AutoQuest do
                 pcall(EquipWeapon)
-                task.wait(0.5)
+                task.wait(0.55)
             end
         end)
 
+        -- Luồng chính
         task.spawn(function()
             while getgenv().AutoQuest do
-                task.wait(0.08)
+                task.wait(0.1)
+
                 pcall(function()
                     local char = GetCharacter()
                     if not char then return end
                     local hrp = char.HumanoidRootPart
+
                     local questName, questLevel, mobName, npcCFrame, mobCFrame = GetQuestData()
 
                     if not HasQuest() then
+                        -- Chưa có quest → đi nhận
                         if npcCFrame then
                             local dist = (hrp.Position - npcCFrame.Position).Magnitude
-                            if dist > 8 then
-                                TweenTo(npcCFrame * CFrame.new(0, 0, 2.5), 230)
+                            if dist > 9 then
+                                TweenTo(npcCFrame * CFrame.new(0, 0, 2), 240)
                             else
                                 StopTween()
-                                for i = 1, 5 do
+                                for i = 1, 6 do
                                     pcall(function()
                                         ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", questName, questLevel)
                                     end)
-                                    task.wait(0.12)
+                                    task.wait(0.1)
                                 end
-                                task.wait(0.6)
+                                task.wait(0.7)
                             end
                         end
                     else
-                        local target = nil
-                        local minDist = math.huge
-                        if workspace:FindFirstChild("Enemies") then
-                            for _, enemy in pairs(workspace.Enemies:GetChildren()) do
-                                if enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0
-                                and enemy:FindFirstChild("HumanoidRootPart")
-                                and string.find(enemy.Name, mobName) then
-                                    local d = (hrp.Position - enemy.HumanoidRootPart.Position).Magnitude
-                                    if d < minDist then
-                                        minDist = d
-                                        target = enemy
-                                    end
-                                end
-                            end
-                        end
+                        -- Đã có quest → farm bằng hàm tối ưu
+                        local target = FindBestMob(mobName, 350)
 
-                        if target then
+                        if target and target:FindFirstChild("HumanoidRootPart") then
                             local pos = target.HumanoidRootPart.Position
-                            local cf = CFrame.new(pos + Vector3.new(0, getgenv().FarmDistance, 0), pos)
-                            TweenTo(cf, 240)
+                            local height = getgenv().FarmDistance or 6
+                            local farmCF = CFrame.new(pos + Vector3.new(0, height, 0), pos)
+                            TweenTo(farmCF, 255)
+
                             pcall(function()
                                 target.HumanoidRootPart.CanCollide = false
-                                target.HumanoidRootPart.Velocity = Vector3.zero
+                                target.HumanoidRootPart.AssemblyLinearVelocity = Vector3.zero
+                                target.HumanoidRootPart.AssemblyAngularVelocity = Vector3.zero
                             end)
-                        elseif mobCFrame then
-                            TweenTo(mobCFrame, 240)
+                        else
+                            if mobCFrame then
+                                TweenTo(mobCFrame, 250)
+                            end
                         end
                     end
                 end)
@@ -393,24 +460,26 @@ Tabs.Main:AddToggle("AutoFarmToggle", {
         task.spawn(function()
             while getgenv().AutoFarm do
                 pcall(EquipWeapon)
-                task.wait(0.5)
+                task.wait(0.55)
             end
         end)
 
         task.spawn(function()
             while getgenv().AutoFarm do
-                task.wait(0.08)
+                task.wait(0.1)
                 pcall(function()
                     local char = GetCharacter()
                     if not char then return end
-                    local hrp = char.HumanoidRootPart
+
+                    local target = FindBestMob("", 400) -- tìm mob gần nhất bất kỳ
+                    -- Vì FindBestMob cần tên, ta viết lại nhanh cho nearest
                     local nearest = nil
-                    local minDist = math.huge
+                    local minDist = 400
+                    local hrp = char.HumanoidRootPart
 
                     if workspace:FindFirstChild("Enemies") then
                         for _, enemy in pairs(workspace.Enemies:GetChildren()) do
-                            if enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0
-                            and enemy:FindFirstChild("HumanoidRootPart") then
+                            if enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 and enemy:FindFirstChild("HumanoidRootPart") then
                                 local d = (hrp.Position - enemy.HumanoidRootPart.Position).Magnitude
                                 if d < minDist then
                                     minDist = d
@@ -422,11 +491,11 @@ Tabs.Main:AddToggle("AutoFarmToggle", {
 
                     if nearest then
                         local pos = nearest.HumanoidRootPart.Position
-                        local cf = CFrame.new(pos + Vector3.new(0, getgenv().FarmDistance, 0), pos)
-                        TweenTo(cf, 240)
+                        local height = getgenv().FarmDistance or 6
+                        TweenTo(CFrame.new(pos + Vector3.new(0, height, 0), pos), 255)
                         pcall(function()
                             nearest.HumanoidRootPart.CanCollide = false
-                            nearest.HumanoidRootPart.Velocity = Vector3.zero
+                            nearest.HumanoidRootPart.AssemblyLinearVelocity = Vector3.zero
                         end)
                     end
                 end)
@@ -455,12 +524,14 @@ Tabs.Main:AddToggle("AutoChestToggle", {
                     local char = GetCharacter()
                     if not char then return end
                     local hrp = char.HumanoidRootPart
+
                     local chests = {}
                     for _, v in pairs(workspace:GetDescendants()) do
                         if v:IsA("Part") and v.Name:find("Chest") and v:FindFirstChild("TouchInterest") then
                             table.insert(chests, v)
                         end
                     end
+
                     if #chests > 0 then
                         table.sort(chests, function(a, b)
                             return (hrp.Position - a.Position).Magnitude < (hrp.Position - b.Position).Magnitude
@@ -502,7 +573,7 @@ Tabs.Player:AddSlider("WalkSpeed", {
 })
 
 -------------------------------------------------
--- SETTINGS + SAVE
+-- SETTINGS
 -------------------------------------------------
 SaveManager:SetLibrary(Fluent)
 InterfaceManager:SetLibrary(Fluent)
@@ -515,7 +586,7 @@ Window:SelectTab(1)
 
 Fluent:Notify({
     Title = "Datkits Premium",
-    Content = "Fluent UI + Fast Attack Redz Style đã sẵn sàng!",
+    Content = "Đã load thành công • Mob Finder tối ưu • Auto Quest đã sửa",
     Duration = 6
 })
 
@@ -524,4 +595,4 @@ LocalPlayer.CharacterAdded:Connect(function()
     ResetCharacterState()
 end)
 
-print("[Datkits] Fluent + Redz Fast Attack loaded!")
+print("[Datkits] Full Optimized Script Loaded!")
