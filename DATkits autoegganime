@@ -1,20 +1,19 @@
--- Khởi tạo thư viện Menu Fluent UI
-local Fluent = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+repeat task.wait() until game:IsLoaded()
 
-local Window = Fluent:CreateWindow({
-    Title = "Auto Farm Valentine Egg",
-    SubTitle = "by AI Assistant",
-    TabWidth = 160,
-    Size = UDim2.fromOffset(450, 320),
-    Acrylic = false,
-    Theme = "Dark",
-    MinimizeKey = Enum.KeyCode.LeftControl
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "egganime | Blox Fruits",
+   LoadingTitle = "egg!",
+   LoadingSubtitle = "Fix menu",
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = "egg",
+      FileName = "Config"
+   },
+   Discord = { Enabled = false },
+   KeySystem = false
 })
-
-local Tabs = {
-    Main = Window:AddTab({ Title = "Tính Năng Chính", Icon = "home" })
-}
-
 -- CẤU HÌNH TỌA ĐỘ (Đã lấy từ ảnh của bạn)
 local targetPosition = Vector3.new(1154.266, 15.681, -484.52)
 local _G = { AutoFarm = false }
