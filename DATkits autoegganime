@@ -5,7 +5,7 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Window = Rayfield:CreateWindow({
    Name = "sleal egg | Anime",
    LoadingTitle = "egg!",
-   LoadingSubtitle = "Fix Teleport",
+   LoadingSubtitle = "Auto Equip & Return Home",
    ConfigurationSaving = { Enabled = false },
    Discord = { Enabled = false },
    KeySystem = false
@@ -15,20 +15,27 @@ local MainTab = Window:CreateTab("Chính", 4483362458)
 local targetPosition = Vector3.new(1154.266, 15.681, -484.52)
 _G.AutoFarm = false
 
--- Hàm Teleport An Toàn (Chống Rubberband / Kéo ngược)
+-- Hàm Teleport dùng PivotTo kết hợp gỡ Va chạm để vượt Anti-cheat
 local function safeTeleport(targetCFrame)
     local player = game.Players.LocalPlayer
     local character = player.Character or player.CharacterAdded:Wait()
     local rootPart = character:FindFirstChild("HumanoidRootPart")
     
-    if rootPart then
-        -- Xóa vận tốc di chuyển cũ để tránh bị game kéo lại
+    if character and rootPart then
+        -- Tắt va chạm tạm thời để tránh bị kẹt địa hình gây giật lùi
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+        
+        -- Triệt tiêu vận tốc cũ
         rootPart.AssemblyLinearVelocity = Vector3.zero
         rootPart.AssemblyAngularVelocity = Vector3.zero
         
-        -- Cập nhật tọa độ
-        rootPart.CFrame = targetCFrame
-        task.wait(0.05)
+        -- Dịch chuyển toàn bộ Character Model
+        character:PivotTo(targetCFrame)
+        task.wait(0.1)
         rootPart.AssemblyLinearVelocity = Vector3.zero
     end
 end
@@ -48,7 +55,7 @@ local function triggerProximityPrompts()
     for _, prompt in ipairs(workspace:GetDescendants()) do
         if prompt:IsA("ProximityPrompt") and prompt.Parent then
             local promptPos = getPosition(prompt.Parent)
-            if promptPos and (promptPos - targetPosition).Magnitude < 15 then
+            if promptPos and (promptPos - targetPosition).Magnitude < 20 then
                 task.spawn(function()
                     if fireproximityprompt then
                         fireproximityprompt(prompt)
@@ -63,9 +70,34 @@ local function triggerProximityPrompts()
     end
 end
 
+-- Hàm tự động tìm và cầm trứng lên tay từ Backpack
+local function equipEgg()
+    local player = game.Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local backpack = player:FindFirstChild("Backpack")
+    
+    if humanoid and backpack then
+        for _, tool in ipairs(backpack:GetChildren()) do
+            if tool:IsA("Tool") then
+                -- Kiểm tra tên vật phẩm (ưu tiên vật phẩm trứng hoặc tự cầm vật phẩm mới nhặt)
+                local toolName = tool.Name:lower()
+                if toolName:find("egg") or toolName:find("trứng") or toolName:find("valen") then
+                    humanoid:EquipTool(tool)
+                    break
+                else
+                    -- Nếu không tìm thấy theo tên cụ thể, tự trang bị tool trong balo
+                    humanoid:EquipTool(tool)
+                    break
+                end
+            end
+        end
+    end
+end
+
 -- Nút Bật/Tắt
 MainTab:CreateToggle({
-   Name = "Tự Động Gom Trứng",
+   Name = "Tự Động Gom Trứng Về Nhà",
    CurrentValue = false,
    Flag = "AutoFarmToggle",
    Callback = function(Value)
@@ -80,25 +112,29 @@ task.spawn(function()
     while true do
         task.wait(0.1)
         if _G.AutoFarm then
-            local character = player.Character
-            local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+            local character = player.Character or player.CharacterAdded:Wait()
+            local rootPart = character:FindFirstChild("HumanoidRootPart")
             
             if rootPart then
-                -- 1. Lưu vị trí ban đầu
-                local originalCFrame = rootPart.CFrame
+                -- 1. Lưu vị trí "Nhà" (Vị trí ban đầu trước khi biến đi nhặt)
+                local homeCFrame = rootPart.CFrame
                 
-                -- 2. Teleport đến vị trí mục tiêu
+                -- 2. Teleport đến vị trí trứng
                 safeTeleport(CFrame.new(targetPosition))
-                task.wait(0.5)
+                task.wait(0.6)
                 
-                -- 3. Kích hoạt nhặt trứng
+                -- 3. Kích hoạt giữ phím E nhặt trứng
                 triggerProximityPrompts()
-                task.wait(1.2)
+                task.wait(1.2) -- Chờ server cấp trứng vào Balo (Backpack)
                 
-                -- 4. Teleport quay về vị trí ban đầu
-                safeTeleport(originalCFrame)
+                -- 4. Tự động cầm trứng lên tay
+                equipEgg()
+                task.wait(0.3)
                 
-                -- 5. Chờ 5 giây trước lần tiếp theo
+                -- 5. Teleport quay trở lại nhà (cùng trứng trên tay)
+                safeTeleport(homeCFrame)
+                
+                -- 6. Nghỉ 5 giây trước lượt tiếp theo
                 task.wait(5)
             end
         end
@@ -107,7 +143,7 @@ end)
 
 Rayfield:Notify({
    Title = "Đã cập nhật!",
-   Content = "Đã tối ưu lại tính năng Teleport chống giật.",
+   Content = "Đã bổ sung tính năng tự động cầm trứng và quay về nhà.",
    Duration = 3,
    Image = 4483362458
 })
