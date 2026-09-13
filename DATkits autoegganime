@@ -1,0 +1,85 @@
+-- Khởi tạo thư viện Menu Fluent UI
+local Fluent = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Fluent:CreateWindow({
+    Title = "Auto Farm Valentine Egg",
+    SubTitle = "by AI Assistant",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(450, 320),
+    Acrylic = false,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+local Tabs = {
+    Main = Window:AddTab({ Title = "Tính Năng Chính", Icon = "home" })
+}
+
+-- CẤU HÌNH TỌA ĐỘ (Đã lấy từ ảnh của bạn)
+local targetPosition = Vector3.new(1154.266, 15.681, -484.52)
+local _G = { AutoFarm = false }
+
+-- Hàm tự động kích hoạt hành động nhặt (Giữ phím E)
+local function triggerProximityPrompts()
+    for _, prompt in ipairs(workspace:GetDescendants()) do
+        if prompt:IsA("ProximityPrompt") then
+            -- Kiểm tra nếu vật thể chứa phím E ở gần vị trí quả trứng
+            if (prompt.Parent:IsA("Model") or prompt.Parent:IsA("BasePart")) and (prompt.Parent.Position - targetPosition).Magnitude < 15 then
+                task.spawn(function()
+                    prompt:InputHoldBegin()
+                    task.wait(prompt.HoldDuration + 0.1)
+                    prompt:InputHoldEnd()
+                end)
+            end
+        end
+    end
+end
+
+-- Tạo nút Bật/Tắt (Toggle) trên Menu
+local FarmToggle = Tabs.Main:AddToggle("AutoFarmToggle", {
+    Title = "Tự Động Gom Trứng",
+    Default = false,
+    Callback = function(Value)
+        _G.AutoFarm = Value
+    end
+})
+
+-- Vòng lặp chính xử lý Teleport và Nhặt trứng độc lập
+task.spawn(function()
+    local player = game.Players.LocalPlayer
+    
+    while true do
+        task.wait(0.1)
+        if _G.AutoFarm then
+            local character = player.Character
+            local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+            
+            if rootPart then
+                -- 1. Lưu vị trí ban đầu của bạn trước khi đi
+                local originalPosition = rootPart.CFrame
+                
+                -- 2. Dịch chuyển đến vị trí Trứng Valentine
+                rootPart.CFrame = CFrame.new(targetPosition)
+                task.wait(0.5) -- Chờ game tải vị trí mới
+                
+                -- Kích hoạt giữ phím E tự động
+                triggerProximityPrompts()
+                task.wait(1.5) -- Chờ hoàn thành hành động trộm trứng
+                
+                -- 3. Dịch chuyển quay trở lại vị trí ban đầu
+                rootPart.CFrame = originalPosition
+                
+                -- 4. Thời gian nghỉ giữa các lần gom trứng (5 giây)
+                task.wait(5)
+            end
+        end
+    end
+end)
+
+-- Thông báo khi script chạy thành công
+Window:SelectTab(1)
+Fluent:Notify({
+    Title = "Thành công!",
+    Content = "Nhấn nút CTRL Trái để ẩn/hiện Menu.",
+    Duration = 5
+})
