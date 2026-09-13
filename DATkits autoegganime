@@ -5,7 +5,7 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Window = Rayfield:CreateWindow({
    Name = "sleal egg | Anime",
    LoadingTitle = "egg!",
-   LoadingSubtitle = "Auto Find Egg & Return Home",
+   LoadingSubtitle = "Fix Auto Farm",
    ConfigurationSaving = { Enabled = false },
    Discord = { Enabled = false },
    KeySystem = false
@@ -14,64 +14,85 @@ local Window = Rayfield:CreateWindow({
 local MainTab = Window:CreateTab("Chính", 4483362458)
 _G.AutoFarm = false
 
--- Hàm Teleport an toàn dùng PivotTo + tắt va chạm
-local function safeTeleport(targetCFrame)
+-- Hàm Teleport mạnh mẽ (Lặp CFrame liên tục để Server không kéo lại)
+local function forceTeleport(targetCFrame)
     local player = game.Players.LocalPlayer
     local character = player.Character or player.CharacterAdded:Wait()
     local rootPart = character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
     
     if character and rootPart then
-        -- Tắt va chạm tạm thời để không bị giật lag/kẹt địa hình
-        for _, part in ipairs(character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = false
-            end
+        if humanoid then humanoid.Sit = false end
+        
+        -- Lặp CFrame 5 lần liên tiếp để ghim vị trí nhân vật
+        for i = 1, 5 do
+            rootPart.AssemblyLinearVelocity = Vector3.zero
+            rootPart.AssemblyAngularVelocity = Vector3.zero
+            character:PivotTo(targetCFrame)
+            task.wait(0.03)
         end
-        
-        rootPart.AssemblyLinearVelocity = Vector3.zero
-        rootPart.AssemblyAngularVelocity = Vector3.zero
-        
-        character:PivotTo(targetCFrame)
-        task.wait(0.1)
-        rootPart.AssemblyLinearVelocity = Vector3.zero
     end
 end
 
--- Hàm lấy vị trí CFrame chuẩn của vật thể
-local function getObjectCFrame(object)
-    if object:IsA("BasePart") then
-        return object.CFrame
-    elseif object:IsA("Model") then
-        return object:GetPivot()
-    end
-    return nil
+-- Hàm kích hoạt phím E chuẩn xác nhất
+local function firePrompt(prompt)
+    if not prompt then return end
+    
+    task.spawn(function()
+        if fireproximityprompt then
+            pcall(function() fireproximityprompt(prompt, 0, true) end)
+            pcall(function() fireproximityprompt(prompt) end)
+        else
+            prompt:InputHoldBegin()
+            task.wait(prompt.HoldDuration + 0.1)
+            prompt:InputHoldEnd()
+        end
+    end)
 end
 
--- Hàm TỰ ĐỘNG TÌM TRỨNG ở nhà người khác (Tránh vị trí nhà mình)
-local function findTargetEggPrompt(homeCFrame)
+-- Hàm tìm ProximityPrompt của trứng ở gần nhất nhưng phải xa vị trí Nhà
+local function getBestEggPrompt()
+    local player = game.Players.LocalPlayer
+    local character = player.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return nil, nil end
+    
+    local myPos = character.HumanoidRootPart.Position
+    local bestPrompt = nil
+    local bestCFrame = nil
+    local shortestDist = math.huge
+    
     for _, prompt in ipairs(workspace:GetDescendants()) do
-        if prompt:IsA("ProximityPrompt") and prompt.Enabled then
+        if prompt:IsA("ProximityPrompt") then
             local parent = prompt.Parent
             if parent then
-                local eggCFrame = getObjectCFrame(parent)
-                if eggCFrame then
-                    -- Kiểm tra khoảng cách: Chỉ nhặt trứng ở cách xa Nhà (> 30 studs) để tránh nhặt nhầm nhà mình
-                    local distFromHome = (eggCFrame.Position - homeCFrame.Position).Magnitude
-                    if distFromHome > 30 then
-                        return prompt, eggCFrame
+                local pos = nil
+                if parent:IsA("BasePart") then 
+                    pos = parent.CFrame
+                elseif parent:IsA("Model") then 
+                    pos = parent:GetPivot() 
+                end
+                
+                if pos then
+                    local dist = (pos.Position - myPos).Magnitude
+                    -- Tìm nút nhặt ở cách vị trí hiện tại > 20 studs (tránh nhà mình)
+                    if dist > 20 and dist < shortestDist then
+                        shortestDist = dist
+                        bestPrompt = prompt
+                        bestCFrame = pos
                     end
                 end
             end
         end
     end
-    return nil, nil
+    
+    return bestPrompt, bestCFrame
 end
 
 -- Hàm tự động cầm trứng lên tay
-local function equipEgg()
+local function equipTool()
     local player = game.Players.LocalPlayer
-    local character = player.Character or player.CharacterAdded:Wait()
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local character = player.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
     local backpack = player:FindFirstChild("Backpack")
     
     if humanoid and backpack then
@@ -84,7 +105,6 @@ local function equipEgg()
     end
 end
 
--- Nút Bật/Tắt trên UI
 MainTab:CreateToggle({
    Name = "Tự Động Gom Trứng Về Nhà",
    CurrentValue = false,
@@ -94,67 +114,49 @@ MainTab:CreateToggle({
    end,
 })
 
--- Vòng lặp xử lý chính
+-- Vòng lặp chính
 task.spawn(function()
     local player = game.Players.LocalPlayer
     
     while true do
-        task.wait(0.1)
+        task.wait(0.2)
         if _G.AutoFarm then
             local character = player.Character or player.CharacterAdded:Wait()
             local rootPart = character:FindFirstChild("HumanoidRootPart")
             
             if rootPart then
-                -- 1. Lưu lại tọa độ Nhà của bạn (Vị trí đang đứng)
+                -- 1. Lưu điểm Nhà
                 local homeCFrame = rootPart.CFrame
                 
-                -- 2. Tự động quét tìm trứng trên bản đồ
-                local prompt, eggCFrame = findTargetEggPrompt(homeCFrame)
+                -- 2. Tìm trứng ở nhà khác
+                local prompt, eggCFrame = getBestEggPrompt()
                 
                 if prompt and eggCFrame then
-                    -- 3. Teleport trực tiếp đến vị trí quả trứng tìm được (Dịch lên trên 2 studs để không kẹt đất)
-                    safeTeleport(eggCFrame * CFrame.new(0, 2, 0))
-                    task.wait(0.4)
-                    
-                    -- 4. Kích hoạt nút nhặt trứng
-                    task.spawn(function()
-                        if fireproximityprompt then
-                            fireproximityprompt(prompt)
-                        else
-                            prompt:InputHoldBegin()
-                            task.wait(prompt.HoldDuration + 0.1)
-                            prompt:InputHoldEnd()
-                        end
-                    end)
-                    task.wait(1)
-                    
-                    -- 5. Cầm trứng trên tay
-                    equipEgg()
+                    -- 3. Teleport tới trứng
+                    forceTeleport(eggCFrame * CFrame.new(0, 3, 0))
                     task.wait(0.3)
                     
-                    -- 6. Teleport mang trứng quay trở về Nhà
-                    safeTeleport(homeCFrame)
+                    -- 4. Kích hoạt nút nhặt
+                    firePrompt(prompt)
+                    task.wait(0.8)
                     
-                    -- 7. Chờ 4 giây trước khi đi trộm quả tiếp theo
+                    -- 5. Trang bị trứng lên tay
+                    equipTool()
+                    task.wait(0.2)
+                    
+                    -- 6. Teleport về Nhà
+                    forceTeleport(homeCFrame)
                     task.wait(4)
                 else
-                    -- Nếu không tìm thấy trứng ở nhà khác
                     Rayfield:Notify({
-                       Title = "Đang tìm trứng...",
-                       Content = "Chưa tìm thấy trứng ở nhà khác hoặc trứng chưa xuất hiện.",
+                       Title = "Thông báo",
+                       Content = "Chưa tìm thấy nút nhặt trứng nào ở xa nhà!",
                        Duration = 2,
                        Image = 4483362458
                     })
-                    task.wait(3)
+                    task.wait(2)
                 end
             end
         end
     end
 end)
-
-Rayfield:Notify({
-   Title = "Đã tối ưu!",
-   Content = "Đã chuyển sang chế độ Tự động quét vị trí Trứng thông minh.",
-   Duration = 3,
-   Image = 4483362458
-})
