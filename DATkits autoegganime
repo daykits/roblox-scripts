@@ -25,6 +25,12 @@ local eggPositions = {
     Vector3.new(2729.87, 7.90, -469.37)
 }
 
+-- Anti-detection: random wait
+local function randomWait(min, max)
+    local t = min + math.random() * (max - min)
+    task.wait(t)
+end
+
 -- Hàm Dịch chuyển an toàn
 local function safeTeleport(cframe)
     local player = game.Players.LocalPlayer
@@ -58,7 +64,6 @@ local function getClosestPrompt(maxDist)
                 if promptPos then
                     local dist = (promptPos - root.Position).Magnitude
                     if dist < closestDist then
-                        -- Ưu tiên prompt có tên / text liên quan đến egg
                         local nameLower = string.lower(prompt.Name or "")
                         local actionLower = string.lower(prompt.ActionText or "")
                         local objectLower = string.lower(prompt.ObjectText or "")
@@ -67,7 +72,7 @@ local function getClosestPrompt(maxDist)
                             or actionLower:find("egg") or actionLower:find("carry") or actionLower:find("pick")
                             or objectLower:find("egg") or objectLower:find("carry")
 
-                        if isEggRelated or dist < 12 then -- nếu rất gần thì lấy luôn
+                        if isEggRelated or dist < 12 then
                             closestDist = dist
                             closestPrompt = prompt
                         end
@@ -79,7 +84,7 @@ local function getClosestPrompt(maxDist)
     return closestPrompt
 end
 
--- Hàm thực hiện nhặt trứng (đã sửa)
+-- Hàm thực hiện nhặt trứng
 local function holdEPickup()
     local player = game.Players.LocalPlayer
     local character = player.Character
@@ -89,28 +94,28 @@ local function holdEPickup()
     local prompt = getClosestPrompt(28)
     if not prompt then return false end
 
-    -- Instant pickup: set HoldDuration = 0
+    -- Instant pickup
     pcall(function()
         prompt.HoldDuration = 0
         prompt.RequiresLineOfSight = false
         prompt.MaxActivationDistance = 30
     end)
 
-    -- Fire nhiều lần cho chắc
-    for i = 1, 6 do
+    -- Fire nhiều lần + random delay nhỏ
+    for i = 1, 5 + math.random(0, 2) do
         pcall(function()
             if fireproximityprompt then
                 fireproximityprompt(prompt)
             end
         end)
-        task.wait(0.05)
+        randomWait(0.03, 0.08)
     end
 
-    -- Backup: InputHoldBegin + End (phòng trường hợp fireproximityprompt bị chặn)
+    -- Backup InputHold
     pcall(function()
         prompt:InputHoldBegin()
     end)
-    task.wait(0.35)
+    randomWait(0.25, 0.45)
     pcall(function()
         prompt:InputHoldEnd()
         if fireproximityprompt then
@@ -194,12 +199,13 @@ task.spawn(function()
     end
 end)
 
--- Vòng lặp chính xử lý Auto Farm
+-- Vòng lặp chính xử lý Auto Farm (đã thêm anti-detection delays)
 task.spawn(function()
     local player = game.Players.LocalPlayer
     
     while true do
-        task.wait(0.25)
+        -- delay ngẫu nhiên giữa các vòng lặp chính
+        randomWait(0.22, 0.45)
         
         if getgenv().AutoFarm then
             local character = player.Character
@@ -212,46 +218,54 @@ task.spawn(function()
                     if not getgenv().AutoFarm then break end
                     
                     pcall(function()
-                        -- 1. Bay đến vị trí trứng
-                        for i = 1, 4 do
-                            safeTeleport(CFrame.new(targetPos + Vector3.new(0, 2, 0)))
-                            task.wait(0.04)
+                        -- 1. Bay đến vị trí trứng (có random delay)
+                        for i = 1, 3 + math.random(0, 2) do
+                            safeTeleport(CFrame.new(targetPos + Vector3.new(0, 1.8 + math.random() * 0.6, 0)))
+                            randomWait(0.03, 0.07)
                         end
-                        task.wait(0.25)
+                        randomWait(0.18, 0.35) -- đứng im một chút trước khi nhặt
                         
                         -- 2. Nhặt trứng
                         holdEPickup()
-                        task.wait(0.4)
+                        randomWait(0.25, 0.5)
                         
-                        -- 3. Chờ kiểm tra đã có trứng trên tay (tối đa 2.5s)
+                        -- 3. Chờ kiểm tra đã có trứng trên tay (tối đa ~2.8s, có random)
                         local hasEgg = false
                         local checkTimer = tick()
-                        while (tick() - checkTimer) < 2.5 do
+                        local maxCheckTime = 2.2 + math.random() * 0.8
+                        
+                        while (tick() - checkTimer) < maxCheckTime do
                             if equipEggTool() then
                                 hasEgg = true
                                 break
                             end
-                            -- thử nhặt lại 1 lần nữa nếu chưa có
-                            if (tick() - checkTimer) > 0.8 then
+                            -- thử nhặt lại nếu chưa có
+                            if (tick() - checkTimer) > (0.7 + math.random() * 0.4) then
                                 holdEPickup()
                             end
-                            task.wait(0.15)
+                            randomWait(0.12, 0.22)
                         end
                         
                         -- 4. Nếu đã nhặt thành công → về nhà
                         if hasEgg then
-                            task.wait(0.2)
-                            for i = 1, 4 do
+                            randomWait(0.15, 0.35)
+                            for i = 1, 3 + math.random(0, 2) do
                                 safeTeleport(homeCFrame)
-                                task.wait(0.04)
+                                randomWait(0.03, 0.07)
                             end
-                            task.wait(1.8) -- chờ game xử lý cất trứng
+                            -- chờ game xử lý cất trứng (random dài hơn)
+                            randomWait(1.5, 2.4)
                         else
                             -- chưa nhặt được → về nhà chờ rồi tiếp
                             safeTeleport(homeCFrame)
-                            task.wait(0.8)
+                            randomWait(0.6, 1.1)
                         end
                     end)
+                    
+                    -- delay nhỏ giữa các vị trí trứng
+                    if getgenv().AutoFarm then
+                        randomWait(0.15, 0.4)
+                    end
                 end
             end
         end
