@@ -37,15 +37,19 @@ local function safeTeleport(cframe)
     end
 end
 
--- Hàm giữ phím E nhặt trứng theo thời gian quy định
-local function holdPickupPrompt(targetPos, holdTime)
-    holdTime = holdTime or 3.5
+-- Hàm thực hiện giữ nút E nhặt trứng
+local function holdEPickup()
+    local player = game.Players.LocalPlayer
+    local character = player.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
     for _, prompt in ipairs(workspace:GetDescendants()) do
-        if prompt:IsA("ProximityPrompt") then
+        if prompt:IsA("ProximityPrompt") and prompt.Enabled then
             local parent = prompt.Parent
             if parent then
-                local cf = parent:IsA("BasePart") and parent.CFrame or (parent:IsA("Model") and parent:GetPivot() or nil)
-                if cf and (cf.Position - targetPos).Magnitude < 25 then
+                local promptPos = parent:IsA("BasePart") and parent.Position or (parent:IsA("Model") and parent:GetPivot().Position or nil)
+                if promptPos and (promptPos - root.Position).Magnitude < 30 then
                     pcall(function()
                         if fireproximityprompt then
                             fireproximityprompt(prompt, 0, true)
@@ -53,8 +57,8 @@ local function holdPickupPrompt(targetPos, holdTime)
                         prompt:InputHoldBegin()
                     end)
                     
-                    -- Đứng giữ nút E trong khoảng 3.5 giây
-                    task.wait(holdTime)
+                    -- Đứng giữ nút E khoảng 3.5 giây
+                    task.wait(3.5)
                     
                     pcall(function()
                         prompt:InputHoldEnd()
@@ -69,24 +73,35 @@ local function holdPickupPrompt(targetPos, holdTime)
     end
 end
 
--- Hàm cầm trứng lên tay
-local function equipTool()
+-- Hàm kiểm tra và cầm trứng lên tay
+local function equipEggTool()
     local player = game.Players.LocalPlayer
     local character = player.Character
     local humanoid = character and character:FindFirstChildOfClass("Humanoid")
     local backpack = player:FindFirstChild("Backpack")
-    
-    if humanoid and backpack then
-        for _, tool in ipairs(backpack:GetChildren()) do
-            if tool:IsA("Tool") then
-                humanoid:EquipTool(tool)
-                break
+
+    -- Kiểm tra xem trên tay đã cầm vật phẩm chưa
+    if character then
+        for _, item in ipairs(character:GetChildren()) do
+            if item:IsA("Tool") then
+                return true
             end
         end
     end
+
+    -- Nếu chưa cầm, tự động lấy vật phẩm từ Backpack ra tay
+    if humanoid and backpack then
+        local tool = backpack:FindFirstChildOfClass("Tool")
+        if tool then
+            humanoid:EquipTool(tool)
+            return true
+        end
+    end
+
+    return false
 end
 
--- Nút Bật/Tắt Auto Farm theo tọa độ XYZ
+-- Toggle Auto Farm
 MainTab:CreateToggle({
    Name = "Tự Động Gom Trứng XYZ Về Nhà",
    CurrentValue = false,
@@ -94,14 +109,14 @@ MainTab:CreateToggle({
    Callback = function(Value)
       getgenv().AutoFarm = Value
       if Value then
-          Rayfield:Notify({Title = "Trạng Thái", Content = "Đã BẬT Tự Động Gom Trứng XYZ!", Duration = 2, Image = 4483362458})
+          Rayfield:Notify({Title = "Trạng Thái", Content = "Đã BẬT Tự Động Gom Trứng!", Duration = 2, Image = 4483362458})
       else
           Rayfield:Notify({Title = "Trạng Thái", Content = "Đã TẮT Tự Động Gom Trứng!", Duration = 2, Image = 4483362458})
       end
    end,
 })
 
--- Nút Bật/Tắt Tốc Độ Chạy (300)
+-- Toggle Speed 300
 MainTab:CreateToggle({
    Name = "Tốc Độ Di Chuyển (300)",
    CurrentValue = false,
@@ -119,7 +134,7 @@ MainTab:CreateToggle({
    end,
 })
 
--- Vòng lặp duy trì Tốc độ 300 liên tục
+-- Vòng lặp duy trì Tốc độ 300
 task.spawn(function()
     local player = game.Players.LocalPlayer
     while true do
@@ -134,7 +149,7 @@ task.spawn(function()
     end
 end)
 
--- Vòng lặp chính xử lý Auto Farm theo tọa độ XYZ
+-- Vòng lặp chính xử lý Auto Farm
 task.spawn(function()
     local player = game.Players.LocalPlayer
     
@@ -152,28 +167,42 @@ task.spawn(function()
                     if not getgenv().AutoFarm then break end
                     
                     pcall(function()
-                        -- 1. Bay/Teleport tới vị trí trứng
+                        -- 1. Bay đến vị trí trứng
                         for i = 1, 3 do
-                            safeTeleport(CFrame.new(targetPos))
+                            safeTeleport(CFrame.new(targetPos + Vector3.new(0, 1.5, 0)))
                             task.wait(0.05)
                         end
-                        task.wait(0.2)
-                        
-                        -- 2. Giữ phím E liên tục 3.5 giây để nhặt trứng
-                        holdPickupPrompt(targetPos, 3.5)
-                        
-                        -- 3. Cầm trứng vừa nhặt lên tay
-                        equipTool()
                         task.wait(0.3)
                         
-                        -- 4. Tự động bay trở về Nhà ngay lập tức
-                        for i = 1, 3 do
-                            safeTeleport(homeCFrame)
-                            task.wait(0.05)
+                        -- 2. Đứng im và giữ nút E trong 3.5 giây để nhặt
+                        holdEPickup()
+                        
+                        -- 3. Vòng lặp chờ tối đa 3 giây để xác nhận đã có trứng trên tay
+                        local hasEgg = false
+                        local checkTimer = tick()
+                        while (tick() - checkTimer) < 3 do
+                            if equipEggTool() then
+                                hasEgg = true
+                                break
+                            end
+                            task.wait(0.2)
                         end
                         
-                        -- 5. Chờ 0.5s rồi tự động sang quả trứng tiếp theo
-                        task.wait(0.5)
+                        -- 4. Nếu đã nhặt thành công trứng -> Bay về nhà
+                        if hasEgg then
+                            task.wait(0.3)
+                            for i = 1, 3 do
+                                safeTeleport(homeCFrame)
+                                task.wait(0.05)
+                            end
+                            
+                            -- Chờ 2 giây tại nhà để game xử lý cất trứng
+                            task.wait(2)
+                        else
+                            -- Nếu chưa nhặt được (ví dụ trứng chưa hồi), bay về nhà chờ rồi tiếp tục
+                            safeTeleport(homeCFrame)
+                            task.wait(1)
+                        end
                     end)
                 end
             end
