@@ -14,36 +14,55 @@ local Window = Rayfield:CreateWindow({
    Discord = { Enabled = false },
    KeySystem = false
 })
--- CẤU HÌNH TỌA ĐỘ (Đã lấy từ ảnh của bạn)
-local targetPosition = Vector3.new(1154.266, 15.681, -484.52)
-local _G = { AutoFarm = false }
 
--- Hàm tự động kích hoạt hành động nhặt (Giữ phím E)
+-- Tạo Tab chính (Sửa lỗi thiếu Tab trong Rayfield)
+local MainTab = Window:CreateTab("Chính", 4483362458)
+
+-- CẤU HÌNH TỌA ĐỘ
+local targetPosition = Vector3.new(1154.266, 15.681, -484.52)
+_G.AutoFarm = false
+
+-- Hàm lấy vị trí an toàn cho cả Model và BasePart (Tránh lỗi văng Script)
+local function getPosition(object)
+    if object:IsA("BasePart") then
+        return object.Position
+    elseif object:IsA("Model") then
+        return object:GetPivot().Position
+    end
+    return nil
+end
+
+-- Hàm tự động kích hoạt phím E
 local function triggerProximityPrompts()
     for _, prompt in ipairs(workspace:GetDescendants()) do
-        if prompt:IsA("ProximityPrompt") then
-            -- Kiểm tra nếu vật thể chứa phím E ở gần vị trí quả trứng
-            if (prompt.Parent:IsA("Model") or prompt.Parent:IsA("BasePart")) and (prompt.Parent.Position - targetPosition).Magnitude < 15 then
+        if prompt:IsA("ProximityPrompt") and prompt.Parent then
+            local promptPos = getPosition(prompt.Parent)
+            if promptPos and (promptPos - targetPosition).Magnitude < 15 then
                 task.spawn(function()
-                    prompt:InputHoldBegin()
-                    task.wait(prompt.HoldDuration + 0.1)
-                    prompt:InputHoldEnd()
+                    if fireproximityprompt then
+                        fireproximityprompt(prompt)
+                    else
+                        prompt:InputHoldBegin()
+                        task.wait(prompt.HoldDuration + 0.1)
+                        prompt:InputHoldEnd()
+                    end
                 end)
             end
         end
     end
 end
 
--- Tạo nút Bật/Tắt (Toggle) trên Menu
-local FarmToggle = Tabs.Main:AddToggle("AutoFarmToggle", {
-    Title = "Tự Động Gom Trứng",
-    Default = false,
-    Callback = function(Value)
-        _G.AutoFarm = Value
-    end
+-- Tạo nút Bật/Tắt (Toggle) đúng chuẩn Rayfield
+local FarmToggle = MainTab:CreateToggle({
+   Name = "Tự Động Gom Trứng",
+   CurrentValue = false,
+   Flag = "AutoFarmToggle",
+   Callback = function(Value)
+      _G.AutoFarm = Value
+   end,
 })
 
--- Vòng lặp chính xử lý Teleport và Nhặt trứng độc lập
+-- Vòng lặp chính xử lý Teleport và Nhặt trứng
 task.spawn(function()
     local player = game.Players.LocalPlayer
     
@@ -54,31 +73,31 @@ task.spawn(function()
             local rootPart = character and character:FindFirstChild("HumanoidRootPart")
             
             if rootPart then
-                -- 1. Lưu vị trí ban đầu của bạn trước khi đi
+                -- 1. Lưu vị trí ban đầu
                 local originalPosition = rootPart.CFrame
                 
-                -- 2. Dịch chuyển đến vị trí Trứng Valentine
+                -- 2. Dịch chuyển đến vị trí mục tiêu
                 rootPart.CFrame = CFrame.new(targetPosition)
-                task.wait(0.5) -- Chờ game tải vị trí mới
+                task.wait(0.5)
                 
-                -- Kích hoạt giữ phím E tự động
+                -- Kích hoạt giữ phím E
                 triggerProximityPrompts()
-                task.wait(1.5) -- Chờ hoàn thành hành động trộm trứng
+                task.wait(1.5)
                 
                 -- 3. Dịch chuyển quay trở lại vị trí ban đầu
                 rootPart.CFrame = originalPosition
                 
-                -- 4. Thời gian nghỉ giữa các lần gom trứng (5 giây)
+                -- 4. Thời gian nghỉ (5 giây)
                 task.wait(5)
             end
         end
     end
 end)
 
--- Thông báo khi script chạy thành công
-Window:SelectTab(1)
-Fluent:Notify({
-    Title = "Thành công!",
-    Content = "Nhấn nút CTRL Trái để ẩn/hiện Menu.",
-    Duration = 5
+-- Thông báo đúng chuẩn Rayfield UI
+Rayfield:Notify({
+   Title = "Thành công!",
+   Content = "Đã tải thành công Menu Gom Trứng.",
+   Duration = 5,
+   Image = 4483362458
 })
