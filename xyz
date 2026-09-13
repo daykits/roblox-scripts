@@ -1,0 +1,22 @@
+local player = game.Players.LocalPlayer
+local sg = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+sg.Name = "XYZ_Tracker"
+
+local label = Instance.new("TextLabel", sg)
+label.Size = UDim2.new(0, 260, 0, 40)
+label.Position = UDim2.new(0.02, 0, 0.02, 0)
+label.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+label.TextColor3 = Color3.fromRGB(0, 255, 150)
+label.TextSize = 14
+label.Font = Enum.Font.SourceSansBold
+
+task.spawn(function()
+    while sg and sg.Parent do
+        local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        if root then
+            local pos = root.Position
+            label.Text = string.format("X: %.2f  |  Y: %.2f  |  Z: %.2f", pos.X, pos.Y, pos.Z)
+        end
+        task.wait(0.1)
+    end
+end)
