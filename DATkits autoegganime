@@ -3,26 +3,37 @@ repeat task.wait() until game:IsLoaded()
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "egganime | Blox Fruits",
+   Name = "sleal egg | Anime",
    LoadingTitle = "egg!",
-   LoadingSubtitle = "Fix menu",
-   ConfigurationSaving = {
-      Enabled = true,
-      FolderName = "egg",
-      FileName = "Config"
-   },
+   LoadingSubtitle = "Fix Teleport",
+   ConfigurationSaving = { Enabled = false },
    Discord = { Enabled = false },
    KeySystem = false
 })
 
--- Tạo Tab chính (Sửa lỗi thiếu Tab trong Rayfield)
 local MainTab = Window:CreateTab("Chính", 4483362458)
-
--- CẤU HÌNH TỌA ĐỘ
 local targetPosition = Vector3.new(1154.266, 15.681, -484.52)
 _G.AutoFarm = false
 
--- Hàm lấy vị trí an toàn cho cả Model và BasePart (Tránh lỗi văng Script)
+-- Hàm Teleport An Toàn (Chống Rubberband / Kéo ngược)
+local function safeTeleport(targetCFrame)
+    local player = game.Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    
+    if rootPart then
+        -- Xóa vận tốc di chuyển cũ để tránh bị game kéo lại
+        rootPart.AssemblyLinearVelocity = Vector3.zero
+        rootPart.AssemblyAngularVelocity = Vector3.zero
+        
+        -- Cập nhật tọa độ
+        rootPart.CFrame = targetCFrame
+        task.wait(0.05)
+        rootPart.AssemblyLinearVelocity = Vector3.zero
+    end
+end
+
+-- Hàm lấy vị trí vật thể
 local function getPosition(object)
     if object:IsA("BasePart") then
         return object.Position
@@ -52,8 +63,8 @@ local function triggerProximityPrompts()
     end
 end
 
--- Tạo nút Bật/Tắt (Toggle) đúng chuẩn Rayfield
-local FarmToggle = MainTab:CreateToggle({
+-- Nút Bật/Tắt
+MainTab:CreateToggle({
    Name = "Tự Động Gom Trứng",
    CurrentValue = false,
    Flag = "AutoFarmToggle",
@@ -62,7 +73,7 @@ local FarmToggle = MainTab:CreateToggle({
    end,
 })
 
--- Vòng lặp chính xử lý Teleport và Nhặt trứng
+-- Vòng lặp xử lý chính
 task.spawn(function()
     local player = game.Players.LocalPlayer
     
@@ -74,30 +85,29 @@ task.spawn(function()
             
             if rootPart then
                 -- 1. Lưu vị trí ban đầu
-                local originalPosition = rootPart.CFrame
+                local originalCFrame = rootPart.CFrame
                 
-                -- 2. Dịch chuyển đến vị trí mục tiêu
-                rootPart.CFrame = CFrame.new(targetPosition)
+                -- 2. Teleport đến vị trí mục tiêu
+                safeTeleport(CFrame.new(targetPosition))
                 task.wait(0.5)
                 
-                -- Kích hoạt giữ phím E
+                -- 3. Kích hoạt nhặt trứng
                 triggerProximityPrompts()
-                task.wait(1.5)
+                task.wait(1.2)
                 
-                -- 3. Dịch chuyển quay trở lại vị trí ban đầu
-                rootPart.CFrame = originalPosition
+                -- 4. Teleport quay về vị trí ban đầu
+                safeTeleport(originalCFrame)
                 
-                -- 4. Thời gian nghỉ (5 giây)
+                -- 5. Chờ 5 giây trước lần tiếp theo
                 task.wait(5)
             end
         end
     end
 end)
 
--- Thông báo đúng chuẩn Rayfield UI
 Rayfield:Notify({
-   Title = "Thành công!",
-   Content = "Đã tải thành công Menu Gom Trứng.",
-   Duration = 5,
+   Title = "Đã cập nhật!",
+   Content = "Đã tối ưu lại tính năng Teleport chống giật.",
+   Duration = 3,
    Image = 4483362458
 })
