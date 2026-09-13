@@ -16,7 +16,7 @@ local MainTab = Window:CreateTab("Chính", 4483362458)
 getgenv().AutoFarm = false
 getgenv().FastSpeed = false
 
--- Danh sách tọa độ trứng trích xuất từ 5 bức ảnh của bạn
+-- Danh sách tọa độ trứng
 local eggPositions = {
     Vector3.new(2693.21, 7.90, -468.93),
     Vector3.new(2708.88, 7.90, -477.18),
@@ -37,14 +37,14 @@ local function safeTeleport(cframe)
     end
 end
 
--- Hàm kích hoạt nút nhặt ở xung quanh tọa độ chỉ định
+-- Hàm kích hoạt nút nhặt xung quanh tọa độ
 local function triggerPromptAt(targetPos)
     for _, prompt in ipairs(workspace:GetDescendants()) do
         if prompt:IsA("ProximityPrompt") then
             local parent = prompt.Parent
             if parent then
                 local cf = parent:IsA("BasePart") and parent.CFrame or (parent:IsA("Model") and parent:GetPivot() or nil)
-                if cf and (cf.Position - targetPos).Magnitude < 15 then
+                if cf and (cf.Position - targetPos).Magnitude < 25 then
                     if fireproximityprompt then
                         fireproximityprompt(prompt, 0, true)
                         fireproximityprompt(prompt)
@@ -139,25 +139,26 @@ task.spawn(function()
             if rootPart then
                 local homeCFrame = rootPart.CFrame
                 
-                -- Duyệt qua lần lượt 5 tọa độ trứng trong bảng
                 for _, targetPos in ipairs(eggPositions) do
                     if not getgenv().AutoFarm then break end
                     
                     pcall(function()
-                        -- 1. Teleport tới vị trí trứng
+                        -- 1. Teleport đến vị trí trứng
                         for i = 1, 3 do
-                            safeTeleport(CFrame.new(targetPos) * CFrame.new(0, 3, 0))
+                            safeTeleport(CFrame.new(targetPos))
                             task.wait(0.05)
                         end
-                        task.wait(0.3)
                         
-                        -- 2. Bấm phím E nhặt trứng
-                        triggerPromptAt(targetPos)
-                        task.wait(0.6)
+                        -- 2. Đứng im tại chỗ 3 giây và phát lệnh nhặt trứng liên tục
+                        local startTime = tick()
+                        while (tick() - startTime) < 3 do
+                            triggerPromptAt(targetPos)
+                            task.wait(0.2)
+                        end
                         
                         -- 3. Cầm trứng trên tay
                         equipTool()
-                        task.wait(0.2)
+                        task.wait(0.3)
                         
                         -- 4. Teleport mang trứng trở về Nhà
                         for i = 1, 3 do
@@ -165,8 +166,8 @@ task.spawn(function()
                             task.wait(0.05)
                         end
                         
-                        -- 5. Chờ 2 giây trước khi sang bệ trứng tiếp theo
-                        task.wait(2)
+                        -- 5. Nghỉ ngắn 1 giây trước khi sang bệ tiếp theo
+                        task.wait(1)
                     end)
                 end
             end
