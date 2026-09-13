@@ -37,40 +37,88 @@ local function safeTeleport(cframe)
     end
 end
 
--- Hàm thực hiện giữ nút E nhặt trứng
-local function holdEPickup()
+-- Hàm tìm ProximityPrompt gần nhất (ưu tiên liên quan đến Egg)
+local function getClosestPrompt(maxDist)
     local player = game.Players.LocalPlayer
     local character = player.Character
     local root = character and character:FindFirstChild("HumanoidRootPart")
-    if not root then return end
+    if not root then return nil end
+
+    local closestPrompt = nil
+    local closestDist = maxDist or 25
 
     for _, prompt in ipairs(workspace:GetDescendants()) do
         if prompt:IsA("ProximityPrompt") and prompt.Enabled then
             local parent = prompt.Parent
             if parent then
-                local promptPos = parent:IsA("BasePart") and parent.Position or (parent:IsA("Model") and parent:GetPivot().Position or nil)
-                if promptPos and (promptPos - root.Position).Magnitude < 30 then
-                    pcall(function()
-                        if fireproximityprompt then
-                            fireproximityprompt(prompt, 0, true)
+                local promptPos = parent:IsA("BasePart") and parent.Position 
+                    or (parent:IsA("Model") and parent:GetPivot().Position) 
+                    or nil
+
+                if promptPos then
+                    local dist = (promptPos - root.Position).Magnitude
+                    if dist < closestDist then
+                        -- Ưu tiên prompt có tên / text liên quan đến egg
+                        local nameLower = string.lower(prompt.Name or "")
+                        local actionLower = string.lower(prompt.ActionText or "")
+                        local objectLower = string.lower(prompt.ObjectText or "")
+
+                        local isEggRelated = nameLower:find("egg") or nameLower:find("carry") 
+                            or actionLower:find("egg") or actionLower:find("carry") or actionLower:find("pick")
+                            or objectLower:find("egg") or objectLower:find("carry")
+
+                        if isEggRelated or dist < 12 then -- nếu rất gần thì lấy luôn
+                            closestDist = dist
+                            closestPrompt = prompt
                         end
-                        prompt:InputHoldBegin()
-                    end)
-                    
-                    -- Đứng giữ nút E khoảng 3.5 giây
-                    task.wait(3.5)
-                    
-                    pcall(function()
-                        prompt:InputHoldEnd()
-                        if fireproximityprompt then
-                            fireproximityprompt(prompt)
-                        end
-                    end)
-                    break
+                    end
                 end
             end
         end
     end
+    return closestPrompt
+end
+
+-- Hàm thực hiện nhặt trứng (đã sửa)
+local function holdEPickup()
+    local player = game.Players.LocalPlayer
+    local character = player.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not root then return false end
+
+    local prompt = getClosestPrompt(28)
+    if not prompt then return false end
+
+    -- Instant pickup: set HoldDuration = 0
+    pcall(function()
+        prompt.HoldDuration = 0
+        prompt.RequiresLineOfSight = false
+        prompt.MaxActivationDistance = 30
+    end)
+
+    -- Fire nhiều lần cho chắc
+    for i = 1, 6 do
+        pcall(function()
+            if fireproximityprompt then
+                fireproximityprompt(prompt)
+            end
+        end)
+        task.wait(0.05)
+    end
+
+    -- Backup: InputHoldBegin + End (phòng trường hợp fireproximityprompt bị chặn)
+    pcall(function()
+        prompt:InputHoldBegin()
+    end)
+    task.wait(0.35)
+    pcall(function()
+        prompt:InputHoldEnd()
+        if fireproximityprompt then
+            fireproximityprompt(prompt)
+        end
+    end)
+
+    return true
 end
 
 -- Hàm kiểm tra và cầm trứng lên tay
@@ -80,7 +128,6 @@ local function equipEggTool()
     local humanoid = character and character:FindFirstChildOfClass("Humanoid")
     local backpack = player:FindFirstChild("Backpack")
 
-    -- Kiểm tra xem trên tay đã cầm vật phẩm chưa
     if character then
         for _, item in ipairs(character:GetChildren()) do
             if item:IsA("Tool") then
@@ -89,7 +136,6 @@ local function equipEggTool()
         end
     end
 
-    -- Nếu chưa cầm, tự động lấy vật phẩm từ Backpack ra tay
     if humanoid and backpack then
         local tool = backpack:FindFirstChildOfClass("Tool")
         if tool then
@@ -97,7 +143,6 @@ local function equipEggTool()
             return true
         end
     end
-
     return false
 end
 
@@ -154,7 +199,7 @@ task.spawn(function()
     local player = game.Players.LocalPlayer
     
     while true do
-        task.wait(0.3)
+        task.wait(0.25)
         
         if getgenv().AutoFarm then
             local character = player.Character
@@ -168,40 +213,43 @@ task.spawn(function()
                     
                     pcall(function()
                         -- 1. Bay đến vị trí trứng
-                        for i = 1, 3 do
-                            safeTeleport(CFrame.new(targetPos + Vector3.new(0, 1.5, 0)))
-                            task.wait(0.05)
+                        for i = 1, 4 do
+                            safeTeleport(CFrame.new(targetPos + Vector3.new(0, 2, 0)))
+                            task.wait(0.04)
                         end
-                        task.wait(0.3)
+                        task.wait(0.25)
                         
-                        -- 2. Đứng im và giữ nút E trong 3.5 giây để nhặt
+                        -- 2. Nhặt trứng
                         holdEPickup()
+                        task.wait(0.4)
                         
-                        -- 3. Vòng lặp chờ tối đa 3 giây để xác nhận đã có trứng trên tay
+                        -- 3. Chờ kiểm tra đã có trứng trên tay (tối đa 2.5s)
                         local hasEgg = false
                         local checkTimer = tick()
-                        while (tick() - checkTimer) < 3 do
+                        while (tick() - checkTimer) < 2.5 do
                             if equipEggTool() then
                                 hasEgg = true
                                 break
                             end
-                            task.wait(0.2)
+                            -- thử nhặt lại 1 lần nữa nếu chưa có
+                            if (tick() - checkTimer) > 0.8 then
+                                holdEPickup()
+                            end
+                            task.wait(0.15)
                         end
                         
-                        -- 4. Nếu đã nhặt thành công trứng -> Bay về nhà
+                        -- 4. Nếu đã nhặt thành công → về nhà
                         if hasEgg then
-                            task.wait(0.3)
-                            for i = 1, 3 do
+                            task.wait(0.2)
+                            for i = 1, 4 do
                                 safeTeleport(homeCFrame)
-                                task.wait(0.05)
+                                task.wait(0.04)
                             end
-                            
-                            -- Chờ 2 giây tại nhà để game xử lý cất trứng
-                            task.wait(2)
+                            task.wait(1.8) -- chờ game xử lý cất trứng
                         else
-                            -- Nếu chưa nhặt được (ví dụ trứng chưa hồi), bay về nhà chờ rồi tiếp tục
+                            -- chưa nhặt được → về nhà chờ rồi tiếp
                             safeTeleport(homeCFrame)
-                            task.wait(1)
+                            task.wait(0.8)
                         end
                     end)
                 end
