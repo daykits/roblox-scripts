@@ -1,26 +1,36 @@
 repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
 
 -- =========================================================
--- DATKITS BF V1 - AUTO FARM STABLE
--- Sửa các lỗi chính:
--- 1) Không spam StartQuest khi quest chưa kịp load.
--- 2) Không dựa hoàn toàn vào Quest.Visible để xác định quest.
--- 3) Không tween lại mỗi 0.13s -> tránh giật/khựng.
--- 4) Không dùng BodyVelocity gây xung đột với TweenService.
--- 5) Luôn xác nhận quest trước khi đi farm.
--- 6) Nếu quest bị mất/đổi mục tiêu -> tự quay lại NPC và nhận lại.
+-- DATKITS BF V3 - STABLE AUTO FARM + AUTO CHEST 3 SEA
+--
+-- Thiết kế lại:
+-- 1. Chỉ có MỘT bộ điều khiển di chuyển -> AutoFarm/AutoChest không giành CFrame.
+-- 2. Không tạo Tween mới mỗi vòng lặp.
+-- 3. Không dùng BodyVelocity/BodyPosition để tránh xung đột vật lý.
+-- 4. Tốc độ mặc định thấp hơn và có waypoint/anti-stuck để giảm server correction.
+-- 5. Noclip chỉ bật/tắt khi trạng thái thay đổi, không ghi CanCollide mỗi frame.
+-- 6. AutoChest quét cả Part/Model và cả descendant, hỗ trợ Chest1/Chest2/Chest3.
+-- 7. AutoChest ưu tiên rương; AutoFarm tự nhường quyền điều khiển khi chest bật.
 -- =========================================================
 
--- LOAD FLUENT
 local Fluent = loadstring(game:HttpGet(
     "https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"
 ))()
 
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local VirtualUser = game:GetService("VirtualUser")
+local Workspace = game:GetService("Workspace")
+
+local LocalPlayer = Players.LocalPlayer
+
 local Window = Fluent:CreateWindow({
-    Title = "Datkits BF V2",
-    SubTitle = "Auto Farm ổn định - Quest + Move + Farm",
+    Title = "Datkits BF V3",
+    SubTitle = "Stable Auto Farm + Auto Chest 3 Sea",
     TabWidth = 160,
-    Size = UDim2.fromOffset(520, 430),
+    Size = UDim2.fromOffset(540, 470),
     Acrylic = false,
     Theme = "Dark",
     MinimizeKey = Enum.KeyCode.LeftControl
@@ -28,252 +38,226 @@ local Window = Fluent:CreateWindow({
 
 local Tabs = {
     Main = Window:AddTab({Title = "Auto Farm", Icon = "sword"}),
+    Chest = Window:AddTab({Title = "Auto Chest", Icon = "package"}),
     Settings = Window:AddTab({Title = "Settings", Icon = "settings"})
 }
 
--- =========================
--- SERVICES / VARIABLES
--- =========================
-local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local VirtualUser = game:GetService("VirtualUser")
-
-local LocalPlayer = Players.LocalPlayer
-
 getgenv().AutoFarm = false
+getgenv().AutoChest = false
 getgenv().FastAttack = true
 getgenv().AutoEquip = true
 getgenv().FarmHeight = 7
-getgenv().TweenSpeed = 300
+getgenv().MoveSpeed = 180
+getgenv().ChestSpeed = 180
+getgenv().ChestDistance = 5
 
-local currentTween = nil
-local currentTarget = nil
-local farmToken = 0
+local movement = {
+    active = false,
+    target = nil,
+    tolerance = 7,
+    speed = 180,
+    lastPos = nil,
+    stuckTime = 0,
+    lastTick = os.clock(),
+    token = 0,
+}
+
+local savedCollision = setmetatable({}, {__mode = "k"})
+local noclipState = false
 local lastQuestAttempt = 0
 local lastQuestKey = nil
-local lastTarget = nil
+local farmToken = 0
+local chestToken = 0
+local chestTarget = nil
+local chestScan = {}
+local chestScanAt = 0
 
--- =========================
--- BASIC HELPERS
--- =========================
 local function GetChar()
     local c = LocalPlayer.Character
     if not c then return nil end
-
     local hrp = c:FindFirstChild("HumanoidRootPart")
     local hum = c:FindFirstChildOfClass("Humanoid")
-
     if hrp and hum and hum.Health > 0 then
         return c
     end
-
     return nil
+end
+
+local function GetHRP()
+    local c = GetChar()
+    return c and c:FindFirstChild("HumanoidRootPart") or nil
 end
 
 local function GetLevel()
     local level = 1
-
     pcall(function()
         local data = LocalPlayer:FindFirstChild("Data")
         local lv = data and data:FindFirstChild("Level")
-        if lv then
-            level = tonumber(lv.Value) or 1
-        end
+        level = tonumber(lv and lv.Value) or 1
     end)
-
     return level
 end
 
-local function StopTween()
-    if currentTween then
-        pcall(function()
-            currentTween:Cancel()
-        end)
-    end
-
-    currentTween = nil
-    currentTarget = nil
-end
-
 local function SetNoclip(enabled)
-    local char = GetChar()
+    if noclipState == enabled then return end
+    noclipState = enabled
+    local char = LocalPlayer.Character
     if not char then return end
 
     for _, part in ipairs(char:GetDescendants()) do
         if part:IsA("BasePart") then
-            pcall(function()
-                part.CanCollide = not enabled
-            end)
+            if enabled then
+                if savedCollision[part] == nil then
+                    savedCollision[part] = part.CanCollide
+                end
+                part.CanCollide = false
+            else
+                local old = savedCollision[part]
+                if old ~= nil then
+                    part.CanCollide = old
+                    savedCollision[part] = nil
+                end
+            end
         end
     end
 end
 
--- =========================
--- STABLE MOVEMENT
--- =========================
--- Không tạo tween mới liên tục.
--- Chỉ cập nhật khi target thay đổi đủ lớn hoặc tween đã kết thúc.
-local function TweenTo(targetCF, force)
-    local char = GetChar()
-    if not char then return false end
+local function StopMove(restoreNoclip)
+    movement.active = false
+    movement.target = nil
+    movement.lastPos = nil
+    movement.stuckTime = 0
+    movement.token += 1
+    if restoreNoclip then
+        SetNoclip(false)
+    end
+end
 
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return false end
+-- Một controller duy nhất. Không Tween mỗi 0.1s.
+-- Tốc độ được giới hạn để tránh các cú server-correction quá mạnh.
+local function MoveTo(targetCF, tolerance, speed)
+    local hrp = GetHRP()
+    if not hrp or not targetCF then return false end
 
-    SetNoclip(true)
+    local dist = (hrp.Position - targetCF.Position).Magnitude
+    movement.tolerance = tolerance or 7
+    movement.speed = math.clamp(tonumber(speed) or getgenv().MoveSpeed or 180, 80, 300)
 
-    local distance = (hrp.Position - targetCF.Position).Magnitude
-
-    if distance <= 4.5 then
-        StopTween()
-        pcall(function()
-            hrp.CFrame = targetCF
-        end)
+    if dist <= movement.tolerance then
+        StopMove(false)
         return true
     end
 
-    if not force and currentTarget then
-        local targetDelta = (currentTarget.Position - targetCF.Position).Magnitude
-        if targetDelta < 5 and currentTween then
-            return false
-        end
-    end
-
-    currentTarget = targetCF
-
-    if currentTween then
-        pcall(function()
-            currentTween:Cancel()
-        end)
-        currentTween = nil
-    end
-
-    local speed = math.max(80, tonumber(getgenv().TweenSpeed) or 300)
-    local duration = math.clamp(distance / speed, 0.12, 8)
-
-    currentTween = TweenService:Create(
-        hrp,
-        TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.Out),
-        {CFrame = targetCF}
-    )
-
-    currentTween:Play()
-
-    task.spawn(function()
-        local myTween = currentTween
-        pcall(function()
-            myTween.Completed:Wait()
-        end)
-
-        if currentTween == myTween then
-            currentTween = nil
-        end
-    end)
-
+    SetNoclip(true)
+    movement.target = targetCF
+    movement.active = true
+    movement.lastTick = os.clock()
     return false
 end
+
+RunService.Heartbeat:Connect(function(dt)
+    if not movement.active or not movement.target then return end
+    local hrp = GetHRP()
+    if not hrp then
+        StopMove(false)
+        return
+    end
+
+    local target = movement.target
+    local delta = target.Position - hrp.Position
+    local dist = delta.Magnitude
+
+    if dist <= movement.tolerance then
+        local token = movement.token
+        StopMove(false)
+        if token == movement.token then
+            pcall(function()
+                hrp.AssemblyLinearVelocity = Vector3.zero
+                hrp.AssemblyAngularVelocity = Vector3.zero
+            end)
+        end
+        return
+    end
+
+    local now = os.clock()
+    local last = movement.lastPos
+    if last then
+        local moved = (hrp.Position - last).Magnitude
+        if moved < 0.15 then
+            movement.stuckTime += dt
+        else
+            movement.stuckTime = 0
+        end
+    end
+    movement.lastPos = hrp.Position
+
+    -- Nếu server vừa correction vị trí, tiếp tục từ vị trí hiện tại thay vì
+    -- tạo một Tween mới. Điều này tránh vòng lặp Cancel/Create gây giật.
+    if movement.stuckTime > 1.0 then
+        movement.stuckTime = 0
+        pcall(function()
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            hrp.AssemblyAngularVelocity = Vector3.zero
+        end)
+    end
+
+    local step = math.min(dist, movement.speed * math.max(dt, 1/240))
+    local dir = delta.Unit
+    local nextPos = hrp.Position + dir * step
+
+    -- CFrame.lookAt giúp hướng nhân vật ổn định; không đổi hướng ngẫu nhiên.
+    pcall(function()
+        hrp.CFrame = CFrame.lookAt(nextPos, target.Position)
+    end)
+end)
 
 -- =========================
 -- EQUIP
 -- =========================
 local function EquipTool()
     if not getgenv().AutoEquip then return end
-
     local char = GetChar()
     if not char then return end
-
-    if char:FindFirstChildOfClass("Tool") then
-        return
-    end
+    if char:FindFirstChildOfClass("Tool") then return end
 
     local backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
-    if not backpack then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not backpack or not hum then return end
 
     for _, tool in ipairs(backpack:GetChildren()) do
         if tool:IsA("Tool") then
-            pcall(function()
-                char:FindFirstChildOfClass("Humanoid"):EquipTool(tool)
-            end)
+            pcall(function() hum:EquipTool(tool) end)
             return
         end
     end
 end
 
 -- =========================
--- QUEST DETECTION
+-- QUEST GUI
 -- =========================
-local function GetQuestGui()
+local function HasQuest()
     local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
-    if not pg then return nil end
+    local main = pg and pg:FindFirstChild("Main")
+    local quest = main and main:FindFirstChild("Quest")
+    if not quest then return false end
 
-    return pg:FindFirstChild("Main")
-end
+    local visible = false
+    pcall(function() visible = quest.Visible end)
+    if visible then return true end
 
-local function GetQuestState()
-    -- Trả về:
-    -- active, questName, progressText
-    --
-    -- Ưu tiên kiểm tra nội dung Quest thay vì chỉ dùng Visible,
-    -- vì một số thời điểm UI chưa cập nhật Visible ngay.
-
-    local main = GetQuestGui()
-    if not main then
-        return false, nil, nil
-    end
-
-    local quest = main:FindFirstChild("Quest")
-    if not quest then
-        return false, nil, nil
-    end
-
-    local active = false
-    local questName = nil
-    local progress = nil
-
+    local foundProgress = false
     pcall(function()
-        if quest:IsA("GuiObject") and quest.Visible then
-            active = true
-        end
-    end)
-
-    local function scan(obj)
-        for _, child in ipairs(obj:GetDescendants()) do
-            if child:IsA("TextLabel") or child:IsA("TextButton") then
-                local text = tostring(child.Text or "")
-                if text ~= "" then
-                    local lower = string.lower(text)
-
-                    -- Tên quest thường nằm trong các TextLabel.
-                    if not questName and (
-                        string.find(lower, "quest", 1, true) or
-                        string.find(lower, "defeat", 1, true) or
-                        string.find(lower, "kill", 1, true)
-                    ) then
-                        questName = text
-                    end
-
-                    -- Nếu có dạng x/y thì coi như quest đang active.
-                    if string.match(text, "%d+/%d+") then
-                        progress = text
-                        active = true
-                    end
+        for _, v in ipairs(quest:GetDescendants()) do
+            if v:IsA("TextLabel") or v:IsA("TextButton") then
+                local t = tostring(v.Text or "")
+                if string.match(t, "%d+/%d+") then
+                    foundProgress = true
+                    break
                 end
             end
         end
-    end
-
-    pcall(function()
-        scan(quest)
     end)
-
-    return active, questName, progress
-end
-
-local function HasQuest()
-    local active = GetQuestState()
-    return active == true
+    return foundProgress
 end
 
 -- =========================
@@ -573,7 +557,7 @@ local function EnsureQuest(info)
     local distance = (hrp.Position - npcCF.Position).Magnitude
 
     if distance > 9 then
-        TweenTo(npcCF)
+        MoveTo(npcCF, 9)
         return false
     end
 
@@ -599,24 +583,19 @@ local function GetFarmCFrame(mob)
     )
 end
 
+
+
 -- =========================
 -- FAST ATTACK
 -- =========================
 task.spawn(function()
-    pcall(function()
-        require(ReplicatedStorage.Util.CameraShaker):Stop()
-    end)
-
     local controller
-
     pcall(function()
+        local cf = LocalPlayer.PlayerScripts:FindFirstChild("CombatFramework")
         for _, v in pairs(getreg()) do
             if typeof(v) == "function" then
                 local env = getfenv(v)
-
-                if env and env.script ==
-                    LocalPlayer.PlayerScripts:FindFirstChild("CombatFramework") then
-
+                if env and env.script == cf then
                     for _, up in pairs(debug.getupvalues(v)) do
                         if typeof(up) == "table" and up.activeController then
                             controller = up
@@ -625,28 +604,25 @@ task.spawn(function()
                     end
                 end
             end
-
-            if controller then
-                break
-            end
+            if controller then break end
         end
     end)
 
-    RunService.RenderStepped:Connect(function()
-        if not getgenv().FastAttack then return end
-        if not GetChar() then return end
+    pcall(function()
+        require(ReplicatedStorage.Util.CameraShaker):Stop()
+    end)
 
+    RunService.RenderStepped:Connect(function()
+        if not getgenv().FastAttack or not GetChar() then return end
         pcall(function()
             if controller and controller.activeController then
                 local ac = controller.activeController
-
                 ac.timeToNextAttack = -math.huge
                 ac.attacking = false
                 ac.increment = 4
                 ac.blocking = false
                 ac.hitboxMagnitude = 130
             end
-
             VirtualUser:CaptureController()
             VirtualUser:ClickButton1(Vector2.new())
         end)
@@ -654,194 +630,261 @@ task.spawn(function()
 end)
 
 -- =========================
--- AUTO EQUIP LOOP
+-- AUTO CHEST - SEA 1/2/3
 -- =========================
-task.spawn(function()
-    while task.wait(0.45) do
-        if getgenv().AutoFarm and getgenv().AutoEquip then
-            pcall(EquipTool)
+local function GetSea()
+    local ids = {
+        [2753915549] = "Sea 1",
+        [4442272183] = "Sea 2",
+        [7449423635] = "Sea 3"
+    }
+    return ids[game.PlaceId] or "Unknown Sea"
+end
+
+local function IsChestObject(obj)
+    if not obj then return false end
+    local n = string.lower(obj.Name or "")
+    return n == "chest1" or n == "chest2" or n == "chest3"
+end
+
+local function GetChestPart(obj)
+    if not obj then return nil end
+    if obj:IsA("BasePart") then return obj end
+    if obj:IsA("Model") then
+        if obj.PrimaryPart and obj.PrimaryPart:IsA("BasePart") then
+            return obj.PrimaryPart
+        end
+        local named = obj:FindFirstChild("Chest")
+        if named and named:IsA("BasePart") then return named end
+        return obj:FindFirstChildWhichIsA("BasePart", true)
+    end
+    return nil
+end
+
+local function IsChestAvailable(obj)
+    local part = GetChestPart(obj)
+    if not part or not part.Parent then return false end
+    pcall(function()
+        if part.Transparency >= 1 then return false end
+    end)
+    return true
+end
+
+local function RebuildChestList()
+    table.clear(chestScan)
+    local seen = {}
+
+    -- Blox Fruits thường đặt Chest1/2/3 trực tiếp dưới Workspace,
+    -- nhưng một số map/phiên bản có thể lồng chúng trong Model/Folder.
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if IsChestObject(obj) and not seen[obj] and IsChestAvailable(obj) then
+            seen[obj] = true
+            table.insert(chestScan, obj)
         end
     end
-end)
-
--- =========================
--- NOCLIP LOOP
--- =========================
-RunService.Stepped:Connect(function()
-    if getgenv().AutoFarm then
-        pcall(function()
-            SetNoclip(true)
-        end)
-    end
-end)
-
--- =========================
--- AUTO CHEST (SEA 1 + SEA 2 + SEA 3)
--- =========================
--- Tự quét các Chest đang tồn tại trong Workspace, không phụ thuộc
--- danh sách tọa độ cố định. Vì vậy có thể hoạt động trên cả 3 Sea
--- miễn game đặt tên chest theo Chest1 / Chest2 / Chest3.
-getgenv().AutoChest = false
-getgenv().ChestSpeed = 350
-
-local chestTween = nil
-local chestTarget = nil
-local chestToken = 0
-
-local function IsChest(obj)
-    if not obj or not obj:IsA("Model") then return false end
-    local n = string.lower(obj.Name)
-    return n == "chest1" or n == "chest2" or n == "chest3" or string.find(n, "chest", 1, true) ~= nil
-end
-
-local function GetChestPart(chest)
-    if not chest then return nil end
-    if chest.PrimaryPart and chest.PrimaryPart:IsA("BasePart") then
-        return chest.PrimaryPart
-    end
-    return chest:FindFirstChildWhichIsA("BasePart", true)
-end
-
-local function ChestIsAlive(chest)
-    if not chest or not chest.Parent then return false end
-    -- Chest thường có TouchInterest khi có thể tương tác.
-    -- Không bắt buộc phải có TouchInterest vì một số phiên bản map
-    -- tạo/chuyển chest hơi khác nhau.
-    return GetChestPart(chest) ~= nil
+    chestScanAt = os.clock()
 end
 
 local function FindNearestChest()
-    local char = GetChar()
-    if not char then return nil end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local hrp = GetHRP()
     if not hrp then return nil end
 
+    if os.clock() - chestScanAt > 0.8 or #chestScan == 0 then
+        RebuildChestList()
+    end
+
     local best, bestDist = nil, math.huge
-    for _, obj in ipairs(workspace:GetChildren()) do
-        if IsChest(obj) and ChestIsAlive(obj) then
-            local part = GetChestPart(obj)
-            if part then
-                local d = (hrp.Position - part.Position).Magnitude
-                if d < bestDist then
-                    best = obj
-                    bestDist = d
-                end
+    for i = #chestScan, 1, -1 do
+        local chest = chestScan[i]
+        if not IsChestAvailable(chest) then
+            table.remove(chestScan, i)
+        else
+            local part = GetChestPart(chest)
+            local d = part and (hrp.Position - part.Position).Magnitude
+            if d and d < bestDist then
+                best, bestDist = chest, d
             end
         end
     end
     return best, bestDist
 end
 
-local function StopChestTween()
-    if chestTween then
-        pcall(function() chestTween:Cancel() end)
-    end
-    chestTween = nil
-    chestTarget = nil
-end
-
-local function TweenToChest(chest)
-    local char = GetChar()
+local function CollectChest(chest)
+    local hrp = GetHRP()
     local part = GetChestPart(chest)
-    if not char or not part then return false end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return false end
+    if not hrp or not part then return false end
 
-    local target = CFrame.new(part.Position + Vector3.new(0, 2.5, 0))
-    local distance = (hrp.Position - target.Position).Magnitude
-
-    if distance <= 5 then
-        StopChestTween()
-        pcall(function()
-            hrp.CFrame = target
-            hrp.AssemblyLinearVelocity = Vector3.zero
-            hrp.AssemblyAngularVelocity = Vector3.zero
-        end)
-        return true
-    end
-
-    if chestTarget == chest and chestTween then
+    local d = (hrp.Position - part.Position).Magnitude
+    if d > (tonumber(getgenv().ChestDistance) or 5) + 2 then
         return false
     end
 
-    StopChestTween()
-    chestTarget = chest
+    StopMove(false)
+    pcall(function()
+        hrp.CFrame = part.CFrame * CFrame.new(0, 0, 1.5)
+        hrp.AssemblyLinearVelocity = Vector3.zero
+        hrp.AssemblyAngularVelocity = Vector3.zero
+    end)
 
-    local speed = math.max(100, tonumber(getgenv().ChestSpeed) or 350)
-    local duration = math.clamp(distance / speed, 0.15, 8)
-    chestTween = TweenService:Create(
-        hrp,
-        TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.Out),
-        {CFrame = target}
-    )
-    chestTween:Play()
-    return false
+    if typeof(firetouchinterest) == "function" then
+        pcall(function()
+            firetouchinterest(hrp, part, 0)
+            task.wait(0.05)
+            firetouchinterest(hrp, part, 1)
+        end)
+    end
+
+    task.wait(0.35)
+    return not IsChestAvailable(chest)
 end
 
--- Khi đã đến gần rương, mô phỏng chạm bằng HumanoidRootPart.
--- Dùng GetTouchingParts trước; nếu game không expose TouchInterest,
--- việc đứng sát rương vẫn cho phép cơ chế pickup của game xử lý.
-local function TouchChest(chest)
-    local char = GetChar()
-    local part = GetChestPart(chest)
-    if not char or not part then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
+local function RunAutoChest()
+    chestToken += 1
+    local token = chestToken
 
-    pcall(function()
-        firetouchinterest(hrp, part, 0)
-        task.wait()
-        firetouchinterest(hrp, part, 1)
+    task.spawn(function()
+        while getgenv().AutoChest and token == chestToken do
+            local ok, err = pcall(function()
+                if not GetChar() then
+                    StopMove(false)
+                    task.wait(0.7)
+                    return
+                end
+
+                SetNoclip(true)
+                local chest, distance = FindNearestChest()
+                if not chest then
+                    StopMove(false)
+                    task.wait(0.8)
+                    return
+                end
+
+                local part = GetChestPart(chest)
+                if not part then
+                    task.wait(0.1)
+                    return
+                end
+
+                if chestTarget ~= chest then
+                    chestTarget = chest
+                    StopMove(false)
+                end
+
+                local target = CFrame.new(part.Position + Vector3.new(0, 2.5, 0))
+                if distance and distance <= (tonumber(getgenv().ChestDistance) or 5) + 2 then
+                    local collected = CollectChest(chest)
+                    if collected then
+                        chestTarget = nil
+                        table.clear(chestScan)
+                    end
+                else
+                    MoveTo(target, 5, getgenv().ChestSpeed)
+                end
+            end)
+
+            if not ok then
+                warn("[Datkits AutoChest]", err)
+                StopMove(false)
+                task.wait(0.5)
+            else
+                task.wait(0.08)
+            end
+        end
     end)
 end
 
--- Luồng Auto Chest độc lập với Auto Farm.
--- Khi bật Auto Chest, nó ưu tiên rương; tắt thì Auto Farm hoạt động bình thường.
-task.spawn(function()
-    while task.wait(0.12) do
-        if not getgenv().AutoChest then
-            StopChestTween()
-            continue
-        end
+-- =========================
+-- AUTO FARM
+-- =========================
+local function RunAutoFarm()
+    farmToken += 1
+    local token = farmToken
 
-        local ok, err = pcall(function()
-            local char = GetChar()
-            if not char then
-                StopChestTween()
-                return
-            end
-
-            SetNoclip(true)
-            local chest, distance = FindNearestChest()
-            if not chest then
-                StopChestTween()
-                return
-            end
-
-            if distance and distance <= 7 then
-                TouchChest(chest)
-                task.wait(0.25)
-                -- Nếu rương biến mất sau khi nhặt, target sẽ được tìm lại.
-                if not ChestIsAlive(chest) then
-                    StopChestTween()
+    task.spawn(function()
+        while getgenv().AutoFarm and token == farmToken do
+            local ok, err = pcall(function()
+                if getgenv().AutoChest then
+                    StopMove(false)
+                    task.wait(0.2)
+                    return
                 end
-            else
-                TweenToChest(chest)
-            end
-        end)
 
-        if not ok then
-            warn("[Datkits AutoChest] Error:", err)
-            StopChestTween()
-            task.wait(0.5)
+                local char = GetChar()
+                if not char then
+                    StopMove(false)
+                    task.wait(0.7)
+                    return
+                end
+
+                local info = GetQuestInfo()
+                if not info then
+                    task.wait(0.5)
+                    return
+                end
+
+                local questKey = tostring(info.Name)..":"..tostring(info.Level)..":"..tostring(info.Mob)
+                if lastQuestKey ~= questKey then
+                    lastQuestKey = questKey
+                    StopMove(false)
+                end
+
+                if not HasQuest() then
+                    if not EnsureQuest(info) then
+                        task.wait(0.25)
+                        return
+                    end
+                    task.wait(0.3)
+                    return
+                end
+
+                local mob = FindMob(info.Mob)
+                if mob then
+                    local hum = mob:FindFirstChildOfClass("Humanoid")
+                    local ehrp = mob:FindFirstChild("HumanoidRootPart")
+                    if hum and ehrp and hum.Health > 0 then
+                        EquipTool()
+                        pcall(function()
+                            ehrp.CanCollide = false
+                            ehrp.AssemblyLinearVelocity = Vector3.zero
+                            ehrp.AssemblyAngularVelocity = Vector3.zero
+                        end)
+
+                        local farmCF = GetFarmCFrame(mob)
+                        if farmCF then
+                            MoveTo(farmCF, 5, getgenv().MoveSpeed)
+                        end
+                        task.wait(0.08)
+                        return
+                    end
+                end
+
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                if not hrp then return end
+                MoveTo(info.MobArea, 10, getgenv().MoveSpeed)
+                task.wait(0.15)
+            end)
+
+            if not ok then
+                warn("[Datkits AutoFarm]", err)
+                StopMove(false)
+                task.wait(0.6)
+            end
         end
-    end
-end)
+    end)
+end
 
 -- =========================
 -- MENU
 -- =========================
-Tabs.Main:AddSection("Cài đặt")
+Tabs.Main:AddSection("Movement")
+Tabs.Main:AddSlider("MoveSpeed", {
+    Title = "Tốc độ Auto Farm",
+    Default = 180,
+    Min = 80,
+    Max = 260,
+    Rounding = 10,
+    Callback = function(v) getgenv().MoveSpeed = v end
+})
 
 Tabs.Main:AddSlider("FarmHeight", {
     Title = "Độ cao trên đầu quái",
@@ -849,276 +892,106 @@ Tabs.Main:AddSlider("FarmHeight", {
     Min = 4,
     Max = 14,
     Rounding = 1,
-    Callback = function(v)
-        getgenv().FarmHeight = v
-    end
-})
-
-Tabs.Main:AddSlider("TweenSpeed", {
-    Title = "Tốc độ di chuyển",
-    Default = 300,
-    Min = 180,
-    Max = 420,
-    Rounding = 10,
-    Callback = function(v)
-        getgenv().TweenSpeed = v
-    end
+    Callback = function(v) getgenv().FarmHeight = v end
 })
 
 Tabs.Main:AddToggle("FastAttack", {
     Title = "Fast Attack",
     Default = true,
-    Callback = function(v)
-        getgenv().FastAttack = v
-    end
+    Callback = function(v) getgenv().FastAttack = v end
 })
 
 Tabs.Main:AddToggle("AutoEquip", {
     Title = "Tự động Equip vũ khí",
     Default = true,
-    Callback = function(v)
-        getgenv().AutoEquip = v
-    end
+    Callback = function(v) getgenv().AutoEquip = v end
 })
 
-Tabs.Main:AddSection("Auto Chest - 3 Sea")
-
-Tabs.Main:AddSlider("ChestSpeed", {
-    Title = "Tốc độ di chuyển tới rương",
-    Default = 350,
-    Min = 180,
-    Max = 500,
-    Rounding = 10,
-    Callback = function(v)
-        getgenv().ChestSpeed = v
-    end
-})
-
-Tabs.Main:AddToggle("AutoChest", {
-    Title = "Auto Chest (Sea 1 + Sea 2 + Sea 3)",
-    Default = false,
-    Callback = function(value)
-        getgenv().AutoChest = value
-        chestToken = chestToken + 1
-        if not value then
-            StopChestTween()
-            SetNoclip(false)
-            Fluent:Notify({
-                Title = "Auto Chest",
-                Content = "Đã tắt Auto Chest",
-                Duration = 3
-            })
-        else
-            Fluent:Notify({
-                Title = "Auto Chest",
-                Content = "Đang tự tìm rương gần nhất trên 3 Sea",
-                Duration = 4
-            })
-        end
-    end
-})
-
-Tabs.Main:AddSection("Auto Farm")
-
+Tabs.Main:AddSection("Quest Auto Farm")
 Tabs.Main:AddToggle("AutoFarm", {
-    Title = "Bật Auto Farm (Sea 1 + Sea 2)",
+    Title = "Auto Farm Quest",
     Default = false,
-
-    Callback = function(value)
-        getgenv().AutoFarm = value
-        farmToken = farmToken + 1
-
-        local myToken = farmToken
-
-        if not value then
-            StopTween()
-            if not getgenv().AutoChest then
-                SetNoclip(false)
-            end
-
-            local char = GetChar()
-            if char then
-                local hrp = char:FindFirstChild("HumanoidRootPart")
-                if hrp then
-                    hrp.AssemblyLinearVelocity = Vector3.zero
-                    hrp.AssemblyAngularVelocity = Vector3.zero
-                end
-            end
-
-            lastTarget = nil
-
-            Fluent:Notify({
-                Title = "Auto Farm",
-                Content = "Đã tắt Auto Farm",
-                Duration = 3
-            })
-
-            return
+    Callback = function(v)
+        getgenv().AutoFarm = v
+        farmToken += 1
+        if not v then
+            StopMove(not getgenv().AutoChest)
+            Fluent:Notify({Title="Auto Farm", Content="Đã tắt", Duration=2})
+        else
+            Fluent:Notify({Title="Auto Farm", Content="Đã bật - đang tự nhận Quest", Duration=3})
+            RunAutoFarm()
         end
-
-        Fluent:Notify({
-            Title = "Auto Farm",
-            Content = "Đã bật - Đang kiểm tra Quest...",
-            Duration = 4
-        })
-
-        task.spawn(function()
-            while getgenv().AutoFarm and myToken == farmToken do
-                local ok, err = pcall(function()
-                    local char = GetChar()
-
-                    if not char then
-                        StopTween()
-                        task.wait(0.8)
-                        return
-                    end
-
-                    -- Auto Chest được ưu tiên để tránh hai hệ thống cùng điều khiển CFrame.
-                    if getgenv().AutoChest then
-                        StopTween()
-                        task.wait(0.2)
-                        return
-                    end
-
-                    local info = GetQuestInfo()
-                    if not info then
-                        task.wait(0.5)
-                        return
-                    end
-
-                    local questKey =
-                        tostring(info.Name) .. ":" ..
-                        tostring(info.Level) .. ":" ..
-                        tostring(info.Mob)
-
-                    -- Nếu level/quest target thay đổi thì reset target.
-                    if lastQuestKey ~= questKey then
-                        lastQuestKey = questKey
-                        lastTarget = nil
-                        StopTween()
-                    end
-
-                    -- =================================================
-                    -- BƯỚC 1: PHẢI CÓ QUEST
-                    -- =================================================
-                    if not HasQuest() then
-                        lastTarget = nil
-
-                        local gotQuest = EnsureQuest(info)
-
-                        if not gotQuest then
-                            task.wait(0.25)
-                            return
-                        end
-
-                        task.wait(0.25)
-                        return
-                    end
-
-                    -- =================================================
-                    -- BƯỚC 2: ĐÃ CÓ QUEST -> TÌM ĐÚNG QUÁI
-                    -- =================================================
-                    local mob = FindMob(info.Mob)
-
-                    if mob then
-                        local hum = mob:FindFirstChildOfClass("Humanoid")
-                        local ehrp = mob:FindFirstChild("HumanoidRootPart")
-
-                        if hum and ehrp and hum.Health > 0 then
-                            lastTarget = mob
-
-                            pcall(function()
-                                ehrp.CanCollide = false
-                                ehrp.AssemblyLinearVelocity = Vector3.zero
-                                ehrp.AssemblyAngularVelocity = Vector3.zero
-                            end)
-
-                            EquipTool()
-
-                            local farmCF = GetFarmCFrame(mob)
-
-                            if farmCF then
-                                -- Chỉ cập nhật khi đổi quái hoặc vị trí đổi đáng kể.
-                                local needMove = true
-
-                                if currentTarget then
-                                    local d =
-                                        (currentTarget.Position - farmCF.Position).Magnitude
-
-                                    if d < 5 and currentTween then
-                                        needMove = false
-                                    end
-                                end
-
-                                if needMove then
-                                    TweenTo(farmCF)
-                                end
-                            end
-
-                            task.wait(0.08)
-                            return
-                        end
-                    end
-
-                    -- =================================================
-                    -- BƯỚC 3: CÓ QUEST NHƯNG CHƯA CÓ QUÁI
-                    -- -> ĐI ĐÚNG BÃI CỦA QUEST
-                    -- =================================================
-                    lastTarget = nil
-
-                    local hrp = char:FindFirstChild("HumanoidRootPart")
-                    if not hrp then
-                        task.wait(0.3)
-                        return
-                    end
-
-                    local areaCF = info.MobArea
-                    local distance = (hrp.Position - areaCF.Position).Magnitude
-
-                    if distance > 10 then
-                        TweenTo(areaCF)
-                    else
-                        StopTween()
-                    end
-
-                    task.wait(0.18)
-                end)
-
-                if not ok then
-                    warn("[Datkits AutoFarm] Error:", err)
-                    StopTween()
-                    task.wait(0.6)
-                end
-            end
-        end)
     end
 })
 
--- =========================
--- CHARACTER RESPAWN
--- =========================
+Tabs.Chest:AddSection("Auto Chest - 3 Sea")
+Tabs.Chest:AddParagraph({
+    Title = "Chest Scanner",
+    Content = "Tự quét Chest1 / Chest2 / Chest3 trên toàn bộ Workspace. Sea hiện tại: " .. GetSea()
+})
+
+Tabs.Chest:AddSlider("ChestSpeed", {
+    Title = "Tốc độ tới rương",
+    Default = 180,
+    Min = 80,
+    Max = 260,
+    Rounding = 10,
+    Callback = function(v) getgenv().ChestSpeed = v end
+})
+
+Tabs.Chest:AddSlider("ChestDistance", {
+    Title = "Khoảng cách nhặt rương",
+    Default = 5,
+    Min = 3,
+    Max = 8,
+    Rounding = 1,
+    Callback = function(v) getgenv().ChestDistance = v end
+})
+
+Tabs.Chest:AddToggle("AutoChest", {
+    Title = "Auto Chest Sea 1 + Sea 2 + Sea 3",
+    Default = false,
+    Callback = function(v)
+        getgenv().AutoChest = v
+        chestToken += 1
+        chestTarget = nil
+        table.clear(chestScan)
+
+        if v then
+            -- Không cho hai loop cùng điều khiển nhân vật.
+            StopMove(false)
+            Fluent:Notify({Title="Auto Chest", Content="Đã bật - đang quét rương " .. GetSea(), Duration=3})
+            RunAutoChest()
+        else
+            StopMove(not getgenv().AutoFarm)
+            Fluent:Notify({Title="Auto Chest", Content="Đã tắt", Duration=2})
+        end
+    end
+})
+
+Tabs.Settings:AddParagraph({
+    Title = "Lưu ý chuyển động",
+    Content = "Bản V3 dùng một movement controller duy nhất, tốc độ vừa phải và không Cancel/Create Tween liên tục để giảm giật và server correction."
+})
+
 LocalPlayer.CharacterAdded:Connect(function()
-    StopTween()
-    StopChestTween()
-    lastTarget = nil
-
-    task.wait(2)
-
-    if getgenv().AutoFarm then
-        Fluent:Notify({
-            Title = "Auto Farm",
-            Content = "Nhân vật đã hồi sinh - đang tiếp tục farm",
-            Duration = 3
-        })
+    StopMove(false)
+    chestTarget = nil
+    table.clear(chestScan)
+    noclipState = false
+    task.wait(1.5)
+    if getgenv().AutoChest then
+        RunAutoChest()
+    elseif getgenv().AutoFarm then
+        RunAutoFarm()
     end
 end)
 
 Window:SelectTab(1)
-
 Fluent:Notify({
-    Title = "Datkits BF V2",
-    Content = "Đã sửa Quest + di chuyển + chống khựng + tự tìm quái",
-    Duration = 6
+    Title = "Datkits BF V3",
+    Content = "Đã viết lại movement + Auto Chest 3 Sea",
+    Duration = 5
 })
 
-print("Datkits BF V2 - Stable Auto Farm loaded")
+print("Datkits BF V3 - Stable Auto Farm + Auto Chest loaded")
