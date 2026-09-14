@@ -17,7 +17,7 @@ local Tabs = {
     Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
 }
 
--- BIẾN
+-- BIẾN TOÀN CỤC
 getgenv().AutoFarm = false
 getgenv().FastAttack = true
 getgenv().AutoEquip = true
@@ -32,7 +32,10 @@ local VirtualUser = game:GetService("VirtualUser")
 local LocalPlayer = Players.LocalPlayer
 
 local currentTween = nil
-local currentTarget = nil
+local currentTargetPos = nil
+local farmBusy = false
+local lastQuestTry = 0
+local lastEquip = 0
 
 -- ==================== HÀM CƠ BẢN ====================
 local function GetChar()
@@ -53,63 +56,73 @@ local function StopTween()
         pcall(function() currentTween:Cancel() end)
         currentTween = nil
     end
-    currentTarget = nil
+    currentTargetPos = nil
+    
+    local char = GetChar()
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        local bv = char.HumanoidRootPart:FindFirstChild("FlyBV")
+        if bv then bv:Destroy() end
+    end
 end
 
--- HÀM BAY ỔN ĐỊNH (không khựng, không bị kéo về)
-local function TweenTo(targetCF)
-    local char = GetChar()
-    if not char then return end
-    local hrp = char.HumanoidRootPart
-    local humanoid = char.Humanoid
-
-    -- Noclip
-    for _, part in pairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.CanCollide = false
+-- NOCLIP LIÊN TỤC (Giúp không bị khựng hoặc đập vào vật cản)
+RunService.Stepped:Connect(function()
+    if getgenv().AutoFarm then
+        local char = GetChar()
+        if char then
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
         end
     end
+end)
 
-    -- Zero velocity
-    hrp.AssemblyLinearVelocity = Vector3.zero
-    hrp.AssemblyAngularVelocity = Vector3.zero
+-- DI CHUYỂN ỔN ĐỊNH
+-- Không dùng BodyVelocity cùng lúc với TweenService vì hai cơ chế này tranh quyền điều khiển HRP,
+-- gây khựng/giật và thường làm vòng farm mất mục tiêu.
+local function TweenTo(targetCF)
+    local char = GetChar()
+    if not char then return false end
 
-    -- BodyVelocity
-    local bv = hrp:FindFirstChild("FlyBV")
-    if not bv then
-        bv = Instance.new("BodyVelocity")
-        bv.Name = "FlyBV"
-        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-        bv.Velocity = Vector3.zero
-        bv.Parent = hrp
-    end
-
+    local hrp = char.HumanoidRootPart
     local distance = (hrp.Position - targetCF.Position).Magnitude
 
-    if distance < 4.5 then
+    if distance <= 5 then
         StopTween()
         hrp.CFrame = targetCF
-        return
+        return true
     end
 
-    -- Chỉ tạo tween mới nếu target thay đổi đáng kể
-    if currentTarget and (currentTarget.Position - targetCF.Position).Magnitude < 3 then
-        return
+    if currentTargetPos and (currentTargetPos - targetCF.Position).Magnitude < 5 then
+        return false
     end
 
-    currentTarget = targetCF
-
-    local speed = getgenv().TweenSpeed or 300
-    local time = math.clamp(distance / speed, 0.08, 4)
+    currentTargetPos = targetCF.Position
 
     if currentTween then
         pcall(function() currentTween:Cancel() end)
+        currentTween = nil
     end
 
-    currentTween = TweenService:Create(hrp, TweenInfo.new(time, Enum.EasingStyle.Linear), {
-        CFrame = targetCF
-    })
+    local speed = math.max(100, getgenv().TweenSpeed or 300)
+    local duration = math.max(0.08, distance / speed)
+
+    currentTween = TweenService:Create(
+        hrp,
+        TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.Out),
+        {CFrame = targetCF}
+    )
+
     currentTween:Play()
+
+    currentTween.Completed:Connect(function()
+        currentTween = nil
+        currentTargetPos = nil
+    end)
+
+    return false
 end
 
 local function EquipTool()
@@ -117,8 +130,8 @@ local function EquipTool()
     if not char then return end
     if char:FindFirstChildOfClass("Tool") then return end
 
-    for _, tool in pairs(LocalPlayer.Backpack:GetChildren()) do
-        if tool:IsA("Tool") then
+    for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
+        if tool:IsA("Tool") and (tool.ToolTip == "Melee" or tool.ToolTip == "Sword" or tool.ToolTip == "Blox Fruit") then
             pcall(function()
                 char.Humanoid:EquipTool(tool)
             end)
@@ -128,14 +141,32 @@ local function EquipTool()
 end
 
 local function HasQuest()
-    local success, result = pcall(function()
-        local main = LocalPlayer.PlayerGui:FindFirstChild("Main")
-        if main and main:FindFirstChild("Quest") then
-            return main.Quest.Visible
+    local hasQ = false
+    pcall(function()
+        local pg = LocalPlayer:FindFirstChild("PlayerGui")
+        local main = pg and pg:FindFirstChild("Main")
+        local quest = main and main:FindFirstChild("Quest")
+        if quest then
+            if quest.Visible then
+                hasQ = true
+            end
+            -- Some UI versions keep the quest frame mounted while changing its contents.
+            if not hasQ then
+                for _, obj in ipairs(quest:GetDescendants()) do
+                    if obj:IsA("TextLabel") and obj.Visible and obj.Text ~= "" then
+                        local s = string.lower(obj.Text)
+                        if string.find(s, "defeat", 1, true)
+                           or string.find(s, "kill", 1, true)
+                           or string.find(s, "0/", 1, true) then
+                            hasQ = true
+                            break
+                        end
+                    end
+                end
+            end
         end
-        return false
     end)
-    return success and result
+    return hasQ
 end
 
 -- ==================== QUEST DATA SEA 1 + SEA 2 ====================
@@ -227,49 +258,27 @@ end
 -- ==================== FAST ATTACK ====================
 task.spawn(function()
     pcall(function()
-        require(game.ReplicatedStorage.Util.CameraShaker):Stop()
+        ReplicatedStorage.Util.CameraShaker:Stop()
     end)
 
-    local controller
-    for _, v in pairs(getreg()) do
-        if typeof(v) == "function" then
-            local env = getfenv(v)
-            if env and env.script == LocalPlayer.PlayerScripts:FindFirstChild("CombatFramework") then
-                for _, up in pairs(debug.getupvalues(v)) do
-                    if typeof(up) == "table" and up.activeController then
-                        controller = up
-                        break
-                    end
-                end
-            end
+    while true do
+        task.wait(0.01)
+        if getgenv().FastAttack and getgenv().AutoFarm then
+            pcall(function()
+                VirtualUser:CaptureController()
+                VirtualUser:ClickButton1(Vector2.new())
+            end)
         end
-        if controller then break end
     end
-
-    RunService.RenderStepped:Connect(function()
-        if not getgenv().FastAttack then return end
-        pcall(function()
-            if controller and controller.activeController then
-                local ac = controller.activeController
-                ac.timeToNextAttack = -math.huge
-                ac.attacking = false
-                ac.increment = 4
-                ac.blocking = false
-                ac.hitboxMagnitude = 130
-            end
-            VirtualUser:CaptureController()
-            VirtualUser:ClickButton1(Vector2.new())
-        end)
-    end)
 end)
 
 -- ==================== AUTO EQUIP ====================
 task.spawn(function()
     while true do
-        if getgenv().AutoEquip then
+        if getgenv().AutoEquip and getgenv().AutoFarm then
             pcall(EquipTool)
         end
-        task.wait(0.45)
+        task.wait(0.5)
     end
 end)
 
@@ -305,85 +314,110 @@ Tabs.Main:AddToggle("AutoFarm", {
 
         if not Value then
             StopTween()
-            local char = GetChar()
-            if char and char:FindFirstChild("HumanoidRootPart") then
-                local bv = char.HumanoidRootPart:FindFirstChild("FlyBV")
-                if bv then bv:Destroy() end
-            end
             Fluent:Notify({Title="Auto Farm", Content="Đã tắt", Duration=3})
             return
         end
 
-        Fluent:Notify({Title="Auto Farm", Content="Đã bật - Đang farm ổn định", Duration=4})
+        Fluent:Notify({Title="Auto Farm", Content="Đã bật - Đang tự động farm", Duration=4})
 
         -- VÒNG LẶP FARM CHÍNH
         task.spawn(function()
+            if farmBusy then return end
+            farmBusy = true
+
             while getgenv().AutoFarm do
-                local success, err = pcall(function()
+                local ok = pcall(function()
                     local char = GetChar()
                     if not char then
+                        StopTween()
                         task.wait(1)
                         return
                     end
 
                     local info = GetQuestInfo()
-                    local mob = FindMob(info.Mob)
+                    if not info then
+                        task.wait(0.5)
+                        return
+                    end
 
-                    if mob and mob:FindFirstChild("HumanoidRootPart") and mob.Humanoid.Health > 0 then
-                        -- Có quái → bay thẳng đến XYZ của quái
-                        local pos = mob.HumanoidRootPart.Position
-                        local height = getgenv().FarmHeight or 7
-                        local farmCF = CFrame.new(pos + Vector3.new(0, height, 0), pos)
-                        TweenTo(farmCF)
+                    -- Equip thưa hơn để tránh spam Humanoid:EquipTool.
+                    if getgenv().AutoEquip and (os.clock() - lastEquip) > 1 then
+                        EquipTool()
+                        lastEquip = os.clock()
+                    end
 
-                        -- Khóa quái
-                        pcall(function()
-                            mob.HumanoidRootPart.CanCollide = false
-                            mob.HumanoidRootPart.AssemblyLinearVelocity = Vector3.zero
-                        end)
+                    -- 1) Chưa có quest -> tới NPC rồi mới gọi StartQuest.
+                    if not HasQuest() then
+                        StopTween()
+
+                        local distNPC = (char.HumanoidRootPart.Position - info.NPC.Position).Magnitude
+                        if distNPC > 10 then
+                            TweenTo(info.NPC * CFrame.new(0, 0, 3))
+                        elseif (os.clock() - lastQuestTry) > 1 then
+                            lastQuestTry = os.clock()
+                            pcall(function()
+                                ReplicatedStorage.Remotes.CommF_:InvokeServer(
+                                    "StartQuest", info.Name, info.Level
+                                )
+                            end)
+                        end
                     else
-                        -- Không có quái
-                        if not HasQuest() then
-                            -- Chưa có nhiệm vụ → đi nhận
-                            local dist = (char.HumanoidRootPart.Position - info.NPC.Position).Magnitude
-                            if dist > 10 then
-                                TweenTo(info.NPC * CFrame.new(0, 0, 3))
-                            else
-                                StopTween()
-                                for i = 1, 5 do
-                                    pcall(function()
-                                        ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", info.Name, info.Level)
-                                    end)
-                                    task.wait(0.12)
+                        -- 2) Có quest -> tìm đúng mob.
+                        local mob = FindMob(info.Mob)
+
+                        if mob then
+                            local hum = mob:FindFirstChildOfClass("Humanoid")
+                            local root = mob:FindFirstChild("HumanoidRootPart")
+
+                            if hum and root and hum.Health > 0 then
+                                local pos = root.Position
+                                local height = getgenv().FarmHeight or 7
+                                local farmCF = CFrame.new(
+                                    pos + Vector3.new(0, height, 0),
+                                    pos
+                                )
+
+                                TweenTo(farmCF)
+
+                                pcall(function()
+                                    root.CanCollide = false
+                                    root.AssemblyLinearVelocity = Vector3.zero
+                                    root.AssemblyAngularVelocity = Vector3.zero
+                                end)
+
+                                -- Đảm bảo nhân vật còn hướng về mob khi đã ở gần.
+                                if (char.HumanoidRootPart.Position - pos).Magnitude <= 12 then
+                                    char.HumanoidRootPart.CFrame = farmCF
                                 end
-                                task.wait(1)
                             end
                         else
-                            -- Có nhiệm vụ nhưng chưa thấy quái → bay về bãi farm
+                            -- Chưa spawn mob -> tới bãi farm, không spam tạo tween.
                             TweenTo(info.MobArea)
                         end
                     end
                 end)
 
-                if not success then
-                    warn("Farm error:", err)
+                if not ok then
+                    StopTween()
                 end
 
-                task.wait(0.13)
+                task.wait(0.15)
             end
-        end)
-    end
+
+            StopTween()
+            farmBusy = false
+        end
 })
 
 Window:SelectTab(1)
 Fluent:Notify({
     Title = "Datkits Premium",
-    Content = "Auto Farm đã viết lại ổn định - Không khựng, không bị kéo về",
-    Duration = 6
+    Content = "Đã sửa lỗi Auto Farm Sea 1 + Sea 2!",
+    Duration = 5
 })
 
 LocalPlayer.CharacterAdded:Connect(function()
-    task.wait(2)
+    task.wait(1.5)
     StopTween()
 end)
 
