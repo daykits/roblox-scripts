@@ -4,9 +4,9 @@ repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 local Window = Fluent:CreateWindow({
     Title = "Datkits BF V1",
-    SubTitle = "Sea 1 + Sea 2 - Farm ổn định",
+    SubTitle = "Auto Farm ổn định - Sea 1 + Sea 2",
     TabWidth = 160,
-    Size = UDim2.fromOffset(520, 420),
+    Size = UDim2.fromOffset(520, 430),
     Acrylic = false,
     Theme = "Dark",
     MinimizeKey = Enum.KeyCode.LeftControl
@@ -20,8 +20,9 @@ local Tabs = {
 -- BIẾN
 getgenv().AutoFarm = false
 getgenv().FastAttack = true
+getgenv().AutoEquip = true
 getgenv().FarmHeight = 7
-getgenv().TweenSpeed = 320
+getgenv().TweenSpeed = 300
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -29,7 +30,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local VirtualUser = game:GetService("VirtualUser")
 local LocalPlayer = Players.LocalPlayer
+
 local currentTween = nil
+local currentTarget = nil
 
 -- ==================== HÀM CƠ BẢN ====================
 local function GetChar()
@@ -50,132 +53,150 @@ local function StopTween()
         pcall(function() currentTween:Cancel() end)
         currentTween = nil
     end
+    currentTarget = nil
 end
 
-local function TweenTo(cf)
+-- HÀM BAY ỔN ĐỊNH (không khựng, không bị kéo về)
+local function TweenTo(targetCF)
     local char = GetChar()
     if not char then return end
     local hrp = char.HumanoidRootPart
+    local humanoid = char.Humanoid
 
-    for _, v in pairs(char:GetDescendants()) do
-        if v:IsA("BasePart") then
-            v.CanCollide = false
+    -- Noclip
+    for _, part in pairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = false
         end
     end
 
+    -- Zero velocity
+    hrp.AssemblyLinearVelocity = Vector3.zero
+    hrp.AssemblyAngularVelocity = Vector3.zero
+
+    -- BodyVelocity
     local bv = hrp:FindFirstChild("FlyBV")
     if not bv then
         bv = Instance.new("BodyVelocity")
         bv.Name = "FlyBV"
-        bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
         bv.Velocity = Vector3.zero
         bv.Parent = hrp
     end
 
-    local dist = (hrp.Position - cf.Position).Magnitude
-    if dist < 5 then
+    local distance = (hrp.Position - targetCF.Position).Magnitude
+
+    if distance < 4.5 then
         StopTween()
-        hrp.CFrame = cf
+        hrp.CFrame = targetCF
         return
     end
 
-    local time = math.clamp(dist / (getgenv().TweenSpeed or 320), 0.05, 3.2)
-    if currentTween then pcall(function() currentTween:Cancel() end) end
+    -- Chỉ tạo tween mới nếu target thay đổi đáng kể
+    if currentTarget and (currentTarget.Position - targetCF.Position).Magnitude < 3 then
+        return
+    end
 
-    currentTween = TweenService:Create(hrp, TweenInfo.new(time, Enum.EasingStyle.Linear), {CFrame = cf})
+    currentTarget = targetCF
+
+    local speed = getgenv().TweenSpeed or 300
+    local time = math.clamp(distance / speed, 0.08, 4)
+
+    if currentTween then
+        pcall(function() currentTween:Cancel() end)
+    end
+
+    currentTween = TweenService:Create(hrp, TweenInfo.new(time, Enum.EasingStyle.Linear), {
+        CFrame = targetCF
+    })
     currentTween:Play()
 end
 
 local function EquipTool()
     local char = GetChar()
-    if not char or char:FindFirstChildOfClass("Tool") then return end
+    if not char then return end
+    if char:FindFirstChildOfClass("Tool") then return end
+
     for _, tool in pairs(LocalPlayer.Backpack:GetChildren()) do
         if tool:IsA("Tool") then
-            pcall(function() char.Humanoid:EquipTool(tool) end)
+            pcall(function()
+                char.Humanoid:EquipTool(tool)
+            end)
             break
         end
     end
 end
 
 local function HasQuest()
-    local ok, result = pcall(function()
+    local success, result = pcall(function()
         local main = LocalPlayer.PlayerGui:FindFirstChild("Main")
-        return main and main:FindFirstChild("Quest") and main.Quest.Visible
+        if main and main:FindFirstChild("Quest") then
+            return main.Quest.Visible
+        end
+        return false
     end)
-    return ok and result
+    return success and result
 end
 
--- ==================== QUEST DATA (SEA 1 + SEA 2) ====================
+-- ==================== QUEST DATA SEA 1 + SEA 2 ====================
 local function GetQuestInfo()
     local level = GetLevel()
 
-    -- ========== SEA 1 ==========
+    -- SEA 1
     if level < 15 then
-        return {Name = "BanditQuest1", Level = 1, Mob = "Bandit", NPC = CFrame.new(1059, 16, 1546), MobArea = CFrame.new(1059, 16, 1546)}
+        return {Name="BanditQuest1", Level=1, Mob="Bandit", NPC=CFrame.new(1059,17,1546), MobArea=CFrame.new(1100,20,1550)}
     elseif level < 30 then
-        return {Name = "JungleQuest", Level = 1, Mob = "Monkey", NPC = CFrame.new(-1602, 36, 146), MobArea = CFrame.new(-1602, 36, 146)}
+        return {Name="JungleQuest", Level=1, Mob="Monkey", NPC=CFrame.new(-1601,37,145), MobArea=CFrame.new(-1600,40,150)}
     elseif level < 40 then
-        return {Name = "JungleQuest", Level = 2, Mob = "Gorilla", NPC = CFrame.new(-1602, 36, 146), MobArea = CFrame.new(-1602, 36, 146)}
+        return {Name="JungleQuest", Level=2, Mob="Gorilla", NPC=CFrame.new(-1601,37,145), MobArea=CFrame.new(-1600,40,150)}
     elseif level < 60 then
-        return {Name = "BuggyQuest1", Level = 1, Mob = "Pirate", NPC = CFrame.new(-1140, 4, 3827), MobArea = CFrame.new(-1140, 4, 3827)}
+        return {Name="BuggyQuest1", Level=1, Mob="Pirate", NPC=CFrame.new(-1140,5,3828), MobArea=CFrame.new(-1140,10,3850)}
     elseif level < 75 then
-        return {Name = "BuggyQuest1", Level = 2, Mob = "Brute", NPC = CFrame.new(-1140, 4, 3827), MobArea = CFrame.new(-1140, 4, 3827)}
+        return {Name="BuggyQuest1", Level=2, Mob="Brute", NPC=CFrame.new(-1140,5,3828), MobArea=CFrame.new(-1140,10,3850)}
     elseif level < 90 then
-        return {Name = "DesertQuest", Level = 1, Mob = "Desert Bandit", NPC = CFrame.new(897, 6, 4388), MobArea = CFrame.new(897, 6, 4388)}
+        return {Name="DesertQuest", Level=1, Mob="Desert Bandit", NPC=CFrame.new(897,7,4389), MobArea=CFrame.new(920,15,4400)}
     elseif level < 100 then
-        return {Name = "DesertQuest", Level = 2, Mob = "Desert Officer", NPC = CFrame.new(897, 6, 4388), MobArea = CFrame.new(897, 6, 4388)}
+        return {Name="DesertQuest", Level=2, Mob="Desert Officer", NPC=CFrame.new(897,7,4389), MobArea=CFrame.new(920,15,4400)}
     elseif level < 120 then
-        return {Name = "SnowQuest", Level = 1, Mob = "Snow Bandit", NPC = CFrame.new(1384, 87, -1297), MobArea = CFrame.new(1384, 87, -1297)}
-    elseif level < 130 then
-        return {Name = "SnowQuest", Level = 2, Mob = "Snowman", NPC = CFrame.new(1384, 87, -1297), MobArea = CFrame.new(1384, 87, -1297)}
+        return {Name="SnowQuest", Level=1, Mob="Snow Bandit", NPC=CFrame.new(1385,88,-1297), MobArea=CFrame.new(1400,90,-1280)}
     elseif level < 150 then
-        return {Name = "MarineQuest2", Level = 1, Mob = "Chief Petty Officer", NPC = CFrame.new(-5035, 28, 4324), MobArea = CFrame.new(-5035, 28, 4324)}
-    elseif level < 175 then
-        return {Name = "SkyQuest", Level = 1, Mob = "Sky Bandit", NPC = CFrame.new(-4721, 845, -1945), MobArea = CFrame.new(-4721, 845, -1945)}
+        return {Name="MarineQuest2", Level=1, Mob="Chief Petty Officer", NPC=CFrame.new(-5035,29,4325), MobArea=CFrame.new(-5050,40,4350)}
     elseif level < 190 then
-        return {Name = "SkyQuest", Level = 2, Mob = "Dark Master", NPC = CFrame.new(-4721, 845, -1945), MobArea = CFrame.new(-4721, 845, -1945)}
-    elseif level < 210 then
-        return {Name = "PrisonerQuest", Level = 1, Mob = "Prisoner", NPC = CFrame.new(5308, 1, 474), MobArea = CFrame.new(5308, 1, 474)}
+        return {Name="SkyQuest", Level=1, Mob="Sky Bandit", NPC=CFrame.new(-4830,518,-1650), MobArea=CFrame.new(-4800,520,-1600)}
     elseif level < 250 then
-        return {Name = "PrisonerQuest", Level = 2, Mob = "Dangerous Prisoner", NPC = CFrame.new(5308, 1, 474), MobArea = CFrame.new(5308, 1, 474)}
+        return {Name="PrisonerQuest", Level=1, Mob="Prisoner", NPC=CFrame.new(5310,2,475), MobArea=CFrame.new(5300,10,500)}
     elseif level < 300 then
-        return {Name = "ColosseumQuest", Level = 1, Mob = "Toga Warrior", NPC = CFrame.new(-1576, 7, -2984), MobArea = CFrame.new(-1576, 7, -2984)}
+        return {Name="ColosseumQuest", Level=1, Mob="Toga Warrior", NPC=CFrame.new(-1576,8,-2985), MobArea=CFrame.new(-1600,20,-3000)}
     elseif level < 375 then
-        return {Name = "MagmaQuest", Level = 1, Mob = "Military Soldier", NPC = CFrame.new(-5312, 12, 8514), MobArea = CFrame.new(-5312, 12, 8514)}
+        return {Name="MagmaQuest", Level=1, Mob="Military Soldier", NPC=CFrame.new(-5312,13,8515), MobArea=CFrame.new(-5300,30,8550)}
     elseif level < 450 then
-        return {Name = "FishmanQuest", Level = 1, Mob = "Fishman Warrior", NPC = CFrame.new(61122, 18, 1566), MobArea = CFrame.new(61122, 18, 1566)}
-    elseif level < 525 then
-        return {Name = "SkyQuest2", Level = 1, Mob = "God's Guard", NPC = CFrame.new(-4721, 845, -1945), MobArea = CFrame.new(-4721, 845, -1945)}
-    elseif level < 625 then
-        return {Name = "SkyQuest2", Level = 2, Mob = "Shanda", NPC = CFrame.new(-4721, 845, -1945), MobArea = CFrame.new(-4721, 845, -1945)}
+        return {Name="FishmanQuest", Level=1, Mob="Fishman Warrior", NPC=CFrame.new(61123,19,1567), MobArea=CFrame.new(61100,30,1600)}
     elseif level < 700 then
-        return {Name = "FountainQuest", Level = 1, Mob = "Galley Pirate", NPC = CFrame.new(5675, 28, -6500), MobArea = CFrame.new(5675, 28, -6500)}
+        return {Name="FountainQuest", Level=1, Mob="Galley Pirate", NPC=CFrame.new(5555,30,-6500), MobArea=CFrame.new(5600,40,-6450)}
 
-    -- ========== SEA 2 ==========
+    -- SEA 2
     elseif level < 725 then
-        return {Name = "Area1Quest", Level = 1, Mob = "Raider", NPC = CFrame.new(-429.54, 71.77, 1836.18), MobArea = CFrame.new(-750, 55, 2300)}
+        return {Name="Area1Quest", Level=1, Mob="Raider", NPC=CFrame.new(-429.54,72,1836), MobArea=CFrame.new(-750,60,2300)}
     elseif level < 775 then
-        return {Name = "Area1Quest", Level = 2, Mob = "Mercenary", NPC = CFrame.new(-429.54, 71.77, 1836.18), MobArea = CFrame.new(-950, 80, 1450)}
+        return {Name="Area1Quest", Level=2, Mob="Mercenary", NPC=CFrame.new(-429.54,72,1836), MobArea=CFrame.new(-950,85,1450)}
     elseif level < 800 then
-        return {Name = "Area2Quest", Level = 1, Mob = "Swan Pirate", NPC = CFrame.new(638.44, 71.77, 918.28), MobArea = CFrame.new(1050, 140, 1300)}
+        return {Name="Area2Quest", Level=1, Mob="Swan Pirate", NPC=CFrame.new(638.5,72,918), MobArea=CFrame.new(1050,145,1300)}
     elseif level < 875 then
-        return {Name = "Area2Quest", Level = 2, Mob = "Factory Staff", NPC = CFrame.new(638.44, 71.77, 918.28), MobArea = CFrame.new(850, 110, 0)}
+        return {Name="Area2Quest", Level=2, Mob="Factory Staff", NPC=CFrame.new(638.5,72,918), MobArea=CFrame.new(850,115,0)}
     elseif level < 950 then
-        return {Name = "MarineQuest3", Level = 1, Mob = "Marine Lieutenant", NPC = CFrame.new(-2440.79, 71.71, -3216.07), MobArea = CFrame.new(-2550, 110, -3100)}
+        return {Name="MarineQuest3", Level=1, Mob="Marine Lieutenant", NPC=CFrame.new(-2440.8,72,-3216), MobArea=CFrame.new(-2550,115,-3100)}
     elseif level < 1000 then
-        return {Name = "MarineQuest3", Level = 2, Mob = "Marine Captain", NPC = CFrame.new(-2440.79, 71.71, -3216.07), MobArea = CFrame.new(-2550, 110, -3100)}
+        return {Name="MarineQuest3", Level=2, Mob="Marine Captain", NPC=CFrame.new(-2440.8,72,-3216), MobArea=CFrame.new(-2550,115,-3100)}
     elseif level < 1100 then
-        return {Name = "ZombieQuest", Level = 1, Mob = "Zombie", NPC = CFrame.new(-5492, 48, -795), MobArea = CFrame.new(-5492, 48, -795)}
+        return {Name="ZombieQuest", Level=1, Mob="Zombie", NPC=CFrame.new(-5493,49,-796), MobArea=CFrame.new(-5500,60,-800)}
     elseif level < 1250 then
-        return {Name = "SnowMountainQuest", Level = 1, Mob = "Snow Trooper", NPC = CFrame.new(609, 401, -5275), MobArea = CFrame.new(609, 401, -5275)}
-    elseif level < 1350 then
-        return {Name = "IceQuest", Level = 1, Mob = "Arctic Warrior", NPC = CFrame.new(5668, 27, -6486), MobArea = CFrame.new(5668, 27, -6486)}
+        return {Name="SnowMountainQuest", Level=1, Mob="Snow Trooper", NPC=CFrame.new(610,402,-5275), MobArea=CFrame.new(600,410,-5250)}
     else
-        return {Name = "ForgottenQuest", Level = 1, Mob = "Sea Soldier", NPC = CFrame.new(-3054, 236, -10143), MobArea = CFrame.new(-3054, 236, -10143)}
+        return {Name="ForgottenQuest", Level=1, Mob="Sea Soldier", NPC=CFrame.new(-3054,237,-10143), MobArea=CFrame.new(-3050,250,-10100)}
     end
 end
 
--- ==================== TÌM QUÁI (NHANH) ====================
+-- ==================== TÌM QUÁI ====================
 local function FindMob(mobName)
     local char = GetChar()
     if not char then return nil end
@@ -191,8 +212,7 @@ local function FindMob(mobName)
         local hum = enemy:FindFirstChild("Humanoid")
         local ehrp = enemy:FindFirstChild("HumanoidRootPart")
         if hum and hum.Health > 0 and ehrp then
-            local name = string.lower(enemy.Name)
-            if string.find(name, lower, 1, true) then
+            if string.find(string.lower(enemy.Name), lower, 1, true) then
                 local dist = (hrp.Position - ehrp.Position).Magnitude
                 if dist < shortest then
                     shortest = dist
@@ -243,81 +263,78 @@ task.spawn(function()
     end)
 end)
 
+-- ==================== AUTO EQUIP ====================
+task.spawn(function()
+    while true do
+        if getgenv().AutoEquip then
+            pcall(EquipTool)
+        end
+        task.wait(0.45)
+    end
+end)
+
 -- ==================== MENU ====================
-Tabs.Main:AddSection("Cài đặt Farm")
+Tabs.Main:AddSection("Cài đặt")
 Tabs.Main:AddSlider("FarmHeight", {
     Title = "Độ cao trên đầu quái",
-    Default = 7, Min = 4, Max = 15, Rounding = 1,
+    Default = 7, Min = 4, Max = 14, Rounding = 1,
     Callback = function(v) getgenv().FarmHeight = v end
-})
-Tabs.Main:AddToggle("AutoEquip", {
-    Title = "Tự động Equip vũ khí",
-    Default = true,
-    Callback = function(v)
-        getgenv().AutoEquip = v
-    end
 })
 Tabs.Main:AddSlider("TweenSpeed", {
     Title = "Tốc độ bay",
-    Default = 320, Min = 200, Max = 450, Rounding = 10,
+    Default = 300, Min = 180, Max = 420, Rounding = 10,
     Callback = function(v) getgenv().TweenSpeed = v end
 })
 Tabs.Main:AddToggle("FastAttack", {
-    Title = "Fast Attack (Redz Style)",
+    Title = "Fast Attack",
     Default = true,
     Callback = function(v) getgenv().FastAttack = v end
 })
--- Trong phần Menu
 Tabs.Main:AddToggle("AutoEquip", {
     Title = "Tự động Equip vũ khí",
     Default = true,
-    Callback = function(v)
-        getgenv().AutoEquip = v
-    end
+    Callback = function(v) getgenv().AutoEquip = v end
 })
+
 Tabs.Main:AddSection("Auto Farm")
 Tabs.Main:AddToggle("AutoFarm", {
     Title = "Bật Auto Farm (Sea 1 + Sea 2)",
     Default = false,
     Callback = function(Value)
         getgenv().AutoFarm = Value
+
         if not Value then
             StopTween()
             local char = GetChar()
-            if char and char.HumanoidRootPart:FindFirstChild("FlyBV") then
-                char.HumanoidRootPart.FlyBV:Destroy()
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                local bv = char.HumanoidRootPart:FindFirstChild("FlyBV")
+                if bv then bv:Destroy() end
             end
-            Fluent:Notify({Title = "Auto Farm", Content = "Đã tắt", Duration = 3})
+            Fluent:Notify({Title="Auto Farm", Content="Đã tắt", Duration=3})
             return
         end
 
-        Fluent:Notify({Title = "Auto Farm", Content = "Đã bật - Sea 1 & Sea 2", Duration = 4})
+        Fluent:Notify({Title="Auto Farm", Content="Đã bật - Đang farm ổn định", Duration=4})
 
-        -- Giữ vũ khí
+        -- VÒNG LẶP FARM CHÍNH
         task.spawn(function()
             while getgenv().AutoFarm do
-                EquipTool()
-                task.wait(0.5)
-            end
-        end)
-
-        -- Vòng lặp farm chính
-        task.spawn(function()
-            while getgenv().AutoFarm do
-                pcall(function()
+                local success, err = pcall(function()
                     local char = GetChar()
-                    if not char then task.wait(1) return end
+                    if not char then
+                        task.wait(1)
+                        return
+                    end
 
                     local info = GetQuestInfo()
-
-                    -- Ưu tiên tìm quái trước (đi thẳng đến XYZ quái)
                     local mob = FindMob(info.Mob)
 
-                    if mob and mob:FindFirstChild("HumanoidRootPart") then
-                        -- Có quái → bay đến đúng vị trí XYZ của quái
+                    if mob and mob:FindFirstChild("HumanoidRootPart") and mob.Humanoid.Health > 0 then
+                        -- Có quái → bay thẳng đến XYZ của quái
                         local pos = mob.HumanoidRootPart.Position
                         local height = getgenv().FarmHeight or 7
-                        TweenTo(CFrame.new(pos + Vector3.new(0, height, 0), pos))
+                        local farmCF = CFrame.new(pos + Vector3.new(0, height, 0), pos)
+                        TweenTo(farmCF)
 
                         -- Khóa quái
                         pcall(function()
@@ -325,10 +342,11 @@ Tabs.Main:AddToggle("AutoFarm", {
                             mob.HumanoidRootPart.AssemblyLinearVelocity = Vector3.zero
                         end)
                     else
-                        -- Không thấy quái → nhận nhiệm vụ hoặc bay về khu vực
+                        -- Không có quái
                         if not HasQuest() then
+                            -- Chưa có nhiệm vụ → đi nhận
                             local dist = (char.HumanoidRootPart.Position - info.NPC.Position).Magnitude
-                            if dist > 12 then
+                            if dist > 10 then
                                 TweenTo(info.NPC * CFrame.new(0, 0, 3))
                             else
                                 StopTween()
@@ -336,36 +354,31 @@ Tabs.Main:AddToggle("AutoFarm", {
                                     pcall(function()
                                         ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", info.Name, info.Level)
                                     end)
-                                    task.wait(0.1)
+                                    task.wait(0.12)
                                 end
-                                task.wait(0.8)
+                                task.wait(1)
                             end
                         else
-                            -- Có quest nhưng không thấy mob → bay về MobArea
+                            -- Có nhiệm vụ nhưng chưa thấy quái → bay về bãi farm
                             TweenTo(info.MobArea)
                         end
                     end
                 end)
-                task.wait(0.12)
+
+                if not success then
+                    warn("Farm error:", err)
+                end
+
+                task.wait(0.13)
             end
         end)
     end
 })
 
--- Vòng lặp Auto Equip (đặt gần cuối script, trước Window:SelectTab)
-task.spawn(function()
-    while true do
-        if getgenv().AutoEquip then
-            pcall(EquipTool)
-        end
-        task.wait(0.4)
-    end
-end)
-
 Window:SelectTab(1)
 Fluent:Notify({
     Title = "Datkits Premium",
-    Content = "Sea 1 + Sea 2 sẵn sàng - Đi thẳng đến XYZ quái",
+    Content = "Auto Farm đã viết lại ổn định - Không khựng, không bị kéo về",
     Duration = 6
 })
 
@@ -374,4 +387,4 @@ LocalPlayer.CharacterAdded:Connect(function()
     StopTween()
 end)
 
-print("Datkits - Sea 1 + Sea 2 Farm ổn định đã sẵn sàng")
+print("Datkits - Auto Farm ổn định Sea 1 + Sea 2 đã sẵn sàng")
