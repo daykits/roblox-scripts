@@ -1,13 +1,10 @@
 repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
 
--------------------------------------------------
 -- LOAD FLUENT
--------------------------------------------------
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
-
 local Window = Fluent:CreateWindow({
     Title = "Datkits BF V1",
-    SubTitle = "Auto Farm ổn định - Không còn đứng yên",
+    SubTitle = "Auto Farm ổn định - Fast Attack Redz Style",
     TabWidth = 160,
     Size = UDim2.fromOffset(500, 400),
     Acrylic = false,
@@ -20,9 +17,7 @@ local Tabs = {
     Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
 }
 
--------------------------------------------------
 -- BIẾN
--------------------------------------------------
 getgenv().AutoFarm = false
 getgenv().FastAttack = true
 getgenv().FarmHeight = 7
@@ -31,13 +26,12 @@ getgenv().TweenSpeed = 300
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local VirtualUser = game:GetService("VirtualUser")
 local LocalPlayer = Players.LocalPlayer
-
 local currentTween = nil
 
--------------------------------------------------
 -- HÀM CƠ BẢN
--------------------------------------------------
 local function GetChar()
     local c = LocalPlayer.Character
     if c and c:FindFirstChild("HumanoidRootPart") and c:FindFirstChild("Humanoid") and c.Humanoid.Health > 0 then
@@ -88,7 +82,7 @@ local function TweenTo(targetCFrame)
     end
 
     local speed = getgenv().TweenSpeed or 300
-    local time = math.clamp(distance / speed, 0.1, 5)
+    local time = math.clamp(distance / speed, 0.08, 4)
 
     if currentTween then
         pcall(function() currentTween:Cancel() end)
@@ -104,10 +98,9 @@ local function EquipTool()
     local char = GetChar()
     if not char then return end
     if char:FindFirstChildOfClass("Tool") then return end
-
     for _, tool in pairs(LocalPlayer.Backpack:GetChildren()) do
         if tool:IsA("Tool") then
-            char.Humanoid:EquipTool(tool)
+            pcall(function() char.Humanoid:EquipTool(tool) end)
             break
         end
     end
@@ -124,13 +117,9 @@ local function HasQuest()
     return success and result
 end
 
--------------------------------------------------
 -- LẤY THÔNG TIN NHIỆM VỤ
--------------------------------------------------
 local function GetQuestInfo()
     local level = GetLevel()
-
-    -- Sea 2
     if level >= 700 and level < 725 then
         return {
             Name = "Area1Quest",
@@ -172,7 +161,6 @@ local function GetQuestInfo()
             MobArea = CFrame.new(-2550, 110, -3100)
         }
     else
-        -- Mặc định Sea 2 thấp
         return {
             Name = "Area1Quest",
             Level = 1,
@@ -183,13 +171,10 @@ local function GetQuestInfo()
     end
 end
 
--------------------------------------------------
 -- TÌM QUÁI
--------------------------------------------------
 local function FindMob(mobName)
     local char = GetChar()
     if not char then return nil end
-
     local closest = nil
     local shortest = 9999
     local folder = workspace:FindFirstChild("Enemies")
@@ -198,10 +183,9 @@ local function FindMob(mobName)
     for _, enemy in pairs(folder:GetChildren()) do
         if enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 and enemy:FindFirstChild("HumanoidRootPart") then
             local name = enemy.Name:lower()
-            if name:find(mobName:lower()) 
+            if name:find(mobName:lower())
             or (mobName == "Raider" and (name:find("raider") or name:find("tập kích") or name:find("tap kich")))
             or (mobName == "Mercenary" and (name:find("mercenary") or name:find("đánh thuê"))) then
-
                 local dist = (char.HumanoidRootPart.Position - enemy.HumanoidRootPart.Position).Magnitude
                 if dist < shortest then
                     shortest = dist
@@ -213,30 +197,54 @@ local function FindMob(mobName)
     return closest
 end
 
--------------------------------------------------
--- FAST ATTACK ĐƠN GIẢN
--------------------------------------------------
+-- ==================== FAST ATTACK REDZ STYLE ====================
 task.spawn(function()
-    while true do
-        task.wait(0.05)
-        if getgenv().AutoFarm and getgenv().FastAttack then
-            pcall(function()
-                local char = GetChar()
-                if not char then return end
-                local tool = char:FindFirstChildOfClass("Tool")
-                if tool then
-                    tool:Activate()
+    pcall(function()
+        local CameraShaker = require(game.ReplicatedStorage.Util.CameraShaker)
+        CameraShaker:Stop()
+    end)
+
+    local CombatController
+    for _, v in pairs(getreg()) do
+        if typeof(v) == "function" then
+            local env = getfenv(v)
+            if env and env.script == LocalPlayer.PlayerScripts:FindFirstChild("CombatFramework") then
+                for _, up in pairs(debug.getupvalues(v)) do
+                    if typeof(up) == "table" and up.activeController then
+                        CombatController = up
+                        break
+                    end
                 end
-            end)
+            end
         end
+        if CombatController then break end
     end
+
+    RunService.RenderStepped:Connect(function()
+        if not getgenv().FastAttack then return end
+        pcall(function()
+            if CombatController and CombatController.activeController then
+                local ac = CombatController.activeController
+                ac.timeToNextAttack = -math.huge
+                ac.attacking = false
+                ac.increment = 4
+                ac.blocking = false
+                ac.hitboxMagnitude = 120
+                if ac.humanoid then
+                    ac.humanoid.AutoRotate = true
+                end
+                ac.focusStart = 0
+            end
+
+            -- Click hỗ trợ
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton1(Vector2.new())
+        end)
+    end)
 end)
 
--------------------------------------------------
 -- MENU
--------------------------------------------------
 Tabs.Main:AddSection("Cài đặt")
-
 Tabs.Main:AddSlider("FarmHeight", {
     Title = "Độ cao trên đầu quái",
     Default = 7,
@@ -260,7 +268,7 @@ Tabs.Main:AddSlider("TweenSpeed", {
 })
 
 Tabs.Main:AddToggle("FastAttack", {
-    Title = "Fast Attack",
+    Title = "Fast Attack (Redz Style)",
     Default = true,
     Callback = function(v)
         getgenv().FastAttack = v
@@ -268,13 +276,11 @@ Tabs.Main:AddToggle("FastAttack", {
 })
 
 Tabs.Main:AddSection("Auto Farm")
-
 Tabs.Main:AddToggle("AutoFarm", {
     Title = "Bật Auto Farm (Nhận nhiệm vụ + Đánh quái)",
     Default = false,
     Callback = function(Value)
         getgenv().AutoFarm = Value
-
         if not Value then
             StopTween()
             local char = GetChar()
@@ -292,15 +298,14 @@ Tabs.Main:AddToggle("AutoFarm", {
         task.spawn(function()
             while getgenv().AutoFarm do
                 EquipTool()
-                task.wait(0.8)
+                task.wait(0.6)
             end
         end)
 
         -- Vòng lặp chính
         task.spawn(function()
             while getgenv().AutoFarm do
-                task.wait(0.2)
-
+                task.wait(0.15)
                 local char = GetChar()
                 if not char then
                     task.wait(1)
@@ -309,39 +314,33 @@ Tabs.Main:AddToggle("AutoFarm", {
 
                 local info = GetQuestInfo()
 
-                -- Chưa có nhiệm vụ → đi nhận
                 if not HasQuest() then
                     local dist = (char.HumanoidRootPart.Position - info.NPC.Position).Magnitude
-                    if dist > 15 then
-                        TweenTo(info.NPC * CFrame.new(0, 0, 4))
+                    if dist > 12 then
+                        TweenTo(info.NPC * CFrame.new(0, 0, 3))
                     else
                         StopTween()
-                        -- Nhận nhiệm vụ
-                        for i = 1, 6 do
+                        for i = 1, 5 do
                             pcall(function()
                                 ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", info.Name, info.Level)
                             end)
-                            task.wait(0.12)
+                            task.wait(0.1)
                         end
-                        task.wait(1.5)
+                        task.wait(1.2)
                     end
                 else
-                    -- Đã có nhiệm vụ → đi đánh quái
                     local mob = FindMob(info.Mob)
-
-                    if mob and mob:FindFirstChild("HumanoidRootPart") then
+                    if mob and mob:FindFirstChild("HumanoidRootPart") and mob.Humanoid.Health > 0 then
                         local pos = mob.HumanoidRootPart.Position
                         local height = getgenv().FarmHeight or 7
                         local farmPos = CFrame.new(pos + Vector3.new(0, height, 0), pos)
                         TweenTo(farmPos)
 
-                        -- Khóa mob
                         pcall(function()
                             mob.HumanoidRootPart.CanCollide = false
                             mob.HumanoidRootPart.AssemblyLinearVelocity = Vector3.zero
                         end)
                     else
-                        -- Không thấy mob → bay về khu vực quái
                         TweenTo(info.MobArea)
                     end
                 end
@@ -350,14 +349,11 @@ Tabs.Main:AddToggle("AutoFarm", {
     end
 })
 
--------------------------------------------------
 -- KẾT THÚC
--------------------------------------------------
 Window:SelectTab(1)
-
 Fluent:Notify({
     Title = "Datkits Premium",
-    Content = "Bản mới - Auto Farm đã được viết lại hoàn toàn",
+    Content = "Fast Attack Redz Style + Farm ổn định đã sẵn sàng",
     Duration = 6
 })
 
@@ -366,4 +362,4 @@ LocalPlayer.CharacterAdded:Connect(function()
     StopTween()
 end)
 
-print("Datkits - Auto Farm ổn định đã sẵn sàng")
+print("Datkits - Auto Farm + Fast Attack Redz đã sẵn sàng")
