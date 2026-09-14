@@ -9,7 +9,7 @@ local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.
 
 local Window = Fluent:CreateWindow({
     Title = "Datkits Premium | Blox Fruits",
-    SubTitle = "Fluent UI • Fixed Movement Engine",
+    SubTitle = "Spatial Grid & Auto-Hunt Engine",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
     Acrylic = false,
@@ -32,6 +32,7 @@ getgenv().AutoChest = false
 getgenv().FastAttack = true
 getgenv().FarmDistance = 6
 getgenv().TweenSpeed = 260
+getgenv().TargetPrioritize = "nearest" -- "nearest", "weakest", "highest_level"
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -44,10 +45,8 @@ local lastTargetPos = nil
 local noclipConnection = nil
 
 -------------------------------------------------
--- OOP CLASSES (OPTIMIZED FOR ROBLOX)
--------------------------------------------------
-
 -- 1. MONSTER CLASS
+-------------------------------------------------
 local MonsterClass = {}
 MonsterClass.__index = MonsterClass
 
@@ -60,6 +59,10 @@ function MonsterClass.new(model)
     self.hrp = model.HumanoidRootPart
     self.humanoid = model.Humanoid
     self.name = model.Name
+    self.level = model:GetAttribute("Level") or 1
+    self.hp = model.Humanoid.Health
+    self.maxHp = model.Humanoid.MaxHealth
+    self.type = model.Name:find("Boss") and "boss" or "normal"
     return self
 end
 
@@ -67,26 +70,130 @@ function MonsterClass:IsAlive()
     return self.humanoid and self.humanoid.Health > 0 and self.model.Parent ~= nil
 end
 
+-------------------------------------------------
 -- 2. QUEST CLASS
+-------------------------------------------------
 local QuestClass = {}
 QuestClass.__index = QuestClass
 
-function QuestClass.new(name, targetName)
+function QuestClass.new(name, targetName, targetType, minLevel, maxLevel)
     local self = setmetatable({}, QuestClass)
     self.name = name
     self.targetName = targetName
+    self.targetType = targetType
+    self.minLevel = minLevel
+    self.maxLevel = maxLevel
     return self
 end
 
 function QuestClass:Matches(monster)
     if not monster or not monster:IsAlive() then return false end
     if self.targetName and not string.find(monster.name, self.targetName) then return false end
+    if self.targetType and monster.type ~= self.targetType then return false end
+    if self.minLevel and monster.level < self.minLevel then return false end
+    if self.maxLevel and monster.level > self.maxLevel then return false end
     return true
 end
 
 -------------------------------------------------
--- HÀM HỖ TRỢ HỆ THỐNG
+-- 3. SPATIAL GRID (QUÉT QUÁI SIÊU NHANH)
 -------------------------------------------------
+local SpatialGridClass = {}
+SpatialGridClass.__index = SpatialGridClass
+
+function SpatialGridClass.new(cellSize)
+    local self = setmetatable({}, SpatialGridClass)
+    self.cellSize = cellSize or 150
+    self.grid = {}
+    return self
+end
+
+function SpatialGridClass:GetKey(pos)
+    local cx = math.floor(pos.X / self.cellSize)
+    local cz = math.floor(pos.Z / self.cellSize)
+    return cx .. "_" .. cz
+end
+
+function SpatialGridClass:Rebuild(monsterList)
+    self.grid = {}
+    for _, monster in ipairs(monsterList) do
+        if monster and monster:IsAlive() then
+            local key = self:GetKey(monster.hrp.Position)
+            if not self.grid[key] then self.grid[key] = {} end
+            table.insert(self.grid[key], monster)
+        end
+    end
+end
+
+function SpatialGridClass:QueryNearby(pos, radius)
+    local result = {}
+    local cellRange = math.ceil(radius / self.cellSize)
+    local cx = math.floor(pos.X / self.cellSize)
+    local cz = math.floor(pos.Z / self.cellSize)
+
+    for dx = -cellRange, cellRange do
+        for dz = -cellRange, cellRange do
+            local key = (cx + dx) .. "_" .. (cz + dz)
+            if self.grid[key] then
+                for _, monster in ipairs(self.grid[key]) do
+                    if (monster.hrp.Position - pos).Magnitude <= radius then
+                        table.insert(result, monster)
+                    end
+                end
+            end
+        end
+    end
+    return result
+end
+
+-------------------------------------------------
+-- 4. MONSTER FINDER (BỘ LỌC ƯU TIÊN MỤC TIÊU)
+-------------------------------------------------
+local MonsterFinderClass = {}
+MonsterFinderClass.__index = MonsterFinderClass
+
+function MonsterFinderClass.new(spatialGrid)
+    local self = setmetatable({}, MonsterFinderClass)
+    self.grid = spatialGrid
+    return self
+end
+
+function MonsterFinderClass:FindBestTarget(charPos, quest, radius, prioritize)
+    radius = radius or 5000
+    prioritize = prioritize or getgenv().TargetPrioritize
+    
+    local candidates = self.grid:QueryNearby(charPos, radius)
+    local valid = {}
+
+    for _, monster in ipairs(candidates) do
+        if quest then
+            if quest:Matches(monster) then table.insert(valid, monster) end
+        else
+            if monster:IsAlive() then table.insert(valid, monster) end
+        end
+    end
+
+    if #valid == 0 then return nil end
+
+    table.sort(valid, function(a, b)
+        if prioritize == "weakest" then
+            return a.hp < b.hp
+        elseif prioritize == "highest_level" then
+            return a.level > b.level
+        else -- "nearest"
+            return (a.hrp.Position - charPos).Magnitude < (b.hrp.Position - charPos).Magnitude
+        end
+    end)
+
+    return valid[1]
+end
+
+-------------------------------------------------
+-- HÀM DI CHUYỂN TỐI ƯU & NỘI TẠI
+-------------------------------------------------
+local globalSpatialGrid = SpatialGridClass.new(150)
+local globalMonsterFinder = MonsterFinderClass.new(globalSpatialGrid)
+
 local function GetCharacter()
     local char = LocalPlayer.Character
     if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
@@ -135,9 +242,7 @@ local function ResetCharacterState()
     if not char then return end
 
     for _, part in ipairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.CanCollide = true
-        end
+        if part:IsA("BasePart") then part.CanCollide = true end
     end
 end
 
@@ -148,9 +253,7 @@ local function ToggleNoclip(enable)
                 local char = GetCharacter()
                 if char then
                     for _, part in ipairs(char:GetDescendants()) do
-                        if part:IsA("BasePart") then
-                            part.CanCollide = false
-                        end
+                        if part:IsA("BasePart") then part.CanCollide = false end
                     end
                 end
             end)
@@ -163,9 +266,6 @@ local function ToggleNoclip(enable)
     end
 end
 
--------------------------------------------------
--- HÀM BAY TỐI ƯU (ĐÃ SỬA LỖI ĐỨNG YÊN)
--------------------------------------------------
 local function TweenTo(cf, speed)
     speed = speed or getgenv().TweenSpeed or 260
     local char = GetCharacter()
@@ -174,28 +274,25 @@ local function TweenTo(cf, speed)
     local hum = char:FindFirstChild("Humanoid")
     if not hrp or not hum then return end
 
-    -- Tắt vật lý chân để tránh bị kẹt vị trí khi bay
     hum.PlatformStand = true
 
     local startPos = hrp.Position
     local targetPos = cf.Position
     local dist = (startPos - targetPos).Magnitude
 
-    -- Đến nơi gần mục tiêu -> Dừng bay
     if dist <= 4 then
         StopTween()
         hrp.CFrame = cf
         return
     end
 
-    -- Nếu vị trí mục tiêu không đổi đáng kể và đang Tween -> Giữ nguyên Tween đang chạy
     if currentTween and lastTargetPos and (lastTargetPos - targetPos).Magnitude <= 4 then
         return
     end
 
     lastTargetPos = targetPos
 
-    -- ĐƯỜNG BAY AN TOÀN (NẾU KHOẢNG CÁCH > 1000 STUDS)
+    -- TỰ ĐỘNG NÂNG ĐỘ CAO (BYPASS ĐẢO / VẬT CẢN)
     if dist > 1000 then
         task.spawn(function()
             local highY = math.max(startPos.Y, targetPos.Y) + 300
@@ -221,7 +318,6 @@ local function TweenTo(cf, speed)
             end
         end)
     else
-        -- BAY NÓI THẲNG KHOẢNG CÁCH NGẮN
         if currentTween then pcall(function() currentTween:Cancel() end) end
         local duration = dist / speed
         currentTween = TweenService:Create(hrp, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = cf})
@@ -355,9 +451,42 @@ task.spawn(function()
 end)
 
 -------------------------------------------------
--- TAB AUTO FARM
+-- VÒNG LẶP CẬP NHẬT SPATIAL GRID
 -------------------------------------------------
-Tabs.Main:AddSection("Cài đặt")
+task.spawn(function()
+    while true do
+        task.wait(0.2)
+        pcall(function()
+            local enemies = workspace:FindFirstChild("Enemies")
+            if enemies then
+                local monsterList = {}
+                for _, enemy in ipairs(enemies:GetChildren()) do
+                    local monster = MonsterClass.new(enemy)
+                    if monster and monster:IsAlive() then
+                        table.insert(monsterList, monster)
+                    end
+                end
+                globalSpatialGrid:Rebuild(monsterList)
+            end
+        end)
+    end
+end)
+
+-------------------------------------------------
+-- TAB AUTO FARM (FLUENT UI)
+-------------------------------------------------
+Tabs.Main:AddSection("Cài đặt Target Engine")
+
+Tabs.Main:AddDropdown("TargetPriority", {
+    Title = "Ưu tiên chọn quái",
+    Values = { "Gần nhất (Nearest)", "Yếu nhất (Weakest HP)", "Cấp cao nhất (Highest Lv)" },
+    Default = "Gần nhất (Nearest)",
+    Callback = function(Value)
+        if Value:find("Nearest") then getgenv().TargetPrioritize = "nearest"
+        elseif Value:find("Weakest") then getgenv().TargetPrioritize = "weakest"
+        elseif Value:find("Highest") then getgenv().TargetPrioritize = "highest_level" end
+    end
+})
 
 Tabs.Main:AddSlider("FarmDistance", {
     Title = "Độ cao lơ lửng",
@@ -375,7 +504,7 @@ Tabs.Main:AddToggle("FastAttackToggle", {
 Tabs.Main:AddSection("Auto Quest")
 
 Tabs.Main:AddToggle("AutoQuestToggle", {
-    Title = "Auto Quest (Sea 1 + Sea 2)",
+    Title = "Auto Quest (Spatial Grid + Finder Engine)",
     Default = false,
     Callback = function(Value)
         getgenv().AutoQuest = Value
@@ -419,22 +548,8 @@ Tabs.Main:AddToggle("AutoQuestToggle", {
                             end
                         end
                     else
-                        local target = nil
-                        local minDist = math.huge
-                        local enemies = workspace:FindFirstChild("Enemies")
-                        
-                        if enemies then
-                            for _, enemy in ipairs(enemies:GetChildren()) do
-                                local monster = MonsterClass.new(enemy)
-                                if monster and currentQuestObj:Matches(monster) then
-                                    local d = (hrp.Position - monster.hrp.Position).Magnitude
-                                    if d < minDist then
-                                        minDist = d
-                                        target = monster
-                                    end
-                                end
-                            end
-                        end
+                        -- Sử dụng Spatial Grid và Monster Finder để chọn quái tốt nhất
+                        local target = globalMonsterFinder:FindBestTarget(hrp.Position, currentQuestObj, 5000, getgenv().TargetPrioritize)
 
                         if target then
                             local pos = target.hrp.Position
@@ -485,21 +600,8 @@ Tabs.Main:AddToggle("AutoFarmToggle", {
                     local char = GetCharacter()
                     if not char then return end
                     local hrp = char.HumanoidRootPart
-                    local nearest, minDist = nil, math.huge
-                    local enemies = workspace:FindFirstChild("Enemies")
-
-                    if enemies then
-                        for _, enemy in ipairs(enemies:GetChildren()) do
-                            local monster = MonsterClass.new(enemy)
-                            if monster and monster:IsAlive() then
-                                local d = (hrp.Position - monster.hrp.Position).Magnitude
-                                if d < minDist then
-                                    minDist = d
-                                    nearest = monster
-                                end
-                            end
-                        end
-                    end
+                    
+                    local nearest = globalMonsterFinder:FindBestTarget(hrp.Position, nil, 5000, getgenv().TargetPrioritize)
 
                     if nearest then
                         local pos = nearest.hrp.Position
@@ -508,61 +610,6 @@ Tabs.Main:AddToggle("AutoFarmToggle", {
                         
                         nearest.hrp.CanCollide = false
                         nearest.hrp.AssemblyLinearVelocity = Vector3.zero
-                    end
-                end)
-            end
-            ResetCharacterState()
-        end)
-    end
-})
-
-Tabs.Main:AddSection("Auto Chest")
-
-Tabs.Main:AddToggle("AutoChestToggle", {
-    Title = "Auto Chest (Tối ưu FPS)",
-    Default = false,
-    Callback = function(Value)
-        getgenv().AutoChest = Value
-        ToggleNoclip(Value)
-        
-        if not Value then
-            ResetCharacterState()
-            return
-        end
-
-        getgenv().AutoQuest = false
-        getgenv().AutoFarm = false
-
-        task.spawn(function()
-            while getgenv().AutoChest do
-                task.wait(0.1)
-                pcall(function()
-                    local char = GetCharacter()
-                    if not char then return end
-                    local hrp = char.HumanoidRootPart
-                    local targetChest = nil
-                    local minDist = math.huge
-
-                    local mapFolder = workspace:FindFirstChild("Map") or workspace
-                    for _, v in ipairs(mapFolder:GetChildren()) do
-                        if v.Name:find("Chest") and v:IsA("BasePart") and v:FindFirstChild("TouchInterest") then
-                            local d = (hrp.Position - v.Position).Magnitude
-                            if d < minDist then
-                                minDist = d
-                                targetChest = v
-                            end
-                        end
-                    end
-
-                    if targetChest then
-                        TweenTo(targetChest.CFrame, 300)
-                        if minDist <= 7 and firetouchinterest then
-                            firetouchinterest(hrp, targetChest, 0)
-                            task.wait(0.02)
-                            firetouchinterest(hrp, targetChest, 1)
-                        end
-                    else
-                        task.wait(1)
                     end
                 end)
             end
@@ -600,4 +647,4 @@ LocalPlayer.CharacterAdded:Connect(function()
     ResetCharacterState()
 end)
 
-print("[Datkits Premium] Đã sửa lỗi đứng yên thành công!")
+print("[Datkits Premium] Tích hợp Spatial Grid & Monster Finder thành công!")
