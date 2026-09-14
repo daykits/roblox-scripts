@@ -9,7 +9,7 @@ local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.
 
 local Window = Fluent:CreateWindow({
     Title = "Datkits Premium | Blox Fruits",
-    SubTitle = "Auto Farm 3 Sea • Bay đúng nhiệm vụ • Không lung tung",
+    SubTitle = "Auto Quest 3 Sea • Đã sửa tìm quái + tọa độ",
     TabWidth = 160,
     Size = UDim2.fromOffset(560, 440),
     Acrylic = true,
@@ -131,96 +131,6 @@ local function HasQuest()
 end
 
 -------------------------------------------------
--- BẢNG NHIỆM VỤ ĐẦY ĐỦ 3 SEA (ĐỊNH DẠNG RÕ RÀNG)
--------------------------------------------------
-local QuestList = {
-    -- ==================== SEA 1 ====================
-    {Min = 1,   Max = 9,   Name = "BanditQuest1",   Level = 1, Mob = "Bandit",           NPC = CFrame.new(1059.37, 16.51, 1549.26), MobPos = CFrame.new(1145, 17, 1634)},
-    {Min = 10,  Max = 14,  Name = "JungleQuest",    Level = 1, Mob = "Monkey",           NPC = CFrame.new(-1598.08, 36.85, 153.38), MobPos = CFrame.new(-1610, 37, 145)},
-    {Min = 15,  Max = 29,  Name = "JungleQuest",    Level = 2, Mob = "Gorilla",          NPC = CFrame.new(-1598.08, 36.85, 153.38), MobPos = CFrame.new(-1235, 6, -486)},
-    {Min = 30,  Max = 39,  Name = "BuggyQuest1",    Level = 1, Mob = "Pirate",           NPC = CFrame.new(-1140.17, 4.75, 3827.41), MobPos = CFrame.new(-1215, 5, 3915)},
-    {Min = 40,  Max = 59,  Name = "BuggyQuest1",    Level = 2, Mob = "Brute",            NPC = CFrame.new(-1140.17, 4.75, 3827.41), MobPos = CFrame.new(-1145, 15, 4350)},
-    {Min = 60,  Max = 89,  Name = "DesertQuest",    Level = 1, Mob = "Desert Bandit",    NPC = CFrame.new(894.49, 6.44, 4384.58),  MobPos = CFrame.new(932, 6, 4485)},
-    {Min = 90,  Max = 119, Name = "SnowQuest",      Level = 1, Mob = "Snow Bandit",      NPC = CFrame.new(1385.84, 87.27, -1298.61), MobPos = CFrame.new(1285, 105, -1342)},
-    {Min = 120, Max = 149, Name = "MarineQuest2",   Level = 1, Mob = "Chief Petty Officer", NPC = CFrame.new(-5039.59, 28.65, 4324.78), MobPos = CFrame.new(-4855, 20, 4260)},
-    {Min = 150, Max = 189, Name = "SkyQuest",       Level = 1, Mob = "Sky Bandit",       NPC = CFrame.new(-4839.53, 717.67, -2629.09), MobPos = CFrame.new(-4975, 717, -2885)},
-    {Min = 190, Max = 224, Name = "PrisonerQuest",  Level = 1, Mob = "Prisoner",         NPC = CFrame.new(530.81, 1.66, 474.98),   MobPos = CFrame.new(540, 2, 485)},
-    {Min = 225, Max = 299, Name = "ColosseumQuest", Level = 1, Mob = "Toga Warrior",     NPC = CFrame.new(-1588.34, 7.39, -2986.48), MobPos = CFrame.new(-1800, 7, -2980)},
-    {Min = 300, Max = 374, Name = "MagmaQuest",     Level = 1, Mob = "Military Soldier", NPC = CFrame.new(-5313.37, 8.58, 8515.29), MobPos = CFrame.new(-5400, 9, 8530)},
-    {Min = 375, Max = 449, Name = "FishmanQuest",   Level = 1, Mob = "Fishman Warrior",  NPC = CFrame.new(61163.85, 18.5, 1569.26), MobPos = CFrame.new(60800, 18, 1500)},
-    {Min = 450, Max = 524, Name = "SkyQuest2",      Level = 1, Mob = "God's Guard",      NPC = CFrame.new(-7861.34, 5545.49, -380.29), MobPos = CFrame.new(-7725, 5600, -440)},
-    {Min = 525, Max = 624, Name = "SkyQuest2",      Level = 2, Mob = "Shandian",         NPC = CFrame.new(-7861.34, 5545.49, -380.29), MobPos = CFrame.new(-7850, 5600, -220)},
-    {Min = 625, Max = 699, Name = "FountainQuest",  Level = 1, Mob = "Galley Pirate",    NPC = CFrame.new(5259.82, 38.5, 4050.03),  MobPos = CFrame.new(5580, 38, 3990)},
-
-    -- ==================== SEA 2 ====================
-    {Min = 700, Max = 724, Name = "Area1Quest",     Level = 1, Mob = "Raider",           NPC = CFrame.new(-429.54, 71.77, 1836.18), MobPos = CFrame.new(-750, 55, 2300)},
-    {Min = 725, Max = 774, Name = "Area1Quest",     Level = 2, Mob = "Mercenary",        NPC = CFrame.new(-429.54, 71.77, 1836.18), MobPos = CFrame.new(-1000, 80, 1450)},
-    {Min = 775, Max = 799, Name = "Area2Quest",     Level = 1, Mob = "Swan Pirate",      NPC = CFrame.new(638.44, 71.77, 918.28),  MobPos = CFrame.new(1050, 140, 1300)},
-    {Min = 800, Max = 874, Name = "Area2Quest",     Level = 2, Mob = "Factory Staff",    NPC = CFrame.new(638.44, 71.77, 918.28),  MobPos = CFrame.new(850, 110, 0)},
-    {Min = 875, Max = 899, Name = "MarineQuest3",   Level = 1, Mob = "Marine Lieutenant",NPC = CFrame.new(-2440.79, 71.71, -3216.07), MobPos = CFrame.new(-2550, 110, -3100)},
-    {Min = 900, Max = 949, Name = "MarineQuest3",   Level = 2, Mob = "Marine Captain",   NPC = CFrame.new(-2440.79, 71.71, -3216.07), MobPos = CFrame.new(-2550, 110, -3100)},
-    {Min = 950, Max = 974, Name = "ZombieQuest",    Level = 1, Mob = "Zombie",           NPC = CFrame.new(-5494.34, 48.52, -795.16), MobPos = CFrame.new(-5550, 50, -800)},
-    {Min = 975, Max = 999, Name = "ZombieQuest",    Level = 2, Mob = "Vampire",          NPC = CFrame.new(-5494.34, 48.52, -795.16), MobPos = CFrame.new(-5550, 50, -800)},
-    {Min = 1000,Max = 1049,Name = "SnowMountainQuest", Level = 1, Mob = "Snow Trooper",  NPC = CFrame.new(609.63, 401.39, -5372.26), MobPos = CFrame.new(500, 401, -5400)},
-    {Min = 1050,Max = 1099,Name = "SnowMountainQuest", Level = 2, Mob = "Winter Warrior",NPC = CFrame.new(609.63, 401.39, -5372.26), MobPos = CFrame.new(500, 401, -5400)},
-    {Min = 1100,Max = 1124,Name = "IceSideQuest",   Level = 1, Mob = "Lab Subordinate",  NPC = CFrame.new(-6060.11, 15.99, -4904.79), MobPos = CFrame.new(-6100, 16, -4900)},
-    {Min = 1125,Max = 1174,Name = "IceSideQuest",   Level = 2, Mob = "Horned Warrior",   NPC = CFrame.new(-6060.11, 15.99, -4904.79), MobPos = CFrame.new(-6100, 16, -4900)},
-    {Min = 1175,Max = 1199,Name = "FireSideQuest",  Level = 1, Mob = "Magma Ninja",      NPC = CFrame.new(-5431.09, 15.99, -5296.53), MobPos = CFrame.new(-5400, 16, -5300)},
-    {Min = 1200,Max = 1249,Name = "FireSideQuest",  Level = 2, Mob = "Lava Pirate",      NPC = CFrame.new(-5431.09, 15.99, -5296.53), MobPos = CFrame.new(-5400, 16, -5300)},
-    {Min = 1250,Max = 1299,Name = "ShipQuest1",     Level = 1, Mob = "Ship Deckhand",    NPC = CFrame.new(1037.80, 125.09, 32911.60), MobPos = CFrame.new(1000, 125, 32900)},
-    {Min = 1300,Max = 1349,Name = "ShipQuest2",     Level = 1, Mob = "Ship Engineer",    NPC = CFrame.new(1037.80, 125.09, 32911.60), MobPos = CFrame.new(1000, 125, 32900)},
-    {Min = 1350,Max = 1374,Name = "FrostQuest",     Level = 1, Mob = "Arctic Warrior",   NPC = CFrame.new(5669.44, 28.21, -6482.60), MobPos = CFrame.new(5700, 28, -6500)},
-    {Min = 1375,Max = 1424,Name = "FrostQuest",     Level = 2, Mob = "Snow Lurker",      NPC = CFrame.new(5669.44, 28.21, -6482.60), MobPos = CFrame.new(5700, 28, -6500)},
-    {Min = 1425,Max = 1449,Name = "ForgottenQuest", Level = 1, Mob = "Sea Soldier",      NPC = CFrame.new(-3054.44, 240.31, -10147.75), MobPos = CFrame.new(-3100, 240, -10100)},
-    {Min = 1450,Max = 1499,Name = "ForgottenQuest", Level = 2, Mob = "Water Fighter",    NPC = CFrame.new(-3054.44, 240.31, -10147.75), MobPos = CFrame.new(-3100, 240, -10100)},
-
-    -- ==================== SEA 3 ====================
-    {Min = 1500,Max = 1524,Name = "PiratePortQuest", Level = 1, Mob = "Pirate Millionaire", NPC = CFrame.new(-290, 44, 5577), MobPos = CFrame.new(-300, 44, 5550)},
-    {Min = 1525,Max = 1574,Name = "PiratePortQuest", Level = 2, Mob = "Pistol Billionaire", NPC = CFrame.new(-290, 44, 5577), MobPos = CFrame.new(-300, 44, 5550)},
-    {Min = 1575,Max = 1599,Name = "AmazonQuest",    Level = 1, Mob = "Dragon Crew Warrior", NPC = CFrame.new(5832.84, 51.68, -1101.52), MobPos = CFrame.new(5800, 52, -1100)},
-    {Min = 1600,Max = 1624,Name = "AmazonQuest",    Level = 2, Mob = "Dragon Crew Archer", NPC = CFrame.new(5832.84, 51.68, -1101.52), MobPos = CFrame.new(5800, 52, -1100)},
-    {Min = 1625,Max = 1649,Name = "AmazonQuest2",   Level = 1, Mob = "Female Island Raider", NPC = CFrame.new(5446.86, 601.66, 751.13), MobPos = CFrame.new(5400, 602, 750)},
-    {Min = 1650,Max = 1699,Name = "AmazonQuest2",   Level = 2, Mob = "Giant Island Raider", NPC = CFrame.new(5446.86, 601.66, 751.13), MobPos = CFrame.new(5400, 602, 750)},
-    {Min = 1700,Max = 1724,Name = "MarineTreeIsland", Level = 1, Mob = "Marine Commodore", NPC = CFrame.new(2180.54, 28.09, -6741.39), MobPos = CFrame.new(2200, 28, -6700)},
-    {Min = 1725,Max = 1774,Name = "MarineTreeIsland", Level = 2, Mob = "Marine Rear Admiral", NPC = CFrame.new(2180.54, 28.09, -6741.39), MobPos = CFrame.new(2200, 28, -6700)},
-    {Min = 1775,Max = 1799,Name = "DeepForestIsland", Level = 1, Mob = "Fishman Raider", NPC = CFrame.new(-10581.66, 331.74, -8761.19), MobPos = CFrame.new(-10550, 332, -8750)},
-    {Min = 1800,Max = 1824,Name = "DeepForestIsland", Level = 2, Mob = "Fishman Captain", NPC = CFrame.new(-10581.66, 331.74, -8761.19), MobPos = CFrame.new(-10550, 332, -8750)},
-    {Min = 1825,Max = 1849,Name = "DeepForestIsland2", Level = 1, Mob = "Forest Pirate", NPC = CFrame.new(-13234.04, 331.63, -7625.40), MobPos = CFrame.new(-13200, 332, -7600)},
-    {Min = 1850,Max = 1899,Name = "DeepForestIsland2", Level = 2, Mob = "Mythological Pirate", NPC = CFrame.new(-13234.04, 331.63, -7625.40), MobPos = CFrame.new(-13200, 332, -7600)},
-    {Min = 1900,Max = 1924,Name = "DeepForestIsland3", Level = 1, Mob = "Jungle Pirate", NPC = CFrame.new(-12680.38, 390.86, -9902.12), MobPos = CFrame.new(-12650, 391, -9900)},
-    {Min = 1925,Max = 1974,Name = "DeepForestIsland3", Level = 2, Mob = "Musketeer Pirate", NPC = CFrame.new(-12680.38, 390.86, -9902.12), MobPos = CFrame.new(-12650, 391, -9900)},
-    {Min = 1975,Max = 1999,Name = "HauntedCastle",  Level = 1, Mob = "Reborn Skeleton",  NPC = CFrame.new(-9515.45, 142.13, 5525.21), MobPos = CFrame.new(-9500, 142, 5550)},
-    {Min = 2000,Max = 2024,Name = "HauntedCastle",  Level = 2, Mob = "Living Zombie",    NPC = CFrame.new(-9515.45, 142.13, 5525.21), MobPos = CFrame.new(-9500, 142, 5550)},
-    {Min = 2025,Max = 2049,Name = "HauntedCastle",  Level = 3, Mob = "Demonic Soul",     NPC = CFrame.new(-9515.45, 142.13, 5525.21), MobPos = CFrame.new(-9500, 142, 5550)},
-    {Min = 2050,Max = 2074,Name = "HauntedCastle",  Level = 4, Mob = "Posessed Mummy",   NPC = CFrame.new(-9515.45, 142.13, 5525.21), MobPos = CFrame.new(-9500, 142, 5550)},
-    {Min = 2075,Max = 2099,Name = "CandyCaneQuest", Level = 1, Mob = "Peanut Scout",     NPC = CFrame.new(-1038.35, 14.61, -11928.91), MobPos = CFrame.new(-1000, 15, -11900)},
-    {Min = 2100,Max = 2124,Name = "CandyCaneQuest", Level = 2, Mob = "Peanut President", NPC = CFrame.new(-1038.35, 14.61, -11928.91), MobPos = CFrame.new(-1000, 15, -11900)},
-    {Min = 2125,Max = 2149,Name = "IceCreamQuest",  Level = 1, Mob = "Ice Cream Chef",   NPC = CFrame.new(-820.65, 65.84, -10965.64), MobPos = CFrame.new(-800, 66, -10950)},
-    {Min = 2150,Max = 2199,Name = "IceCreamQuest",  Level = 2, Mob = "Ice Cream Commander", NPC = CFrame.new(-820.65, 65.84, -10965.64), MobPos = CFrame.new(-800, 66, -10950)},
-    {Min = 2200,Max = 2224,Name = "CookieQuest",    Level = 1, Mob = "Cookie Crafter",   NPC = CFrame.new(-2337.27, 36.83, -12093.29), MobPos = CFrame.new(-2300, 37, -12050)},
-    {Min = 2225,Max = 2249,Name = "CookieQuest",    Level = 2, Mob = "Cake Guard",       NPC = CFrame.new(-2337.27, 36.83, -12093.29), MobPos = CFrame.new(-2300, 37, -12050)},
-    {Min = 2250,Max = 2274,Name = "CakeQuest1",     Level = 1, Mob = "Baking Staff",     NPC = CFrame.new(-2027.32, 36.85, -12028.26), MobPos = CFrame.new(-2000, 37, -12000)},
-    {Min = 2275,Max = 2299,Name = "CakeQuest1",     Level = 2, Mob = "Head Baker",       NPC = CFrame.new(-2027.32, 36.85, -12028.26), MobPos = CFrame.new(-2000, 37, -12000)},
-    {Min = 2300,Max = 2324,Name = "CakeQuest2",     Level = 1, Mob = "Cocoa Warrior",    NPC = CFrame.new(-1873.54, 13.13, -12100.91), MobPos = CFrame.new(-1850, 13, -12050)},
-    {Min = 2325,Max = 2349,Name = "CakeQuest2",     Level = 2, Mob = "Chocolate Bar Battler", NPC = CFrame.new(-1873.54, 13.13, -12100.91), MobPos = CFrame.new(-1850, 13, -12050)},
-    {Min = 2350,Max = 2374,Name = "ChocQuest1",     Level = 1, Mob = "Sweet Thief",      NPC = CFrame.new(620.43, 78.27, -12574.39), MobPos = CFrame.new(600, 78, -12550)},
-    {Min = 2375,Max = 2399,Name = "ChocQuest1",     Level = 2, Mob = "Candy Rebel",      NPC = CFrame.new(620.43, 78.27, -12574.39), MobPos = CFrame.new(600, 78, -12550)},
-    {Min = 2400,Max = 2424,Name = "ChocQuest2",     Level = 1, Mob = "Candy Pirate",     NPC = CFrame.new(147.99, 24.82, -12774.91), MobPos = CFrame.new(150, 25, -12750)},
-    {Min = 2425,Max = 2499,Name = "ChocQuest2",     Level = 2, Mob = "Snow Demon",       NPC = CFrame.new(147.99, 24.82, -12774.91), MobPos = CFrame.new(150, 25, -12750)},
-}
-
-local function GetCurrentQuest()
-    local level = GetLevel()
-    for _, q in ipairs(QuestList) do
-        if level >= q.Min and level <= q.Max then
-            return q
-        end
-    end
-    -- Fallback Sea 2
-    return QuestList[17]
-end
-
--------------------------------------------------
 -- HÀM TÌM QUÁI ĐÃ SỬA LỖI
 -------------------------------------------------
 local function FindMob(mobName)
@@ -236,7 +146,6 @@ local function FindMob(mobName)
 
     local lowerMob = tostring(mobName):lower()
 
-    -- Từ khóa hỗ trợ tiếng Việt + tiếng Anh
     local keywords = {
         ["raider"] = {"raider", "kẻ tập kích", "tap kich", "tapkich"},
         ["mercenary"] = {"mercenary", "lính đánh thuê", "danh thue", "linh danh thue"},
@@ -295,38 +204,80 @@ local function FindMob(mobName)
     return closest
 end
 
-    -- ==================== SEA 2 (ĐÃ SỬA TỌA ĐỘ) ====================
-    {Min = 700, Max = 724, Name = "Area1Quest", Level = 1, Mob = "Raider",
-     NPC = CFrame.new(-429.54, 71.77, 1836.18),
-     MobPos = CFrame.new(-750, 55, 2300)},
+-------------------------------------------------
+-- BẢNG NHIỆM VỤ 3 SEA (ĐÃ SỬA TỌA ĐỘ)
+-------------------------------------------------
+local QuestList = {
+    -- SEA 1
+    {Min = 1,   Max = 9,   Name = "BanditQuest1",   Level = 1, Mob = "Bandit",            NPC = CFrame.new(1059.37, 16.51, 1549.26), MobPos = CFrame.new(1145, 17, 1634)},
+    {Min = 10,  Max = 14,  Name = "JungleQuest",    Level = 1, Mob = "Monkey",            NPC = CFrame.new(-1598.08, 36.85, 153.38), MobPos = CFrame.new(-1610, 37, 145)},
+    {Min = 15,  Max = 29,  Name = "JungleQuest",    Level = 2, Mob = "Gorilla",           NPC = CFrame.new(-1598.08, 36.85, 153.38), MobPos = CFrame.new(-1235, 6, -486)},
+    {Min = 30,  Max = 39,  Name = "BuggyQuest1",    Level = 1, Mob = "Pirate",            NPC = CFrame.new(-1140.17, 4.75, 3827.41), MobPos = CFrame.new(-1215, 5, 3915)},
+    {Min = 40,  Max = 59,  Name = "BuggyQuest1",    Level = 2, Mob = "Brute",             NPC = CFrame.new(-1140.17, 4.75, 3827.41), MobPos = CFrame.new(-1145, 15, 4350)},
+    {Min = 60,  Max = 89,  Name = "DesertQuest",    Level = 1, Mob = "Desert Bandit",     NPC = CFrame.new(894.49, 6.44, 4384.58),  MobPos = CFrame.new(932, 6, 4485)},
+    {Min = 90,  Max = 119, Name = "SnowQuest",      Level = 1, Mob = "Snow Bandit",       NPC = CFrame.new(1385.84, 87.27, -1298.61), MobPos = CFrame.new(1285, 105, -1342)},
+    {Min = 120, Max = 149, Name = "MarineQuest2",   Level = 1, Mob = "Chief Petty Officer", NPC = CFrame.new(-5039.59, 28.65, 4324.78), MobPos = CFrame.new(-4855, 20, 4260)},
+    {Min = 150, Max = 189, Name = "SkyQuest",       Level = 1, Mob = "Sky Bandit",        NPC = CFrame.new(-4839.53, 717.67, -2629.09), MobPos = CFrame.new(-4975, 717, -2885)},
+    {Min = 190, Max = 224, Name = "PrisonerQuest",  Level = 1, Mob = "Prisoner",          NPC = CFrame.new(530.81, 1.66, 474.98),   MobPos = CFrame.new(540, 2, 485)},
+    {Min = 225, Max = 299, Name = "ColosseumQuest", Level = 1, Mob = "Toga Warrior",      NPC = CFrame.new(-1588.34, 7.39, -2986.48), MobPos = CFrame.new(-1800, 7, -2980)},
+    {Min = 300, Max = 374, Name = "MagmaQuest",     Level = 1, Mob = "Military Soldier",  NPC = CFrame.new(-5313.37, 8.58, 8515.29), MobPos = CFrame.new(-5400, 9, 8530)},
+    {Min = 375, Max = 449, Name = "FishmanQuest",   Level = 1, Mob = "Fishman Warrior",   NPC = CFrame.new(61163.85, 18.5, 1569.26), MobPos = CFrame.new(60800, 18, 1500)},
+    {Min = 450, Max = 524, Name = "SkyQuest2",      Level = 1, Mob = "God's Guard",       NPC = CFrame.new(-7861.34, 5545.49, -380.29), MobPos = CFrame.new(-7725, 5600, -440)},
+    {Min = 525, Max = 624, Name = "SkyQuest2",      Level = 2, Mob = "Shandian",          NPC = CFrame.new(-7861.34, 5545.49, -380.29), MobPos = CFrame.new(-7850, 5600, -220)},
+    {Min = 625, Max = 699, Name = "FountainQuest",  Level = 1, Mob = "Galley Pirate",     NPC = CFrame.new(5259.82, 38.5, 4050.03),  MobPos = CFrame.new(5580, 38, 3990)},
 
-    {Min = 725, Max = 774, Name = "Area1Quest", Level = 2, Mob = "Mercenary",
-     NPC = CFrame.new(-429.54, 71.77, 1836.18),
-     MobPos = CFrame.new(-1005, 79, 1425)},
+    -- SEA 2 (ĐÃ SỬA TỌA ĐỘ)
+    {Min = 700, Max = 724, Name = "Area1Quest",     Level = 1, Mob = "Raider",            NPC = CFrame.new(-429.54, 71.77, 1836.18), MobPos = CFrame.new(-750, 55, 2300)},
+    {Min = 725, Max = 774, Name = "Area1Quest",     Level = 2, Mob = "Mercenary",         NPC = CFrame.new(-429.54, 71.77, 1836.18), MobPos = CFrame.new(-1005, 79, 1425)},
+    {Min = 775, Max = 799, Name = "Area2Quest",     Level = 1, Mob = "Swan Pirate",       NPC = CFrame.new(638.44, 71.77, 918.28),  MobPos = CFrame.new(970, 125, 1280)},
+    {Min = 800, Max = 874, Name = "Area2Quest",     Level = 2, Mob = "Factory Staff",     NPC = CFrame.new(638.44, 71.77, 918.28),  MobPos = CFrame.new(300, 73, -30)},
+    {Min = 875, Max = 899, Name = "MarineQuest3",   Level = 1, Mob = "Marine Lieutenant", NPC = CFrame.new(-2440.79, 71.71, -3216.07), MobPos = CFrame.new(-2600, 73, -3300)},
+    {Min = 900, Max = 949, Name = "MarineQuest3",   Level = 2, Mob = "Marine Captain",    NPC = CFrame.new(-2440.79, 71.71, -3216.07), MobPos = CFrame.new(-2600, 73, -3300)},
+    {Min = 950, Max = 974, Name = "ZombieQuest",    Level = 1, Mob = "Zombie",            NPC = CFrame.new(-5494.34, 48.52, -795.16), MobPos = CFrame.new(-5600, 48, -800)},
+    {Min = 975, Max = 999, Name = "ZombieQuest",    Level = 2, Mob = "Vampire",           NPC = CFrame.new(-5494.34, 48.52, -795.16), MobPos = CFrame.new(-5600, 48, -800)},
+    {Min = 1000,Max = 1049,Name = "SnowMountainQuest", Level = 1, Mob = "Snow Trooper",   NPC = CFrame.new(609.63, 401.39, -5372.26), MobPos = CFrame.new(500, 401, -5400)},
+    {Min = 1050,Max = 1099,Name = "SnowMountainQuest", Level = 2, Mob = "Winter Warrior", NPC = CFrame.new(609.63, 401.39, -5372.26), MobPos = CFrame.new(500, 401, -5400)},
+    {Min = 1100,Max = 1124,Name = "IceSideQuest",   Level = 1, Mob = "Lab Subordinate",   NPC = CFrame.new(-6060.11, 15.99, -4904.79), MobPos = CFrame.new(-6100, 16, -4900)},
+    {Min = 1125,Max = 1174,Name = "IceSideQuest",   Level = 2, Mob = "Horned Warrior",    NPC = CFrame.new(-6060.11, 15.99, -4904.79), MobPos = CFrame.new(-6100, 16, -4900)},
+    {Min = 1175,Max = 1199,Name = "FireSideQuest",  Level = 1, Mob = "Magma Ninja",       NPC = CFrame.new(-5431.09, 15.99, -5296.53), MobPos = CFrame.new(-5400, 16, -5300)},
+    {Min = 1200,Max = 1249,Name = "FireSideQuest",  Level = 2, Mob = "Lava Pirate",       NPC = CFrame.new(-5431.09, 15.99, -5296.53), MobPos = CFrame.new(-5400, 16, -5300)},
+    {Min = 1250,Max = 1299,Name = "ShipQuest1",     Level = 1, Mob = "Ship Deckhand",     NPC = CFrame.new(1037.80, 125.09, 32911.60), MobPos = CFrame.new(1000, 125, 32900)},
+    {Min = 1300,Max = 1349,Name = "ShipQuest2",     Level = 1, Mob = "Ship Engineer",     NPC = CFrame.new(1037.80, 125.09, 32911.60), MobPos = CFrame.new(1000, 125, 32900)},
+    {Min = 1350,Max = 1374,Name = "FrostQuest",     Level = 1, Mob = "Arctic Warrior",    NPC = CFrame.new(5669.44, 28.21, -6482.60), MobPos = CFrame.new(5700, 28, -6500)},
+    {Min = 1375,Max = 1424,Name = "FrostQuest",     Level = 2, Mob = "Snow Lurker",       NPC = CFrame.new(5669.44, 28.21, -6482.60), MobPos = CFrame.new(5700, 28, -6500)},
+    {Min = 1425,Max = 1449,Name = "ForgottenQuest", Level = 1, Mob = "Sea Soldier",       NPC = CFrame.new(-3054.44, 240.31, -10147.75), MobPos = CFrame.new(-3100, 240, -10100)},
+    {Min = 1450,Max = 1499,Name = "ForgottenQuest", Level = 2, Mob = "Water Fighter",     NPC = CFrame.new(-3054.44, 240.31, -10147.75), MobPos = CFrame.new(-3100, 240, -10100)},
 
-    {Min = 775, Max = 799, Name = "Area2Quest", Level = 1, Mob = "Swan Pirate",
-     NPC = CFrame.new(638.44, 71.77, 918.28),
-     MobPos = CFrame.new(970, 125, 1280)},
+    -- SEA 3
+    {Min = 1500,Max = 1524,Name = "PiratePortQuest", Level = 1, Mob = "Pirate Millionaire", NPC = CFrame.new(-290, 44, 5577), MobPos = CFrame.new(-300, 44, 5550)},
+    {Min = 1525,Max = 1574,Name = "PiratePortQuest", Level = 2, Mob = "Pistol Billionaire", NPC = CFrame.new(-290, 44, 5577), MobPos = CFrame.new(-300, 44, 5550)},
+    {Min = 1575,Max = 1599,Name = "AmazonQuest",    Level = 1, Mob = "Dragon Crew Warrior", NPC = CFrame.new(5832.84, 51.68, -1101.52), MobPos = CFrame.new(5800, 52, -1100)},
+    {Min = 1600,Max = 1624,Name = "AmazonQuest",    Level = 2, Mob = "Dragon Crew Archer", NPC = CFrame.new(5832.84, 51.68, -1101.52), MobPos = CFrame.new(5800, 52, -1100)},
+    {Min = 1625,Max = 1649,Name = "AmazonQuest2",   Level = 1, Mob = "Female Island Raider", NPC = CFrame.new(5446.86, 601.66, 751.13), MobPos = CFrame.new(5400, 602, 750)},
+    {Min = 1650,Max = 1699,Name = "AmazonQuest2",   Level = 2, Mob = "Giant Island Raider", NPC = CFrame.new(5446.86, 601.66, 751.13), MobPos = CFrame.new(5400, 602, 750)},
+    {Min = 1700,Max = 1724,Name = "MarineTreeIsland", Level = 1, Mob = "Marine Commodore", NPC = CFrame.new(2180.54, 28.09, -6741.39), MobPos = CFrame.new(2200, 28, -6700)},
+    {Min = 1725,Max = 1774,Name = "MarineTreeIsland", Level = 2, Mob = "Marine Rear Admiral", NPC = CFrame.new(2180.54, 28.09, -6741.39), MobPos = CFrame.new(2200, 28, -6700)},
+    {Min = 1775,Max = 1799,Name = "DeepForestIsland", Level = 1, Mob = "Fishman Raider", NPC = CFrame.new(-10581.66, 331.74, -8761.19), MobPos = CFrame.new(-10550, 332, -8750)},
+    {Min = 1800,Max = 1824,Name = "DeepForestIsland", Level = 2, Mob = "Fishman Captain", NPC = CFrame.new(-10581.66, 331.74, -8761.19), MobPos = CFrame.new(-10550, 332, -8750)},
+    {Min = 1825,Max = 1849,Name = "DeepForestIsland2", Level = 1, Mob = "Forest Pirate", NPC = CFrame.new(-13234.04, 331.63, -7625.40), MobPos = CFrame.new(-13200, 332, -7600)},
+    {Min = 1850,Max = 1899,Name = "DeepForestIsland2", Level = 2, Mob = "Mythological Pirate", NPC = CFrame.new(-13234.04, 331.63, -7625.40), MobPos = CFrame.new(-13200, 332, -7600)},
+    {Min = 1900,Max = 1924,Name = "DeepForestIsland3", Level = 1, Mob = "Jungle Pirate", NPC = CFrame.new(-12680.38, 390.86, -9902.12), MobPos = CFrame.new(-12650, 391, -9900)},
+    {Min = 1925,Max = 1974,Name = "DeepForestIsland3", Level = 2, Mob = "Musketeer Pirate", NPC = CFrame.new(-12680.38, 390.86, -9902.12), MobPos = CFrame.new(-12650, 391, -9900)},
+    {Min = 1975,Max = 1999,Name = "HauntedCastle",  Level = 1, Mob = "Reborn Skeleton",   NPC = CFrame.new(-9515.45, 142.13, 5525.21), MobPos = CFrame.new(-9500, 142, 5550)},
+    {Min = 2000,Max = 2024,Name = "HauntedCastle",  Level = 2, Mob = "Living Zombie",     NPC = CFrame.new(-9515.45, 142.13, 5525.21), MobPos = CFrame.new(-9500, 142, 5550)},
+    {Min = 2025,Max = 2049,Name = "HauntedCastle",  Level = 3, Mob = "Demonic Soul",      NPC = CFrame.new(-9515.45, 142.13, 5525.21), MobPos = CFrame.new(-9500, 142, 5550)},
+    {Min = 2050,Max = 2074,Name = "HauntedCastle",  Level = 4, Mob = "Posessed Mummy",    NPC = CFrame.new(-9515.45, 142.13, 5525.21), MobPos = CFrame.new(-9500, 142, 5550)},
+}
 
-    {Min = 800, Max = 874, Name = "Area2Quest", Level = 2, Mob = "Factory Staff",
-     NPC = CFrame.new(638.44, 71.77, 918.28),
-     MobPos = CFrame.new(300, 73, -30)},
-
-    {Min = 875, Max = 899, Name = "MarineQuest3", Level = 1, Mob = "Marine Lieutenant",
-     NPC = CFrame.new(-2440.79, 71.71, -3216.07),
-     MobPos = CFrame.new(-2600, 73, -3300)},
-
-    {Min = 900, Max = 949, Name = "MarineQuest3", Level = 2, Mob = "Marine Captain",
-     NPC = CFrame.new(-2440.79, 71.71, -3216.07),
-     MobPos = CFrame.new(-2600, 73, -3300)},
-
-    {Min = 950, Max = 974, Name = "ZombieQuest", Level = 1, Mob = "Zombie",
-     NPC = CFrame.new(-5494.34, 48.52, -795.16),
-     MobPos = CFrame.new(-5600, 48, -800)},
-
-    {Min = 975, Max = 999, Name = "ZombieQuest", Level = 2, Mob = "Vampire",
-     NPC = CFrame.new(-5494.34, 48.52, -795.16),
-     MobPos = CFrame.new(-5600, 48, -800)},
+local function GetCurrentQuest()
+    local level = GetLevel()
+    for _, q in ipairs(QuestList) do
+        if level >= q.Min and level <= q.Max then
+            return q
+        end
+    end
+    return QuestList[17] -- fallback Sea 2
+end
 
 -------------------------------------------------
 -- FAST ATTACK
@@ -440,7 +391,7 @@ Tabs.Main:AddToggle("AutoQuestToggle", {
                             task.wait(1.2)
                         end
                     else
-                        -- Đã có nhiệm vụ → bay đến tọa độ quái + đánh
+                        -- Đã có nhiệm vụ → tìm quái hoặc bay đến tọa độ quái
                         local mob = FindMob(quest.Mob)
                         if mob and mob:FindFirstChild("HumanoidRootPart") then
                             local pos = mob.HumanoidRootPart.Position
@@ -451,7 +402,7 @@ Tabs.Main:AddToggle("AutoQuestToggle", {
                                 mob.HumanoidRootPart.AssemblyLinearVelocity = Vector3.zero
                             end)
                         else
-                            -- Không thấy mob → bay đến tọa độ khu vực quái
+                            -- Không thấy mob → bay đúng tọa độ khu vực quái
                             TweenTo(quest.MobPos)
                         end
                     end
@@ -491,7 +442,7 @@ Window:SelectTab(1)
 
 Fluent:Notify({
     Title = "Datkits Premium",
-    Content = "Auto Quest 3 Sea đã sẵn sàng • Bay đúng nhiệm vụ",
+    Content = "Đã sửa logic tìm quái + tọa độ • Sẵn sàng",
     Duration = 6
 })
 
@@ -500,4 +451,4 @@ LocalPlayer.CharacterAdded:Connect(function()
     ResetState()
 end)
 
-print("[Datkits] Auto Quest 3 Sea - Optimized")
+print("[Datkits] Full Fixed - Tìm quái + Tọa độ đã sửa")
