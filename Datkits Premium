@@ -9,7 +9,7 @@ local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.
 
 local Window = Fluent:CreateWindow({
     Title = "Datkits Premium | Blox Fruits",
-    SubTitle = "Fluent UI • Optimized Engine • Sea 1+2",
+    SubTitle = "Fluent UI • Optimized Engine • Safe Flight",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
     Acrylic = false,
@@ -44,16 +44,16 @@ local lastTargetPos = nil
 local noclipConnection = nil
 
 -------------------------------------------------
--- CLASS CHARACTER (CHUYỂN ĐỔI TỪ PYTHON SANG LUA)
+-- OOP CLASSES (PYTHON TO LUA CONVERSION)
 -------------------------------------------------
+
+-- 1. CLASS CHARACTER
 local CharacterClass = {}
 CharacterClass.__index = CharacterClass
 
 function CharacterClass.new(x, y, z, speed)
     local self = setmetatable({}, CharacterClass)
-    self.x = x or 0
-    self.y = y or 0
-    self.z = z or 0
+    self.x, self.y, self.z = x or 0, y or 0, z or 0
     self.speed = speed or 3
     self.currentQuest = nil
     self.moving = false
@@ -64,40 +64,73 @@ function CharacterClass:AcceptQuest(quest)
     self.currentQuest = quest
     quest.isActive = true
     self.moving = true
-    print("Đã nhận nhiệm vụ: " .. tostring(quest.name))
 end
 
-function CharacterClass:Update()
-    if self.moving and self.currentQuest then
-        local targetX, targetY, targetZ = self.currentQuest.targetPos.X, self.currentQuest.targetPos.Y, self.currentQuest.targetPos.Z
-        local dx = targetX - self.x
-        local dy = targetY - self.y
-        local dz = targetZ - self.z
-        
-        -- Tương đương math.hypot trong Python (Khoảng cách Vector 3D)
-        local distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+-- 2. CLASS MONSTER (ĐÃ CHUYỂN ĐỔI TỪ PYTHON SANG LUA)
+local MonsterClass = {}
+MonsterClass.__index = MonsterClass
 
-        if distance > 2 then -- Chưa tới nơi
-            dx, dy, dz = dx / distance, dy / distance, dz / distance -- Chuẩn hóa Vector
-            self.x = self.x + (dx * self.speed)
-            self.y = self.y + (dy * self.speed)
-            self.z = self.z + (dz * self.speed)
-        else
-            self.moving = false
-            self:OnArrived()
-        end
+function MonsterClass.new(model)
+    if not model or not model:FindFirstChild("Humanoid") or not model:FindFirstChild("HumanoidRootPart") then
+        return nil
+    end
+    local self = setmetatable({}, MonsterClass)
+    self.model = model
+    self.hrp = model.HumanoidRootPart
+    self.humanoid = model.Humanoid
+    self.name = model.Name
+    self.hp = model.Humanoid.Health
+    self.maxHp = model.Humanoid.MaxHealth
+    self.level = model:getAttribute("Level") or 1
+    self.type = model.Name:find("Boss") and "boss" or "normal" -- "normal", "elite", "boss"
+    self.alive = self.hp > 0
+    return self
+end
+
+function MonsterClass:TakeDamage(dmg)
+    if self.humanoid then
+        self.humanoid.Health = math.max(0, self.humanoid.Health - dmg)
+        self.hp = self.humanoid.Health
+        if self.hp <= 0 then self.alive = false end
     end
 end
 
-function CharacterClass:OnArrived()
-    print("Đã đến nơi có quái! Bắt đầu chiến đấu...")
-    if self.currentQuest then
-        self.currentQuest.isCompleted = true
-    end
+function MonsterClass:IsAlive()
+    return self.humanoid and self.humanoid.Health > 0
+end
+
+-- 3. CLASS QUEST (ĐÃ CHUYỂN ĐỔI TỪ PYTHON SANG LUA)
+local QuestClass = {}
+QuestClass.__index = QuestClass
+
+function QuestClass.new(name, targetName, targetType, minLevel, maxLevel, countRequired)
+    local self = setmetatable({}, QuestClass)
+    self.name = name
+    self.targetName = targetName
+    self.targetType = targetType
+    self.minLevel = minLevel
+    self.maxLevel = maxLevel
+    self.countRequired = countRequired or 1
+    self.countDone = 0
+    self.isActive = false
+    return self
+end
+
+function QuestClass:Matches(monster)
+    if not monster or not monster:IsAlive() then return false end
+    if self.targetName and not string.find(monster.name, self.targetName) then return false end
+    if self.targetType and monster.type ~= self.targetType then return false end
+    if self.minLevel and monster.level < self.minLevel then return false end
+    if self.maxLevel and monster.level > self.maxLevel then return false end
+    return true
+end
+
+function QuestClass:IsCompleted()
+    return self.countDone >= self.countRequired
 end
 
 -------------------------------------------------
--- HÀM HỖ TRỢ HỆ THỐNG
+-- HÀM HỖ TRỢ HỆ THỐNG & ĐƯỜNG BAY AN TOÀN
 -------------------------------------------------
 local function GetCharacter()
     local char = LocalPlayer.Character
@@ -169,6 +202,7 @@ local function ToggleNoclip(enable)
     end
 end
 
+-- HÀM BAY AN TOÀN TÍCH HỢP TỰ ĐỘNG NÂNG ĐỘ CAO (BYPASS ĐẢO / VẬT CẢN)
 local function TweenTo(cf, speed)
     speed = speed or getgenv().TweenSpeed
     local char = GetCharacter()
@@ -184,20 +218,49 @@ local function TweenTo(cf, speed)
         bv.Parent = hrp
     end
 
-    local dist = (hrp.Position - cf.Position).Magnitude
+    local startPos = hrp.Position
+    local targetPos = cf.Position
+    local dist = (startPos - targetPos).Magnitude
+
     if dist <= 4 then
         StopTween()
         hrp.CFrame = cf
         return
     end
 
-    if not currentTween or not lastTargetPos or (lastTargetPos - cf.Position).Magnitude > 3 then
-        lastTargetPos = cf.Position
-        if currentTween then pcall(function() currentTween:Cancel() end) end
-        
-        local duration = dist / speed
-        currentTween = TweenService:Create(hrp, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = cf})
-        currentTween:Play()
+    -- Nếu khoảng cách > 1000 studs: Tự động kích hoạt ĐƯỜNG BAY BAYPASS trên cao
+    if dist > 1000 then
+        local highY = math.max(startPos.Y, targetPos.Y) + 300
+        local waypoints = {
+            CFrame.new(startPos.X, highY, startPos.Z),
+            CFrame.new(targetPos.X, highY, targetPos.Z),
+            cf
+        }
+
+        for _, wayCF in ipairs(waypoints) do
+            if not (getgenv().AutoQuest or getgenv().AutoFarm or getgenv().AutoChest) then 
+                StopTween()
+                break 
+            end
+
+            local legDist = (hrp.Position - wayCF.Position).Magnitude
+            local legDuration = legDist / speed
+
+            if currentTween then pcall(function() currentTween:Cancel() end) end
+            currentTween = TweenService:Create(hrp, TweenInfo.new(legDuration, Enum.EasingStyle.Linear), {CFrame = wayCF})
+            currentTween:Play()
+            task.wait(legDuration)
+        end
+    else
+        -- Bay bình thường khoảng cách ngắn
+        if not currentTween or not lastTargetPos or (lastTargetPos - targetPos).Magnitude > 3 then
+            lastTargetPos = targetPos
+            if currentTween then pcall(function() currentTween:Cancel() end) end
+            
+            local duration = dist / speed
+            currentTween = TweenService:Create(hrp, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = cf})
+            currentTween:Play()
+        end
     end
 end
 
@@ -268,7 +331,7 @@ local function GetQuestData()
 end
 
 -------------------------------------------------
--- FAST ATTACK ENGINE (OPTIMIZED)
+-- FAST ATTACK ENGINE
 -------------------------------------------------
 local function GetClosestHits()
     local hits = {}
@@ -276,12 +339,11 @@ local function GetClosestHits()
     if not char or not workspace:FindFirstChild("Enemies") then return hits end
 
     for _, enemy in ipairs(workspace.Enemies:GetChildren()) do
-        local hum = enemy:FindFirstChild("Humanoid")
-        local ehrp = enemy:FindFirstChild("HumanoidRootPart")
-        if hum and hum.Health > 0 and ehrp then
-            local dist = (char.HumanoidRootPart.Position - ehrp.Position).Magnitude
+        local monster = MonsterClass.new(enemy)
+        if monster and monster:IsAlive() then
+            local dist = (char.HumanoidRootPart.Position - monster.hrp.Position).Magnitude
             if dist <= 55 then
-                table.insert(hits, {enemy, ehrp})
+                table.insert(hits, {monster.model, monster.hrp})
             end
         end
     end
@@ -325,7 +387,7 @@ task.spawn(function()
 end)
 
 -------------------------------------------------
--- TAB AUTO FARM (LOGIC CHÍNH)
+-- TAB AUTO FARM (SỬ DỤNG MONSTER VÀ QUEST CLASS)
 -------------------------------------------------
 Tabs.Main:AddSection("Cài đặt")
 
@@ -374,6 +436,9 @@ Tabs.Main:AddToggle("AutoQuestToggle", {
                     if not char then return end
                     local hrp = char.HumanoidRootPart
                     local questName, questLevel, mobName, npcCFrame, mobCFrame = GetQuestData()
+                    
+                    -- Khởi tạo đối tượng QuestClass
+                    local currentQuestObj = QuestClass.new(questName, mobName, "normal", 1, 3000, 8)
 
                     if not HasQuest() then
                         if npcCFrame then
@@ -393,25 +458,25 @@ Tabs.Main:AddToggle("AutoQuestToggle", {
                         
                         if enemies then
                             for _, enemy in ipairs(enemies:GetChildren()) do
-                                local hum = enemy:FindFirstChild("Humanoid")
-                                local ehrp = enemy:FindFirstChild("HumanoidRootPart")
-                                if hum and hum.Health > 0 and ehrp and string.find(enemy.Name, mobName) then
-                                    local d = (hrp.Position - ehrp.Position).Magnitude
+                                local monster = MonsterClass.new(enemy)
+                                -- Sử dụng hàm QuestClass:Matches(monster) để lọc đúng quái
+                                if monster and currentQuestObj:Matches(monster) then
+                                    local d = (hrp.Position - monster.hrp.Position).Magnitude
                                     if d < minDist then
                                         minDist = d
-                                        target = enemy
+                                        target = monster
                                     end
                                 end
                             end
                         end
 
                         if target then
-                            local pos = target.HumanoidRootPart.Position
+                            local pos = target.hrp.Position
                             local cf = CFrame.new(pos + Vector3.new(0, getgenv().FarmDistance, 0), pos)
                             TweenTo(cf, 260)
                             
-                            target.HumanoidRootPart.CanCollide = false
-                            target.HumanoidRootPart.AssemblyLinearVelocity = Vector3.zero
+                            target.hrp.CanCollide = false
+                            target.hrp.AssemblyLinearVelocity = Vector3.zero
                         elseif mobCFrame then
                             TweenTo(mobCFrame, 260)
                         end
@@ -459,25 +524,24 @@ Tabs.Main:AddToggle("AutoFarmToggle", {
 
                     if enemies then
                         for _, enemy in ipairs(enemies:GetChildren()) do
-                            local hum = enemy:FindFirstChild("Humanoid")
-                            local ehrp = enemy:FindFirstChild("HumanoidRootPart")
-                            if hum and hum.Health > 0 and ehrp then
-                                local d = (hrp.Position - ehrp.Position).Magnitude
+                            local monster = MonsterClass.new(enemy)
+                            if monster and monster:IsAlive() then
+                                local d = (hrp.Position - monster.hrp.Position).Magnitude
                                 if d < minDist then
                                     minDist = d
-                                    nearest = enemy
+                                    nearest = monster
                                 end
                             end
                         end
                     end
 
                     if nearest then
-                        local pos = nearest.HumanoidRootPart.Position
+                        local pos = nearest.hrp.Position
                         local cf = CFrame.new(pos + Vector3.new(0, getgenv().FarmDistance, 0), pos)
                         TweenTo(cf, 260)
                         
-                        nearest.HumanoidRootPart.CanCollide = false
-                        nearest.HumanoidRootPart.AssemblyLinearVelocity = Vector3.zero
+                        nearest.hrp.CanCollide = false
+                        nearest.hrp.AssemblyLinearVelocity = Vector3.zero
                     end
                 end)
             end
@@ -570,4 +634,4 @@ LocalPlayer.CharacterAdded:Connect(function()
     ResetCharacterState()
 end)
 
-print("[Datkits] Engine tối ưu hóa ổn định hoàn tất!")
+print("[Datkits Premium] Tích hợp MonsterClass & QuestClass thành công!")
