@@ -4,7 +4,7 @@ repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 local Window = Fluent:CreateWindow({
     Title = "Datkits BF V1",
-    SubTitle = "Auto Farm ổn định - Fast Attack Redz Style",
+    SubTitle = "Auto Farm ổn định - Redz Style",
     TabWidth = 160,
     Size = UDim2.fromOffset(500, 400),
     Acrylic = false,
@@ -64,7 +64,7 @@ local function TweenTo(targetCFrame)
         end
     end
 
-    -- BodyVelocity
+    -- BodyVelocity (giữ để không rơi)
     local bv = hrp:FindFirstChild("FlyBV")
     if not bv then
         bv = Instance.new("BodyVelocity")
@@ -75,14 +75,14 @@ local function TweenTo(targetCFrame)
     end
 
     local distance = (hrp.Position - targetCFrame.Position).Magnitude
-    if distance < 6 then
+    if distance < 5 then
         StopTween()
         hrp.CFrame = targetCFrame
         return
     end
 
     local speed = getgenv().TweenSpeed or 300
-    local time = math.clamp(distance / speed, 0.08, 4)
+    local time = math.clamp(distance / speed, 0.05, 3.5)
 
     if currentTween then
         pcall(function() currentTween:Cancel() end)
@@ -100,7 +100,9 @@ local function EquipTool()
     if char:FindFirstChildOfClass("Tool") then return end
     for _, tool in pairs(LocalPlayer.Backpack:GetChildren()) do
         if tool:IsA("Tool") then
-            pcall(function() char.Humanoid:EquipTool(tool) end)
+            pcall(function()
+                char.Humanoid:EquipTool(tool)
+            end)
             break
         end
     end
@@ -171,28 +173,39 @@ local function GetQuestInfo()
     end
 end
 
--- TÌM QUÁI
+-- TÌM QUÁI (cải thiện)
 local function FindMob(mobName)
     local char = GetChar()
     if not char then return nil end
+
     local closest = nil
-    local shortest = 9999
+    local shortest = math.huge
     local folder = workspace:FindFirstChild("Enemies")
     if not folder then return nil end
 
     for _, enemy in pairs(folder:GetChildren()) do
-        if enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 and enemy:FindFirstChild("HumanoidRootPart") then
-            local name = enemy.Name:lower()
-            if name:find(mobName:lower())
-            or (mobName == "Raider" and (name:find("raider") or name:find("tập kích") or name:find("tap kich")))
-            or (mobName == "Mercenary" and (name:find("mercenary") or name:find("đánh thuê"))) then
-                local dist = (char.HumanoidRootPart.Position - enemy.HumanoidRootPart.Position).Magnitude
-                if dist < shortest then
-                    shortest = dist
-                    closest = enemy
+        pcall(function()
+            if enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 and enemy:FindFirstChild("HumanoidRootPart") then
+                local name = string.lower(enemy.Name)
+                local match = false
+
+                if string.find(name, string.lower(mobName)) then
+                    match = true
+                elseif mobName == "Raider" and (string.find(name, "raider") or string.find(name, "tập kích") or string.find(name, "tap kich")) then
+                    match = true
+                elseif mobName == "Mercenary" and (string.find(name, "mercenary") or string.find(name, "đánh thuê") or string.find(name, "danh thue")) then
+                    match = true
+                end
+
+                if match then
+                    local dist = (char.HumanoidRootPart.Position - enemy.HumanoidRootPart.Position).Magnitude
+                    if dist < shortest then
+                        shortest = dist
+                        closest = enemy
+                    end
                 end
             end
-        end
+        end)
     end
     return closest
 end
@@ -233,10 +246,7 @@ task.spawn(function()
                 if ac.humanoid then
                     ac.humanoid.AutoRotate = true
                 end
-                ac.focusStart = 0
             end
-
-            -- Click hỗ trợ
             VirtualUser:CaptureController()
             VirtualUser:ClickButton1(Vector2.new())
         end)
@@ -292,58 +302,71 @@ Tabs.Main:AddToggle("AutoFarm", {
             return
         end
 
-        Fluent:Notify({Title = "Auto Farm", Content = "Đã bật - Đang chạy...", Duration = 4})
+        Fluent:Notify({Title = "Auto Farm", Content = "Đã bật - Đang chạy ổn định...", Duration = 4})
 
-        -- Giữ vũ khí
+        -- Giữ vũ khí liên tục
         task.spawn(function()
             while getgenv().AutoFarm do
                 EquipTool()
-                task.wait(0.6)
+                task.wait(0.5)
             end
         end)
 
-        -- Vòng lặp chính
+        -- VÒNG LẶP FARM CHÍNH (viết lại ổn định)
         task.spawn(function()
             while getgenv().AutoFarm do
-                task.wait(0.15)
-                local char = GetChar()
-                if not char then
-                    task.wait(1)
-                    continue
-                end
+                local success, err = pcall(function()
+                    local char = GetChar()
+                    if not char then
+                        task.wait(1)
+                        return
+                    end
 
-                local info = GetQuestInfo()
+                    local info = GetQuestInfo()
 
-                if not HasQuest() then
-                    local dist = (char.HumanoidRootPart.Position - info.NPC.Position).Magnitude
-                    if dist > 12 then
-                        TweenTo(info.NPC * CFrame.new(0, 0, 3))
-                    else
-                        StopTween()
-                        for i = 1, 5 do
-                            pcall(function()
-                                ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", info.Name, info.Level)
-                            end)
-                            task.wait(0.1)
+                    -- CHƯA CÓ NHIỆM VỤ → ĐI NHẬN
+                    if not HasQuest() then
+                        local dist = (char.HumanoidRootPart.Position - info.NPC.Position).Magnitude
+                        if dist > 10 then
+                            TweenTo(info.NPC * CFrame.new(0, 0, 3))
+                        else
+                            StopTween()
+                            for i = 1, 6 do
+                                pcall(function()
+                                    ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", info.Name, info.Level)
+                                end)
+                                task.wait(0.08)
+                            end
+                            task.wait(1)
                         end
-                        task.wait(1.2)
-                    end
-                else
-                    local mob = FindMob(info.Mob)
-                    if mob and mob:FindFirstChild("HumanoidRootPart") and mob.Humanoid.Health > 0 then
-                        local pos = mob.HumanoidRootPart.Position
-                        local height = getgenv().FarmHeight or 7
-                        local farmPos = CFrame.new(pos + Vector3.new(0, height, 0), pos)
-                        TweenTo(farmPos)
-
-                        pcall(function()
-                            mob.HumanoidRootPart.CanCollide = false
-                            mob.HumanoidRootPart.AssemblyLinearVelocity = Vector3.zero
-                        end)
                     else
-                        TweenTo(info.MobArea)
+                        -- ĐÃ CÓ NHIỆM VỤ → ĐI FARM
+                        local mob = FindMob(info.Mob)
+
+                        if mob and mob:FindFirstChild("HumanoidRootPart") and mob.Humanoid.Health > 0 then
+                            local pos = mob.HumanoidRootPart.Position
+                            local height = getgenv().FarmHeight or 7
+                            local farmPos = CFrame.new(pos + Vector3.new(0, height, 0), pos)
+
+                            TweenTo(farmPos)
+
+                            -- Khóa mob lại
+                            pcall(function()
+                                mob.HumanoidRootPart.CanCollide = false
+                                mob.HumanoidRootPart.AssemblyLinearVelocity = Vector3.zero
+                            end)
+                        else
+                            -- Không thấy mob → bay về khu vực quái
+                            TweenTo(info.MobArea)
+                        end
                     end
+                end)
+
+                if not success then
+                    warn("Farm error:", err)
                 end
+
+                task.wait(0.12) -- tốc độ cập nhật ổn định
             end
         end)
     end
@@ -352,8 +375,8 @@ Tabs.Main:AddToggle("AutoFarm", {
 -- KẾT THÚC
 Window:SelectTab(1)
 Fluent:Notify({
-    Title = "Datkits Premium",
-    Content = "Fast Attack Redz Style + Farm ổn định đã sẵn sàng",
+    Title = "Datkits BF V1",
+    Content = "Farm đã viết lại ổn định như Redz",
     Duration = 6
 })
 
@@ -362,4 +385,4 @@ LocalPlayer.CharacterAdded:Connect(function()
     StopTween()
 end)
 
-print("Datkits - Auto Farm + Fast Attack Redz đã sẵn sàng")
+print("Datkits - Auto Farm ổn định + Fast Attack Redz đã sẵn sàng")
