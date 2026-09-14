@@ -1,542 +1,503 @@
-repeat task.wait() until game:IsLoaded() and game:GetService('Players').LocalPlayer
+repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
 
---==============================================================
--- DATKITS BF V5 - STABLE FULL AUTOFARM
--- Focus: stable quest -> movement -> target -> attack loop
--- UI: Fluent
---==============================================================
+-------------------------------------------------
+-- LOAD FLUENT
+-------------------------------------------------
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
 
-local Players = game:GetService('Players')
-local ReplicatedStorage = game:GetService('ReplicatedStorage')
-local RunService = game:GetService('RunService')
-local TweenService = game:GetService('TweenService')
-local VirtualUser = game:GetService('VirtualUser')
-local LocalPlayer = Players.LocalPlayer
-
-local Fluent = loadstring(game:HttpGet('https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua'))()
 local Window = Fluent:CreateWindow({
-    Title = 'Datkits BF V5',
-    SubTitle = 'Stable Full Auto Farm',
+    Title = "Datkits Premium | Blox Fruits",
+    SubTitle = "Auto Farm 3 Sea • Bay đúng nhiệm vụ • Không lung tung",
     TabWidth = 160,
-    Size = UDim2.fromOffset(560, 500),
-    Acrylic = false,
-    Theme = 'Dark',
+    Size = UDim2.fromOffset(560, 440),
+    Acrylic = true,
+    Theme = "Dark",
     MinimizeKey = Enum.KeyCode.LeftControl
 })
 
 local Tabs = {
-    Farm = Window:AddTab({Title = 'Auto Farm', Icon = 'sword'}),
-    Combat = Window:AddTab({Title = 'Combat', Icon = 'zap'}),
-    Movement = Window:AddTab({Title = 'Movement', Icon = 'move'}),
-    Settings = Window:AddTab({Title = 'Settings', Icon = 'settings'})
+    Main = Window:AddTab({ Title = "Auto Farm", Icon = "sword" }),
+    Player = Window:AddTab({ Title = "Nhân Vật", Icon = "user" }),
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
 }
 
-getgenv().Datkits = getgenv().Datkits or {}
-local CFG = getgenv().Datkits
-CFG.AutoFarm = CFG.AutoFarm or false
-CFG.AutoQuest = CFG.AutoQuest ~= false
-CFG.FastAttack = CFG.FastAttack ~= false
-CFG.AutoEquip = CFG.AutoEquip ~= false
-CFG.AutoChest = CFG.AutoChest or false
-CFG.StableTween = CFG.StableTween ~= false
-CFG.FarmHeight = CFG.FarmHeight or 8
-CFG.MoveSpeed = CFG.MoveSpeed or 145
-CFG.TargetRefresh = CFG.TargetRefresh or 0.18
-CFG.QuestRefresh = CFG.QuestRefresh or 0.35
-CFG.AttackRange = CFG.AttackRange or 11
-CFG.Noclip = CFG.Noclip or false
+-------------------------------------------------
+-- BIẾN
+-------------------------------------------------
+getgenv().AutoQuest = false
+getgenv().FastAttack = true
+getgenv().FarmDistance = 7
+getgenv().TweenSpeed = 300
 
-local state = {
-    running = false,
-    phase = 'Idle',
-    questInfo = nil,
-    target = nil,
-    lastQuestCall = 0,
-    lastMovePoint = nil,
-    lastMoveTime = 0,
-    lastEquip = 0,
-    controller = nil,
-    character = nil,
-    humanoid = nil,
-    hrp = nil,
-    collisionCache = {},
-    chestBusy = false,
-}
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
 
-local function char()
-    local c = LocalPlayer.Character
-    if c and c.Parent then return c end
-    return nil
-end
+local currentTween = nil
 
-local function getHumanoid()
-    local c = char()
-    return c and c:FindFirstChildOfClass('Humanoid') or nil
-end
-
-local function getRoot()
-    local c = char()
-    return c and c:FindFirstChild('HumanoidRootPart') or nil
-end
-
-local function getLevel()
-    local ok, v = pcall(function()
-        return LocalPlayer:FindFirstChild('Data') and LocalPlayer.Data:FindFirstChild('Level') and LocalPlayer.Data.Level.Value
-    end)
-    return ok and tonumber(v) or 1
-end
-
-local function isAlive()
-    local h = getHumanoid()
-    local r = getRoot()
-    return h and r and h.Health > 0
-end
-
--- Known leveling route used by common Blox Fruits farm scripts.
--- Positions are used only as fallbacks; if the quest NPC is found by name,
--- the actual NPC position is preferred.
-local QUESTS = {
-    -- Sea 1
-    {min=1,max=9,   quest='BanditQuest1',  qn=1, mob='Bandit',                npc=Vector3.new(1059,17,1546),   area=Vector3.new(1140,20,1610)},
-    {min=10,max=14, quest='BanditQuest1',  qn=2, mob='Monkey',                npc=Vector3.new(-1601,37,145),  area=Vector3.new(-1520,40,110)},
-    {min=15,max=29, quest='JungleQuest',   qn=1, mob='Monkey',                npc=Vector3.new(-1598,36,153),   area=Vector3.new(-1530,40,110)},
-    {min=30,max=39, quest='JungleQuest',   qn=2, mob='Gorilla',               npc=Vector3.new(-1598,36,153),   area=Vector3.new(-1220,45,-220)},
-    {min=40,max=59, quest='BuggyQuest1',   qn=1, mob='Pirate',                npc=Vector3.new(-1140,5,3828),   area=Vector3.new(-1170,12,3900)},
-    {min=60,max=74, quest='BuggyQuest1',   qn=2, mob='Brute',                 npc=Vector3.new(-1140,5,3828),   area=Vector3.new(-1080,20,4040)},
-    {min=75,max=89, quest='DesertQuest',   qn=1, mob='Desert Bandit',         npc=Vector3.new(897,7,4389),     area=Vector3.new(930,18,4510)},
-    {min=90,max=99, quest='DesertQuest',   qn=2, mob='Desert Officer',        npc=Vector3.new(897,7,4389),     area=Vector3.new(1540,18,4380)},
-    {min=100,max=119,quest='SnowQuest',    qn=1, mob='Snow Bandit',            npc=Vector3.new(1385,87,-1297),   area=Vector3.new(1330,100,-1380)},
-    {min=120,max=149,quest='SnowQuest',    qn=2, mob='Snowman',                npc=Vector3.new(1385,87,-1297),   area=Vector3.new(1380,100,-1480)},
-    {min=150,max=174,quest='MarineQuest2', qn=1, mob='Chief Petty Officer',    npc=Vector3.new(-5035,28,4325),  area=Vector3.new(-4960,35,4330)},
-    {min=175,max=189,quest='SkyQuest',     qn=1, mob='Sky Bandit',              npc=Vector3.new(-4842,717,-2623),  area=Vector3.new(-4900,735,-2750)},
-    {min=190,max=224,quest='SkyQuest',     qn=2, mob='Dark Master',              npc=Vector3.new(-4842,717,-2623),  area=Vector3.new(-4830,735,-2860)},
-    {min=225,max=249,quest='PrisonerQuest',qn=1, mob='Prisoner',                 npc=Vector3.new(5310,2,474),       area=Vector3.new(5270,5,530)},
-    {min=250,max=299,quest='PrisonerQuest',qn=2, mob='Dangerous Prisoner',        npc=Vector3.new(5310,2,474),       area=Vector3.new(5430,5,700)},
-    {min=300,max=324,quest='ColosseumQuest',qn=1,mob='Toga Warrior',              npc=Vector3.new(-1576,7,-2985),    area=Vector3.new(-1770,20,-2960)},
-    {min=325,max=374,quest='ColosseumQuest',qn=2,mob='Gladiator',                 npc=Vector3.new(-1576,7,-2985),    area=Vector3.new(-1380,20,-3200)},
-    {min=375,max=399,quest='MagmaQuest',   qn=1, mob='Military Soldier',          npc=Vector3.new(-5310,13,8515),    area=Vector3.new(-5300,30,8570)},
-    {min=400,max=449,quest='MagmaQuest',   qn=2, mob='Military Spy',              npc=Vector3.new(-5310,13,8515),    area=Vector3.new(-5450,30,8450)},
-    {min=450,max=474,quest='FishmanQuest', qn=1, mob='Fishman Warrior',            npc=Vector3.new(61122,18,1567),    area=Vector3.new(61150,30,1650)},
-    {min=475,max=524,quest='FishmanQuest', qn=2, mob='Fishman Commando',           npc=Vector3.new(61122,18,1567),    area=Vector3.new(61230,30,1800)},
-    {min=525,max=549,quest='SkyExp1Quest', qn=1, mob='God\'s Guard',              npc=Vector3.new(-4721,845,-1952),    area=Vector3.new(-4690,865,-1760)},
-    {min=550,max=624,quest='SkyExp1Quest', qn=2, mob='Shanda',                     npc=Vector3.new(-7859,5547,-381),   area=Vector3.new(-7650,5570,-400)},
-    {min=625,max=699,quest='SkyExp2Quest', qn=1, mob='Royal Squad',                npc=Vector3.new(-7903,5636,-1410),  area=Vector3.new(-7670,5650,-1460)},
-
-    -- Sea 2
-    {min=700,max=724,quest='Area1Quest',   qn=1, mob='Raider',                    npc=Vector3.new(-429,72,1836),     area=Vector3.new(-750,90,2350)},
-    {min=725,max=774,quest='Area1Quest',   qn=2, mob='Mercenary',                 npc=Vector3.new(-429,72,1836),     area=Vector3.new(-930,90,1450)},
-    {min=775,max=799,quest='Area2Quest',   qn=1, mob='Swan Pirate',               npc=Vector3.new(638,72,918),       area=Vector3.new(1050,100,1320)},
-    {min=800,max=849,quest='Area2Quest',   qn=2, mob='Factory Staff',              npc=Vector3.new(632,72,918),       area=Vector3.new(500,100,300)},
-    {min=850,max=874,quest='MarineQuest3', qn=1, mob='Marine Lieutenant',          npc=Vector3.new(-2440,72,-3216),    area=Vector3.new(-2460,100,-3150)},
-    {min=875,max=899,quest='MarineQuest3', qn=2, mob='Marine Captain',             npc=Vector3.new(-2440,72,-3216),    area=Vector3.new(-2250,100,-3150)},
-    {min=900,max=949,quest='ZombieQuest',  qn=1, mob='Zombie',                    npc=Vector3.new(-5494,48,-795),     area=Vector3.new(-5500,70,-850)},
-    {min=950,max=974,quest='ZombieQuest',  qn=2, mob='Vampire',                   npc=Vector3.new(-5494,48,-795),     area=Vector3.new(-5750,70,-820)},
-    {min=975,max=999,quest='SnowMountainQuest',qn=1,mob='Snow Trooper',           npc=Vector3.new(607,401,-5371),     area=Vector3.new(620,420,-5300)},
-    {min=1000,max=1049,quest='SnowMountainQuest',qn=2,mob='Winter Warrior',        npc=Vector3.new(607,401,-5371),     area=Vector3.new(1180,430,-5250)},
-    {min=1050,max=1099,quest='IceSideQuest',qn=1,mob='Lab Subordinate',            npc=Vector3.new(-6064,15,-4902),    area=Vector3.new(-5950,30,-5000)},
-    {min=1100,max=1124,quest='IceSideQuest',qn=2,mob='Horned Warrior',              npc=Vector3.new(-6064,15,-4902),    area=Vector3.new(-6400,30,-6200)},
-    {min=1125,max=1174,quest='FrostQuest',  qn=1, mob='Snow Lurker',                npc=Vector3.new(5668,28,-6480),     area=Vector3.new(5600,40,-6500)},
-    {min=1175,max=1199,quest='FrostQuest',  qn=2, mob='Arctic Warrior',             npc=Vector3.new(5668,28,-6480),     area=Vector3.new(5450,40,-6750)},
-    {min=1200,max=1249,quest='ForgottenQuest',qn=1,mob='Sea Soldier',               npc=Vector3.new(-3054,237,-10145),  area=Vector3.new(-3000,260,-10150)},
-    {min=1250,max=1274,quest='ForgottenQuest',qn=2,mob='Water Fighter',              npc=Vector3.new(-3054,237,-10145),  area=Vector3.new(-3350,260,-10100)},
-    {min=1275,max=1299,quest='Smoke Admiral Quest',qn=1,mob='Smoke Admiral',         npc=Vector3.new(-5015,22,-5358),    area=Vector3.new(-5000,40,-5300)},
-    {min=1300,max=1324,quest='CursedShipQuest1',qn=1,mob='Ship Deckhand',            npc=Vector3.new(902,14,3300),       area=Vector3.new(900,30,3330)},
-    {min=1325,max=1349,quest='CursedShipQuest1',qn=2,mob='Ship Engineer',             npc=Vector3.new(902,14,3300),       area=Vector3.new(970,30,3250)},
-    {min=1350,max=1374,quest='CursedShipQuest2',qn=1,mob='Ship Steward',              npc=Vector3.new(902,14,3300),       area=Vector3.new(1200,30,3250)},
-    {min=1375,max=1424,quest='CursedShipQuest2',qn=2,mob='Ship Officer',              npc=Vector3.new(902,14,3300),       area=Vector3.new(1150,30,3050)},
-    {min=1425,max=1474,quest='FrostQuest2', qn=1, mob='Arctic Warrior',              npc=Vector3.new(5668,28,-6480),     area=Vector3.new(5450,40,-6750)},
-    {min=1475,max=1499,quest='IceCastleQuest',qn=1,mob='Sea of Treats Warrior',       npc=Vector3.new(6148,28,-6641),     area=Vector3.new(6100,45,-6500)},
-
-    -- Sea 3 (route; level gates can vary by current game updates)
-    {min=1500,max=1524,quest='PiratePortQuest',qn=1,mob='Pirate Millionaire',         npc=Vector3.new(-290,43,5580),      area=Vector3.new(-150,80,5700)},
-    {min=1525,max=1574,quest='PiratePortQuest',qn=2,mob='Pistol Billionaire',          npc=Vector3.new(-290,43,5580),      area=Vector3.new(-10,80,5750)},
-    {min=1575,max=1624,quest='HydraQuest',qn=1,mob='Dragon Crew Warrior',              npc=Vector3.new(5228,604,345),       area=Vector3.new(4800,650,250)},
-    {min=1625,max=1649,quest='HydraQuest',qn=2,mob='Dragon Crew Archer',               npc=Vector3.new(5228,604,345),       area=Vector3.new(5000,650,0)},
-    {min=1650,max=1699,quest='HydraQuest',qn=3,mob='Dragon Crew Warrior',              npc=Vector3.new(5228,604,345),       area=Vector3.new(4700,650,0)},
-    {min=1700,max=1724,quest='Beautiful Pirate Quest',qn=1,mob='Beautiful Pirate',      npc=Vector3.new(5312,351,351),        area=Vector3.new(5350,380,250)},
-    {min=1725,max=1774,quest='Beautiful Pirate Quest',qn=2,mob='Mythological Pirate',   npc=Vector3.new(5312,351,351),        area=Vector3.new(5480,380,150)},
-    {min=1775,max=1799,quest='Big Mom Pirate Quest',qn=1,mob='Pirate Millionaire',      npc=Vector3.new(-1000,332,6680),      area=Vector3.new(-900,380,6700)},
-    {min=1800,max=1824,quest='HauntedQuest1',qn=1,mob='Reborn Skeleton',                npc=Vector3.new(-9514,142,5590),      area=Vector3.new(-9300,180,5650)},
-    {min=1825,max=1849,quest='HauntedQuest1',qn=2,mob='Living Zombie',                 npc=Vector3.new(-9514,142,5590),      area=Vector3.new(-9500,180,5500)},
-    {min=1850,max=1899,quest='HauntedQuest2',qn=1,mob='Demonic Soul',                 npc=Vector3.new(-9514,142,5590),      area=Vector3.new(-9600,180,5700)},
-    {min=1900,max=1924,quest='HauntedQuest2',qn=2,mob='Soul Reaper',                  npc=Vector3.new(-9514,142,5590),      area=Vector3.new(-9750,180,5850)},
-    {min=1925,max=1974,quest='CakeQuest1',qn=1,mob='Cookie Crafter',                   npc=Vector3.new(-2022,37,-12028),     area=Vector3.new(-2150,80,-12100)},
-    {min=1975,max=2024,quest='CakeQuest1',qn=2,mob='Cake Guard',                      npc=Vector3.new(-2022,37,-12028),     area=Vector3.new(-2200,80,-11900)},
-    {min=2025,max=2049,quest='CakeQuest2',qn=1,mob='Baking Staff',                    npc=Vector3.new(-1927,37,-12842),     area=Vector3.new(-2000,80,-12950)},
-    {min=2050,max=2074,quest='CakeQuest2',qn=2,mob='Head Baker',                      npc=Vector3.new(-1927,37,-12842),     area=Vector3.new(-1950,80,-13100)},
-    {min=2075,max=2099,quest='ChocQuest1',qn=1,mob='Cocoa Warrior',                   npc=Vector3.new(233,29,-12201),       area=Vector3.new(150,80,-12300)},
-    {min=2100,max=2124,quest='ChocQuest1',qn=2,mob='Chocolate Bar Battler',           npc=Vector3.new(233,29,-12201),       area=Vector3.new(350,80,-12100)},
-    {min=2125,max=2150,quest='ChocQuest2',qn=1,mob='Sweet Thief',                     npc=Vector3.new(150,29,-12600),       area=Vector3.new(100,80,-12700)},
-    {min=2151,max=2200,quest='CandyQuest1',qn=1,mob='Candy Rebel',                   npc=Vector3.new(-1149,13,-14445),     area=Vector3.new(-1100,80,-14300)},
-    {min=2201,max=2250,quest='CandyQuest1',qn=2,mob='Sweet Thief',                   npc=Vector3.new(-1149,13,-14445),     area=Vector3.new(-1250,80,-14500)},
-    {min=2251,max=2300,quest='TikiQuest1',qn=1,mob='Isle Champion',                  npc=Vector3.new(-16253,55,-17264),     area=Vector3.new(-16100,100,-17150)},
-    {min=2301,max=2350,quest='TikiQuest1',qn=2,mob='Serpent Hunter',                  npc=Vector3.new(-16253,55,-17264),     area=Vector3.new(-16400,100,-17400)},
-    {min=2351,max=2400,quest='TikiQuest2',qn=1,mob='Skull Slayer',                   npc=Vector3.new(-16550,55,-16480),     area=Vector3.new(-16700,90,-16300)},
-    {min=2401,max=2450,quest='TikiQuest2',qn=2,mob='Reaver',                         npc=Vector3.new(-16550,55,-16480),     area=Vector3.new(-16300,90,-16600)},
-}
-
-local function questForLevel(level)
-    for _, q in ipairs(QUESTS) do
-        if level >= q.min and level <= q.max then return q end
+-------------------------------------------------
+-- HÀM CƠ BẢN
+-------------------------------------------------
+local function GetCharacter()
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
+        return char
     end
-    return QUESTS[#QUESTS]
 end
 
-local function getQuestGui()
-    local main = LocalPlayer:FindFirstChild('PlayerGui') and LocalPlayer.PlayerGui:FindFirstChild('Main')
-    local quest = main and main:FindFirstChild('Quest')
-    return quest
+local function GetLevel()
+    local lv = 1
+    pcall(function() lv = LocalPlayer.Data.Level.Value end)
+    return lv
 end
 
-local function hasQuest()
-    local q = getQuestGui()
-    if not q then return false end
-    if q:IsA('GuiObject') and q.Visible then return true end
-    local title = q:FindFirstChild('Container') and q.Container:FindFirstChild('QuestTitle')
-    local t = title and title:FindFirstChild('Title')
-    return t and type(t.Text) == 'string' and t.Text ~= ''
+local function StopTween()
+    if currentTween then
+        pcall(function() currentTween:Cancel() end)
+        currentTween = nil
+    end
 end
 
-local function getQuestTitle()
-    local q = getQuestGui()
-    if not q then return '' end
-    local c = q:FindFirstChild('Container')
-    local title = c and c:FindFirstChild('QuestTitle')
-    local t = title and title:FindFirstChild('Title')
-    return (t and t.Text) or ''
-end
-
-local function resolveQuestNPC(info)
-    local best, dist = nil, math.huge
-    local targetName = info.quest
-    local npcs = workspace:FindFirstChild('NPCs')
-    if npcs then
-        for _, npc in ipairs(npcs:GetChildren()) do
-            local root = npc:FindFirstChild('HumanoidRootPart') or npc:FindFirstChild('Head') or npc:FindFirstChildWhichIsA('BasePart')
-            if root and npc:IsA('Model') then
-                local name = string.lower(npc.Name)
-                local wanted = string.lower(targetName:gsub(' Quest',''))
-                if string.find(name, wanted, 1, true) or (root.Position - info.npc).Magnitude < 80 then
-                    local d = (getRoot() and (getRoot().Position-root.Position).Magnitude) or 0
-                    if d < dist then best, dist = npc, d end
-                end
+local function ResetState()
+    StopTween()
+    local char = GetCharacter()
+    if not char then return end
+    for _, part in pairs(char:GetChildren()) do
+        if part:IsA("BasePart") then part.CanCollide = true end
+    end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        for _, v in pairs(hrp:GetChildren()) do
+            if v:IsA("BodyVelocity") or v.Name == "FarmBV" then
+                v:Destroy()
             end
         end
     end
-    return best
 end
 
-local function questPosition(info)
-    local npc = resolveQuestNPC(info)
-    if npc then
-        local root = npc:FindFirstChild('HumanoidRootPart') or npc:FindFirstChild('Head') or npc:FindFirstChildWhichIsA('BasePart')
-        if root then return root.Position end
-    end
-    return info.npc
-end
+local function TweenTo(cf, speed)
+    local char = GetCharacter()
+    if not char then return end
+    local hrp = char.HumanoidRootPart
 
-local function invokeStartQuest(info)
-    local now = os.clock()
-    if now - state.lastQuestCall < 1.4 then return false end
-    state.lastQuestCall = now
-    local remotes = ReplicatedStorage:FindFirstChild('Remotes')
-    local comm = remotes and remotes:FindFirstChild('CommF_')
-    if not comm then return false end
-    local ok = pcall(function()
-        comm:InvokeServer('StartQuest', info.quest, info.qn)
-    end)
-    return ok
-end
-
-local movement = { tween = nil, target = nil, token = 0, lastTargetUpdate = 0 }
-
-local function stopMove()
-    movement.token += 1
-    if movement.tween then
-        pcall(function() movement.tween:Cancel() end)
-        movement.tween = nil
-    end
-    movement.target = nil
-    state.lastMovePoint = nil
-end
-
-local function moveToPoint(pos)
-    local h = getHumanoid()
-    local r = getRoot()
-    if not h or not r or h.Health <= 0 then return false end
-
-    local target = Vector3.new(pos.X, pos.Y, pos.Z)
-    local distance = (r.Position - target).Magnitude
-    if distance <= 6 then
-        stopMove()
-        return true
+    for _, part in pairs(char:GetChildren()) do
+        if part:IsA("BasePart") then part.CanCollide = false end
     end
 
-    local sameTarget = movement.target and (movement.target - target).Magnitude < 10
-    if not CFG.StableTween then
-        if not state.lastMovePoint or (state.lastMovePoint-target).Magnitude > 5 or os.clock()-state.lastMoveTime > 1.0 then
-            state.lastMovePoint = target
-            state.lastMoveTime = os.clock()
-            pcall(function() h:MoveTo(target) end)
-        end
-        return false
-    end
-    if CFG.StableTween and sameTarget and movement.tween then
-        return false
+    local bv = hrp:FindFirstChild("FarmBV")
+    if not bv then
+        bv = Instance.new("BodyVelocity")
+        bv.Name = "FarmBV"
+        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        bv.Velocity = Vector3.zero
+        bv.Parent = hrp
     end
 
-    -- Keep exactly one active tween. A moving mob is only retargeted when it
-    -- has moved a meaningful distance, preventing cancel/recreate jitter.
-    if movement.tween then
-        pcall(function() movement.tween:Cancel() end)
-        movement.tween = nil
-    end
-
-    movement.token += 1
-    local myToken = movement.token
-    movement.target = target
-    state.lastMovePoint = target
-    state.lastMoveTime = os.clock()
-
-    local speed = math.clamp(tonumber(CFG.MoveSpeed) or 145, 80, 260)
-    local duration = math.clamp(distance / speed, 0.18, 6)
-    local goal = CFrame.lookAt(target + Vector3.new(0, 0.01, 0), target + Vector3.new(0, 0.01, -1))
-
-    local tween = TweenService:Create(r, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = goal})
-    movement.tween = tween
-    tween:Play()
-
-    task.spawn(function()
-        local ok = pcall(function() tween.Completed:Wait() end)
-        if ok and myToken == movement.token and movement.tween == tween then
-            movement.tween = nil
-        end
-    end)
-
-    return false
-end
-
-local function setNoClip(enabled)
-    if not CFG.Noclip then enabled = false end
-    local c = char()
-    if not c then return end
-    for _, p in ipairs(c:GetDescendants()) do
-        if p:IsA('BasePart') and p.Name ~= 'HumanoidRootPart' then
-            if enabled then
-                if state.collisionCache[p] == nil then state.collisionCache[p] = p.CanCollide end
-                p.CanCollide = false
-            else
-                local old = state.collisionCache[p]
-                if old ~= nil then p.CanCollide = old end
-            end
-        end
-    end
-    if not enabled then table.clear(state.collisionCache) end
-end
-
-local function equipTool()
-    if not CFG.AutoEquip then return end
-    if os.clock() - state.lastEquip < 0.35 then return end
-    state.lastEquip = os.clock()
-    local c = char()
-    if not c or c:FindFirstChildOfClass('Tool') then return end
-    local backpack = LocalPlayer:FindFirstChildOfClass('Backpack')
-    local h = getHumanoid()
-    if not backpack or not h then return end
-    for _, tool in ipairs(backpack:GetChildren()) do
-        if tool:IsA('Tool') then
-            pcall(function() h:EquipTool(tool) end)
-            break
-        end
-    end
-end
-
-local function validEnemy(enemy, wanted)
-    if not enemy:IsA('Model') then return false end
-    local hum = enemy:FindFirstChildOfClass('Humanoid')
-    local root = enemy:FindFirstChild('HumanoidRootPart')
-    if not hum or hum.Health <= 0 or not root then return false end
-    return string.find(string.lower(enemy.Name), string.lower(wanted), 1, true) ~= nil
-end
-
-local function findNearestMob(wanted)
-    local r = getRoot()
-    local enemies = workspace:FindFirstChild('Enemies')
-    if not r or not enemies then return nil end
-    local best, dist = nil, math.huge
-    for _, enemy in ipairs(enemies:GetChildren()) do
-        if validEnemy(enemy, wanted) then
-            local er = enemy.HumanoidRootPart
-            local d = (r.Position-er.Position).Magnitude
-            if d < dist then best, dist = enemy, d end
-        end
-    end
-    return best
-end
-
-local function setFarmTarget(enemy)
-    state.target = enemy
-end
-
-local function attackTarget()
-    if not CFG.FastAttack then return end
-    if not state.target or not state.target.Parent then return end
-    local h = state.target:FindFirstChildOfClass('Humanoid')
-    local er = state.target:FindFirstChild('HumanoidRootPart')
-    local r = getRoot()
-    if not h or h.Health <= 0 or not er or not r then return end
-    if (r.Position-er.Position).Magnitude > CFG.AttackRange + 8 then return end
-    pcall(function()
-        VirtualUser:CaptureController()
-        VirtualUser:ClickButton1(Vector2.new())
-    end)
-end
-
--- Locate CombatFramework controller without crashing if executor APIs are absent.
-task.spawn(function()
-    task.wait(2)
-    pcall(function()
-        if not getreg or not getfenv or not debug then return end
-        local framework = LocalPlayer:FindFirstChild('PlayerScripts') and LocalPlayer.PlayerScripts:FindFirstChild('CombatFramework')
-        if not framework then return end
-        for _, fn in ipairs(getreg()) do
-            if typeof(fn) == 'function' then
-                local env = getfenv(fn)
-                if env and env.script == framework then
-                    for _, up in pairs(debug.getupvalues(fn)) do
-                        if type(up) == 'table' and up.activeController then
-                            state.controller = up
-                            return
-                        end
-                    end
-                end
-            end
-        end
-    end)
-end)
-
-RunService.RenderStepped:Connect(function()
-    if not CFG.FastAttack then return end
-    pcall(function()
-        local controller = state.controller
-        if controller and controller.activeController then
-            local ac = controller.activeController
-            ac.timeToNextAttack = 0
-            ac.attacking = false
-            ac.blocking = false
-            ac.increment = 3
-            ac.hitboxMagnitude = math.max(ac.hitboxMagnitude or 60, 100)
-        end
-    end)
-    attackTarget()
-end)
-
-local function runFarmStep()
-    if not isAlive() then return end
-    equipTool()
-    setNoClip(CFG.Noclip)
-
-    local info = questForLevel(getLevel())
-    state.questInfo = info
-
-    if CFG.AutoQuest and not hasQuest() then
-        state.phase = 'Quest'
-        state.target = nil
-        local qpos = questPosition(info)
-        if moveToPoint(qpos) then
-            invokeStartQuest(info)
-        end
+    local dist = (hrp.Position - cf.Position).Magnitude
+    if dist <= 5 then
+        StopTween()
+        hrp.CFrame = cf
         return
     end
 
-    if CFG.AutoQuest and getQuestTitle() ~= '' then
-        local title = string.lower(getQuestTitle())
-        if not string.find(title, string.lower(info.mob), 1, true) and not string.find(title, string.lower(info.quest:gsub(' Quest','')), 1, true) then
-            -- Wrong quest: do not wander to another area. Return only to the currently selected NPC.
-            state.phase = 'Correcting quest'
-            state.target = nil
-            local qpos = questPosition(info)
-            moveToPoint(qpos)
+    speed = speed or getgenv().TweenSpeed or 300
+    local time = math.clamp(dist / speed, 0.1, 6)
+
+    if currentTween then pcall(function() currentTween:Cancel() end) end
+    currentTween = TweenService:Create(hrp, TweenInfo.new(time, Enum.EasingStyle.Linear), {CFrame = cf})
+    currentTween:Play()
+end
+
+local function EquipWeapon()
+    local char = GetCharacter()
+    if not char or char:FindFirstChildOfClass("Tool") then return end
+    for _, tool in pairs(LocalPlayer.Backpack:GetChildren()) do
+        if tool:IsA("Tool") then
+            char.Humanoid:EquipTool(tool)
             return
         end
     end
-
-    local target = state.target
-    if not target or not validEnemy(target, info.mob) then
-        target = findNearestMob(info.mob)
-        setFarmTarget(target)
-    end
-
-    if target and target.Parent then
-        state.phase = 'Farming '..info.mob
-        local er = target:FindFirstChild('HumanoidRootPart')
-        if er then
-            local p = er.Position + Vector3.new(0, CFG.FarmHeight, 0)
-            moveToPoint(p)
-        end
-        return
-    end
-
-    state.phase = 'Searching mob'
-    moveToPoint(info.area)
 end
 
--- One and only one main AutoFarm loop.
+local function HasQuest()
+    local ok, res = pcall(function()
+        local main = LocalPlayer.PlayerGui:FindFirstChild("Main")
+        return main and main:FindFirstChild("Quest") and main.Quest.Visible
+    end)
+    return ok and res
+end
+
+-------------------------------------------------
+-- BẢNG NHIỆM VỤ ĐẦY ĐỦ 3 SEA (ĐỊNH DẠNG RÕ RÀNG)
+-------------------------------------------------
+local QuestList = {
+    -- ==================== SEA 1 ====================
+    {Min = 1,   Max = 9,   Name = "BanditQuest1",   Level = 1, Mob = "Bandit",           NPC = CFrame.new(1059.37, 16.51, 1549.26), MobPos = CFrame.new(1145, 17, 1634)},
+    {Min = 10,  Max = 14,  Name = "JungleQuest",    Level = 1, Mob = "Monkey",           NPC = CFrame.new(-1598.08, 36.85, 153.38), MobPos = CFrame.new(-1610, 37, 145)},
+    {Min = 15,  Max = 29,  Name = "JungleQuest",    Level = 2, Mob = "Gorilla",          NPC = CFrame.new(-1598.08, 36.85, 153.38), MobPos = CFrame.new(-1235, 6, -486)},
+    {Min = 30,  Max = 39,  Name = "BuggyQuest1",    Level = 1, Mob = "Pirate",           NPC = CFrame.new(-1140.17, 4.75, 3827.41), MobPos = CFrame.new(-1215, 5, 3915)},
+    {Min = 40,  Max = 59,  Name = "BuggyQuest1",    Level = 2, Mob = "Brute",            NPC = CFrame.new(-1140.17, 4.75, 3827.41), MobPos = CFrame.new(-1145, 15, 4350)},
+    {Min = 60,  Max = 89,  Name = "DesertQuest",    Level = 1, Mob = "Desert Bandit",    NPC = CFrame.new(894.49, 6.44, 4384.58),  MobPos = CFrame.new(932, 6, 4485)},
+    {Min = 90,  Max = 119, Name = "SnowQuest",      Level = 1, Mob = "Snow Bandit",      NPC = CFrame.new(1385.84, 87.27, -1298.61), MobPos = CFrame.new(1285, 105, -1342)},
+    {Min = 120, Max = 149, Name = "MarineQuest2",   Level = 1, Mob = "Chief Petty Officer", NPC = CFrame.new(-5039.59, 28.65, 4324.78), MobPos = CFrame.new(-4855, 20, 4260)},
+    {Min = 150, Max = 189, Name = "SkyQuest",       Level = 1, Mob = "Sky Bandit",       NPC = CFrame.new(-4839.53, 717.67, -2629.09), MobPos = CFrame.new(-4975, 717, -2885)},
+    {Min = 190, Max = 224, Name = "PrisonerQuest",  Level = 1, Mob = "Prisoner",         NPC = CFrame.new(530.81, 1.66, 474.98),   MobPos = CFrame.new(540, 2, 485)},
+    {Min = 225, Max = 299, Name = "ColosseumQuest", Level = 1, Mob = "Toga Warrior",     NPC = CFrame.new(-1588.34, 7.39, -2986.48), MobPos = CFrame.new(-1800, 7, -2980)},
+    {Min = 300, Max = 374, Name = "MagmaQuest",     Level = 1, Mob = "Military Soldier", NPC = CFrame.new(-5313.37, 8.58, 8515.29), MobPos = CFrame.new(-5400, 9, 8530)},
+    {Min = 375, Max = 449, Name = "FishmanQuest",   Level = 1, Mob = "Fishman Warrior",  NPC = CFrame.new(61163.85, 18.5, 1569.26), MobPos = CFrame.new(60800, 18, 1500)},
+    {Min = 450, Max = 524, Name = "SkyQuest2",      Level = 1, Mob = "God's Guard",      NPC = CFrame.new(-7861.34, 5545.49, -380.29), MobPos = CFrame.new(-7725, 5600, -440)},
+    {Min = 525, Max = 624, Name = "SkyQuest2",      Level = 2, Mob = "Shandian",         NPC = CFrame.new(-7861.34, 5545.49, -380.29), MobPos = CFrame.new(-7850, 5600, -220)},
+    {Min = 625, Max = 699, Name = "FountainQuest",  Level = 1, Mob = "Galley Pirate",    NPC = CFrame.new(5259.82, 38.5, 4050.03),  MobPos = CFrame.new(5580, 38, 3990)},
+
+    -- ==================== SEA 2 ====================
+    {Min = 700, Max = 724, Name = "Area1Quest",     Level = 1, Mob = "Raider",           NPC = CFrame.new(-429.54, 71.77, 1836.18), MobPos = CFrame.new(-750, 55, 2300)},
+    {Min = 725, Max = 774, Name = "Area1Quest",     Level = 2, Mob = "Mercenary",        NPC = CFrame.new(-429.54, 71.77, 1836.18), MobPos = CFrame.new(-1000, 80, 1450)},
+    {Min = 775, Max = 799, Name = "Area2Quest",     Level = 1, Mob = "Swan Pirate",      NPC = CFrame.new(638.44, 71.77, 918.28),  MobPos = CFrame.new(1050, 140, 1300)},
+    {Min = 800, Max = 874, Name = "Area2Quest",     Level = 2, Mob = "Factory Staff",    NPC = CFrame.new(638.44, 71.77, 918.28),  MobPos = CFrame.new(850, 110, 0)},
+    {Min = 875, Max = 899, Name = "MarineQuest3",   Level = 1, Mob = "Marine Lieutenant",NPC = CFrame.new(-2440.79, 71.71, -3216.07), MobPos = CFrame.new(-2550, 110, -3100)},
+    {Min = 900, Max = 949, Name = "MarineQuest3",   Level = 2, Mob = "Marine Captain",   NPC = CFrame.new(-2440.79, 71.71, -3216.07), MobPos = CFrame.new(-2550, 110, -3100)},
+    {Min = 950, Max = 974, Name = "ZombieQuest",    Level = 1, Mob = "Zombie",           NPC = CFrame.new(-5494.34, 48.52, -795.16), MobPos = CFrame.new(-5550, 50, -800)},
+    {Min = 975, Max = 999, Name = "ZombieQuest",    Level = 2, Mob = "Vampire",          NPC = CFrame.new(-5494.34, 48.52, -795.16), MobPos = CFrame.new(-5550, 50, -800)},
+    {Min = 1000,Max = 1049,Name = "SnowMountainQuest", Level = 1, Mob = "Snow Trooper",  NPC = CFrame.new(609.63, 401.39, -5372.26), MobPos = CFrame.new(500, 401, -5400)},
+    {Min = 1050,Max = 1099,Name = "SnowMountainQuest", Level = 2, Mob = "Winter Warrior",NPC = CFrame.new(609.63, 401.39, -5372.26), MobPos = CFrame.new(500, 401, -5400)},
+    {Min = 1100,Max = 1124,Name = "IceSideQuest",   Level = 1, Mob = "Lab Subordinate",  NPC = CFrame.new(-6060.11, 15.99, -4904.79), MobPos = CFrame.new(-6100, 16, -4900)},
+    {Min = 1125,Max = 1174,Name = "IceSideQuest",   Level = 2, Mob = "Horned Warrior",   NPC = CFrame.new(-6060.11, 15.99, -4904.79), MobPos = CFrame.new(-6100, 16, -4900)},
+    {Min = 1175,Max = 1199,Name = "FireSideQuest",  Level = 1, Mob = "Magma Ninja",      NPC = CFrame.new(-5431.09, 15.99, -5296.53), MobPos = CFrame.new(-5400, 16, -5300)},
+    {Min = 1200,Max = 1249,Name = "FireSideQuest",  Level = 2, Mob = "Lava Pirate",      NPC = CFrame.new(-5431.09, 15.99, -5296.53), MobPos = CFrame.new(-5400, 16, -5300)},
+    {Min = 1250,Max = 1299,Name = "ShipQuest1",     Level = 1, Mob = "Ship Deckhand",    NPC = CFrame.new(1037.80, 125.09, 32911.60), MobPos = CFrame.new(1000, 125, 32900)},
+    {Min = 1300,Max = 1349,Name = "ShipQuest2",     Level = 1, Mob = "Ship Engineer",    NPC = CFrame.new(1037.80, 125.09, 32911.60), MobPos = CFrame.new(1000, 125, 32900)},
+    {Min = 1350,Max = 1374,Name = "FrostQuest",     Level = 1, Mob = "Arctic Warrior",   NPC = CFrame.new(5669.44, 28.21, -6482.60), MobPos = CFrame.new(5700, 28, -6500)},
+    {Min = 1375,Max = 1424,Name = "FrostQuest",     Level = 2, Mob = "Snow Lurker",      NPC = CFrame.new(5669.44, 28.21, -6482.60), MobPos = CFrame.new(5700, 28, -6500)},
+    {Min = 1425,Max = 1449,Name = "ForgottenQuest", Level = 1, Mob = "Sea Soldier",      NPC = CFrame.new(-3054.44, 240.31, -10147.75), MobPos = CFrame.new(-3100, 240, -10100)},
+    {Min = 1450,Max = 1499,Name = "ForgottenQuest", Level = 2, Mob = "Water Fighter",    NPC = CFrame.new(-3054.44, 240.31, -10147.75), MobPos = CFrame.new(-3100, 240, -10100)},
+
+    -- ==================== SEA 3 ====================
+    {Min = 1500,Max = 1524,Name = "PiratePortQuest", Level = 1, Mob = "Pirate Millionaire", NPC = CFrame.new(-290, 44, 5577), MobPos = CFrame.new(-300, 44, 5550)},
+    {Min = 1525,Max = 1574,Name = "PiratePortQuest", Level = 2, Mob = "Pistol Billionaire", NPC = CFrame.new(-290, 44, 5577), MobPos = CFrame.new(-300, 44, 5550)},
+    {Min = 1575,Max = 1599,Name = "AmazonQuest",    Level = 1, Mob = "Dragon Crew Warrior", NPC = CFrame.new(5832.84, 51.68, -1101.52), MobPos = CFrame.new(5800, 52, -1100)},
+    {Min = 1600,Max = 1624,Name = "AmazonQuest",    Level = 2, Mob = "Dragon Crew Archer", NPC = CFrame.new(5832.84, 51.68, -1101.52), MobPos = CFrame.new(5800, 52, -1100)},
+    {Min = 1625,Max = 1649,Name = "AmazonQuest2",   Level = 1, Mob = "Female Island Raider", NPC = CFrame.new(5446.86, 601.66, 751.13), MobPos = CFrame.new(5400, 602, 750)},
+    {Min = 1650,Max = 1699,Name = "AmazonQuest2",   Level = 2, Mob = "Giant Island Raider", NPC = CFrame.new(5446.86, 601.66, 751.13), MobPos = CFrame.new(5400, 602, 750)},
+    {Min = 1700,Max = 1724,Name = "MarineTreeIsland", Level = 1, Mob = "Marine Commodore", NPC = CFrame.new(2180.54, 28.09, -6741.39), MobPos = CFrame.new(2200, 28, -6700)},
+    {Min = 1725,Max = 1774,Name = "MarineTreeIsland", Level = 2, Mob = "Marine Rear Admiral", NPC = CFrame.new(2180.54, 28.09, -6741.39), MobPos = CFrame.new(2200, 28, -6700)},
+    {Min = 1775,Max = 1799,Name = "DeepForestIsland", Level = 1, Mob = "Fishman Raider", NPC = CFrame.new(-10581.66, 331.74, -8761.19), MobPos = CFrame.new(-10550, 332, -8750)},
+    {Min = 1800,Max = 1824,Name = "DeepForestIsland", Level = 2, Mob = "Fishman Captain", NPC = CFrame.new(-10581.66, 331.74, -8761.19), MobPos = CFrame.new(-10550, 332, -8750)},
+    {Min = 1825,Max = 1849,Name = "DeepForestIsland2", Level = 1, Mob = "Forest Pirate", NPC = CFrame.new(-13234.04, 331.63, -7625.40), MobPos = CFrame.new(-13200, 332, -7600)},
+    {Min = 1850,Max = 1899,Name = "DeepForestIsland2", Level = 2, Mob = "Mythological Pirate", NPC = CFrame.new(-13234.04, 331.63, -7625.40), MobPos = CFrame.new(-13200, 332, -7600)},
+    {Min = 1900,Max = 1924,Name = "DeepForestIsland3", Level = 1, Mob = "Jungle Pirate", NPC = CFrame.new(-12680.38, 390.86, -9902.12), MobPos = CFrame.new(-12650, 391, -9900)},
+    {Min = 1925,Max = 1974,Name = "DeepForestIsland3", Level = 2, Mob = "Musketeer Pirate", NPC = CFrame.new(-12680.38, 390.86, -9902.12), MobPos = CFrame.new(-12650, 391, -9900)},
+    {Min = 1975,Max = 1999,Name = "HauntedCastle",  Level = 1, Mob = "Reborn Skeleton",  NPC = CFrame.new(-9515.45, 142.13, 5525.21), MobPos = CFrame.new(-9500, 142, 5550)},
+    {Min = 2000,Max = 2024,Name = "HauntedCastle",  Level = 2, Mob = "Living Zombie",    NPC = CFrame.new(-9515.45, 142.13, 5525.21), MobPos = CFrame.new(-9500, 142, 5550)},
+    {Min = 2025,Max = 2049,Name = "HauntedCastle",  Level = 3, Mob = "Demonic Soul",     NPC = CFrame.new(-9515.45, 142.13, 5525.21), MobPos = CFrame.new(-9500, 142, 5550)},
+    {Min = 2050,Max = 2074,Name = "HauntedCastle",  Level = 4, Mob = "Posessed Mummy",   NPC = CFrame.new(-9515.45, 142.13, 5525.21), MobPos = CFrame.new(-9500, 142, 5550)},
+    {Min = 2075,Max = 2099,Name = "CandyCaneQuest", Level = 1, Mob = "Peanut Scout",     NPC = CFrame.new(-1038.35, 14.61, -11928.91), MobPos = CFrame.new(-1000, 15, -11900)},
+    {Min = 2100,Max = 2124,Name = "CandyCaneQuest", Level = 2, Mob = "Peanut President", NPC = CFrame.new(-1038.35, 14.61, -11928.91), MobPos = CFrame.new(-1000, 15, -11900)},
+    {Min = 2125,Max = 2149,Name = "IceCreamQuest",  Level = 1, Mob = "Ice Cream Chef",   NPC = CFrame.new(-820.65, 65.84, -10965.64), MobPos = CFrame.new(-800, 66, -10950)},
+    {Min = 2150,Max = 2199,Name = "IceCreamQuest",  Level = 2, Mob = "Ice Cream Commander", NPC = CFrame.new(-820.65, 65.84, -10965.64), MobPos = CFrame.new(-800, 66, -10950)},
+    {Min = 2200,Max = 2224,Name = "CookieQuest",    Level = 1, Mob = "Cookie Crafter",   NPC = CFrame.new(-2337.27, 36.83, -12093.29), MobPos = CFrame.new(-2300, 37, -12050)},
+    {Min = 2225,Max = 2249,Name = "CookieQuest",    Level = 2, Mob = "Cake Guard",       NPC = CFrame.new(-2337.27, 36.83, -12093.29), MobPos = CFrame.new(-2300, 37, -12050)},
+    {Min = 2250,Max = 2274,Name = "CakeQuest1",     Level = 1, Mob = "Baking Staff",     NPC = CFrame.new(-2027.32, 36.85, -12028.26), MobPos = CFrame.new(-2000, 37, -12000)},
+    {Min = 2275,Max = 2299,Name = "CakeQuest1",     Level = 2, Mob = "Head Baker",       NPC = CFrame.new(-2027.32, 36.85, -12028.26), MobPos = CFrame.new(-2000, 37, -12000)},
+    {Min = 2300,Max = 2324,Name = "CakeQuest2",     Level = 1, Mob = "Cocoa Warrior",    NPC = CFrame.new(-1873.54, 13.13, -12100.91), MobPos = CFrame.new(-1850, 13, -12050)},
+    {Min = 2325,Max = 2349,Name = "CakeQuest2",     Level = 2, Mob = "Chocolate Bar Battler", NPC = CFrame.new(-1873.54, 13.13, -12100.91), MobPos = CFrame.new(-1850, 13, -12050)},
+    {Min = 2350,Max = 2374,Name = "ChocQuest1",     Level = 1, Mob = "Sweet Thief",      NPC = CFrame.new(620.43, 78.27, -12574.39), MobPos = CFrame.new(600, 78, -12550)},
+    {Min = 2375,Max = 2399,Name = "ChocQuest1",     Level = 2, Mob = "Candy Rebel",      NPC = CFrame.new(620.43, 78.27, -12574.39), MobPos = CFrame.new(600, 78, -12550)},
+    {Min = 2400,Max = 2424,Name = "ChocQuest2",     Level = 1, Mob = "Candy Pirate",     NPC = CFrame.new(147.99, 24.82, -12774.91), MobPos = CFrame.new(150, 25, -12750)},
+    {Min = 2425,Max = 2499,Name = "ChocQuest2",     Level = 2, Mob = "Snow Demon",       NPC = CFrame.new(147.99, 24.82, -12774.91), MobPos = CFrame.new(150, 25, -12750)},
+}
+
+local function GetCurrentQuest()
+    local level = GetLevel()
+    for _, q in ipairs(QuestList) do
+        if level >= q.Min and level <= q.Max then
+            return q
+        end
+    end
+    -- Fallback Sea 2
+    return QuestList[17]
+end
+
+-------------------------------------------------
+-- HÀM TÌM QUÁI ĐÃ SỬA LỖI
+-------------------------------------------------
+local function FindMob(mobName)
+    local char = GetCharacter()
+    if not char then return nil end
+
+    local hrp = char.HumanoidRootPart
+    local closest = nil
+    local shortest = 450
+
+    local folder = workspace:FindFirstChild("Enemies")
+    if not folder then return nil end
+
+    local lowerMob = tostring(mobName):lower()
+
+    -- Từ khóa hỗ trợ tiếng Việt + tiếng Anh
+    local keywords = {
+        ["raider"] = {"raider", "kẻ tập kích", "tap kich", "tapkich"},
+        ["mercenary"] = {"mercenary", "lính đánh thuê", "danh thue", "linh danh thue"},
+        ["swan pirate"] = {"swan", "pirate"},
+        ["factory staff"] = {"factory", "staff"},
+        ["marine lieutenant"] = {"lieutenant", "trung úy", "trung uy"},
+        ["marine captain"] = {"captain", "đại úy", "dai uy"},
+        ["zombie"] = {"zombie"},
+        ["vampire"] = {"vampire"},
+        ["bandit"] = {"bandit"},
+        ["monkey"] = {"monkey"},
+        ["gorilla"] = {"gorilla"},
+        ["pirate"] = {"pirate"},
+        ["brute"] = {"brute"},
+        ["desert bandit"] = {"desert", "bandit"},
+        ["snow bandit"] = {"snow", "bandit"},
+        ["chief petty officer"] = {"chief", "petty", "officer"},
+        ["sky bandit"] = {"sky", "bandit"},
+        ["prisoner"] = {"prisoner"},
+        ["toga warrior"] = {"toga", "warrior"},
+        ["military soldier"] = {"military", "soldier"},
+        ["fishman warrior"] = {"fishman", "warrior"},
+        ["god's guard"] = {"god", "guard"},
+        ["shandian"] = {"shandian", "shanda"},
+        ["galley pirate"] = {"galley", "pirate"},
+    }
+
+    local searchList = keywords[lowerMob] or {lowerMob}
+
+    for _, enemy in pairs(folder:GetChildren()) do
+        if enemy:IsA("Model")
+        and enemy:FindFirstChild("Humanoid")
+        and enemy.Humanoid.Health > 0
+        and enemy:FindFirstChild("HumanoidRootPart") then
+
+            local enemyName = enemy.Name:lower()
+            local matched = false
+
+            for _, key in pairs(searchList) do
+                if enemyName:find(key) then
+                    matched = true
+                    break
+                end
+            end
+
+            if matched then
+                local dist = (hrp.Position - enemy.HumanoidRootPart.Position).Magnitude
+                if dist < shortest then
+                    shortest = dist
+                    closest = enemy
+                end
+            end
+        end
+    end
+
+    return closest
+end
+
+    -- ==================== SEA 2 (ĐÃ SỬA TỌA ĐỘ) ====================
+    {Min = 700, Max = 724, Name = "Area1Quest", Level = 1, Mob = "Raider",
+     NPC = CFrame.new(-429.54, 71.77, 1836.18),
+     MobPos = CFrame.new(-750, 55, 2300)},
+
+    {Min = 725, Max = 774, Name = "Area1Quest", Level = 2, Mob = "Mercenary",
+     NPC = CFrame.new(-429.54, 71.77, 1836.18),
+     MobPos = CFrame.new(-1005, 79, 1425)},
+
+    {Min = 775, Max = 799, Name = "Area2Quest", Level = 1, Mob = "Swan Pirate",
+     NPC = CFrame.new(638.44, 71.77, 918.28),
+     MobPos = CFrame.new(970, 125, 1280)},
+
+    {Min = 800, Max = 874, Name = "Area2Quest", Level = 2, Mob = "Factory Staff",
+     NPC = CFrame.new(638.44, 71.77, 918.28),
+     MobPos = CFrame.new(300, 73, -30)},
+
+    {Min = 875, Max = 899, Name = "MarineQuest3", Level = 1, Mob = "Marine Lieutenant",
+     NPC = CFrame.new(-2440.79, 71.71, -3216.07),
+     MobPos = CFrame.new(-2600, 73, -3300)},
+
+    {Min = 900, Max = 949, Name = "MarineQuest3", Level = 2, Mob = "Marine Captain",
+     NPC = CFrame.new(-2440.79, 71.71, -3216.07),
+     MobPos = CFrame.new(-2600, 73, -3300)},
+
+    {Min = 950, Max = 974, Name = "ZombieQuest", Level = 1, Mob = "Zombie",
+     NPC = CFrame.new(-5494.34, 48.52, -795.16),
+     MobPos = CFrame.new(-5600, 48, -800)},
+
+    {Min = 975, Max = 999, Name = "ZombieQuest", Level = 2, Mob = "Vampire",
+     NPC = CFrame.new(-5494.34, 48.52, -795.16),
+     MobPos = CFrame.new(-5600, 48, -800)},
+
+-------------------------------------------------
+-- FAST ATTACK
+-------------------------------------------------
 task.spawn(function()
     while true do
-        if CFG.AutoFarm then
-            local ok, err = pcall(runFarmStep)
-            if not ok then warn('[Datkits V5] Farm:', err) end
-            task.wait(0.12)
-        else
-            state.phase = 'Idle'
-            state.target = nil
-            stopMove()
-            setNoClip(false)
-            task.wait(0.25)
+        task.wait(getgenv().FastAttack and 0.04 or 0.2)
+        if getgenv().AutoQuest and getgenv().FastAttack then
+            pcall(function()
+                local char = GetCharacter()
+                if not char then return end
+                local tool = char:FindFirstChildOfClass("Tool")
+                if tool then
+                    tool:Activate()
+                    local net = ReplicatedStorage:FindFirstChild("Modules") and ReplicatedStorage.Modules:FindFirstChild("Net")
+                    if net then
+                        local regAttack = net:FindFirstChild("RE/RegisterAttack")
+                        local regHit = net:FindFirstChild("RE/RegisterHit")
+                        if regAttack then regAttack:FireServer(0.05) end
+                        if regHit then
+                            for _, e in pairs(workspace.Enemies:GetChildren()) do
+                                if e:FindFirstChild("HumanoidRootPart") and e.Humanoid.Health > 0 then
+                                    if (char.HumanoidRootPart.Position - e.HumanoidRootPart.Position).Magnitude < 50 then
+                                        pcall(function()
+                                            regHit:FireServer(e.HumanoidRootPart, {{e, e.HumanoidRootPart}})
+                                        end)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
         end
     end
 end)
 
-LocalPlayer.CharacterAdded:Connect(function()
-    state.target = nil
-    state.lastMovePoint = nil
-    task.wait(1)
-    setNoClip(false)
-end)
+-------------------------------------------------
+-- MENU
+-------------------------------------------------
+Tabs.Main:AddSection("Cài đặt")
 
---============================== UI ==============================
-Tabs.Farm:AddSection('Main Farm')
-Tabs.Farm:AddToggle('AutoFarm', {Title='Auto Farm', Default=CFG.AutoFarm, Callback=function(v) CFG.AutoFarm=v end})
-Tabs.Farm:AddToggle('AutoQuest', {Title='Auto Quest', Default=CFG.AutoQuest, Callback=function(v) CFG.AutoQuest=v end})
-Tabs.Farm:AddSlider('FarmHeight', {Title='Farm Height', Default=CFG.FarmHeight, Min=4, Max=16, Rounding=1, Callback=function(v) CFG.FarmHeight=v end})
+Tabs.Main:AddSlider("FarmDistance", {
+    Title = "Độ cao lơ lửng",
+    Default = 7,
+    Min = 4,
+    Max = 15,
+    Rounding = 1,
+    Callback = function(v) getgenv().FarmDistance = v end
+})
 
-Tabs.Combat:AddSection('Combat')
-Tabs.Combat:AddToggle('FastAttack', {Title='Fast Attack', Default=CFG.FastAttack, Callback=function(v) CFG.FastAttack=v end})
-Tabs.Combat:AddToggle('AutoEquip', {Title='Auto Equip', Default=CFG.AutoEquip, Callback=function(v) CFG.AutoEquip=v end})
-Tabs.Combat:AddSlider('AttackRange', {Title='Attack Range', Default=CFG.AttackRange, Min=6, Max=20, Rounding=1, Callback=function(v) CFG.AttackRange=v end})
+Tabs.Main:AddSlider("TweenSpeed", {
+    Title = "Tốc độ bay",
+    Default = 300,
+    Min = 200,
+    Max = 450,
+    Rounding = 10,
+    Callback = function(v) getgenv().TweenSpeed = v end
+})
 
-Tabs.Movement:AddSection('Stable Movement')
-Tabs.Movement:AddParagraph({Title='Movement mode', Content='Uses one Humanoid movement controller with throttled refresh to reduce jitter and target fighting.'})
-Tabs.Movement:AddToggle('StableTween', {Title='Stable Tween Movement', Default=CFG.StableTween, Callback=function(v) CFG.StableTween=v end})
-Tabs.Movement:AddToggle('Noclip', {Title='Noclip (optional)', Default=CFG.Noclip, Callback=function(v) CFG.Noclip=v end})
-Tabs.Movement:AddSlider('MoveSpeed', {Title='Movement Speed', Default=CFG.MoveSpeed, Min=90, Max=220, Rounding=5, Callback=function(v) CFG.MoveSpeed=v end})
+Tabs.Main:AddToggle("FastAttackToggle", {
+    Title = "Fast Attack",
+    Default = true,
+    Callback = function(v) getgenv().FastAttack = v end
+})
 
-Tabs.Settings:AddSection('Status')
-local status = Tabs.Settings:AddParagraph({Title='Status', Content='Idle'})
+Tabs.Main:AddSection("Auto Quest")
 
-task.spawn(function()
-    while true do
-        pcall(function()
-            status:SetDesc(state.phase..' | Level: '..tostring(getLevel()))
+Tabs.Main:AddToggle("AutoQuestToggle", {
+    Title = "Auto Quest (Cả 3 Sea)",
+    Default = false,
+    Callback = function(Value)
+        getgenv().AutoQuest = Value
+        if not Value then
+            ResetState()
+            Fluent:Notify({Title = "Auto Quest", Content = "Đã tắt", Duration = 3})
+            return
+        end
+
+        Fluent:Notify({Title = "Auto Quest", Content = "Đã bật - Đang chạy", Duration = 4})
+
+        task.spawn(function()
+            while getgenv().AutoQuest do
+                pcall(EquipWeapon)
+                task.wait(0.7)
+            end
         end)
-        task.wait(0.35)
-    end
-end)
 
-Tabs.Settings:AddSection('Notes')
-Tabs.Settings:AddParagraph({Title='Stability first', Content='The script intentionally avoids repeated TweenService/CFrame ownership. If the server corrects movement, client code cannot guarantee zero rubberbanding.'})
+        task.spawn(function()
+            while getgenv().AutoQuest do
+                task.wait(0.18)
+                pcall(function()
+                    local char = GetCharacter()
+                    if not char then return end
+                    local hrp = char.HumanoidRootPart
+                    local quest = GetCurrentQuest()
+
+                    if not HasQuest() then
+                        -- Bay đến NPC nhận nhiệm vụ
+                        local dist = (hrp.Position - quest.NPC.Position).Magnitude
+                        if dist > 12 then
+                            TweenTo(quest.NPC * CFrame.new(0, 0, 3))
+                        else
+                            StopTween()
+                            for i = 1, 6 do
+                                pcall(function()
+                                    ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", quest.Name, quest.Level)
+                                end)
+                                task.wait(0.1)
+                            end
+                            task.wait(1.2)
+                        end
+                    else
+                        -- Đã có nhiệm vụ → bay đến tọa độ quái + đánh
+                        local mob = FindMob(quest.Mob)
+                        if mob and mob:FindFirstChild("HumanoidRootPart") then
+                            local pos = mob.HumanoidRootPart.Position
+                            local height = getgenv().FarmDistance or 7
+                            TweenTo(CFrame.new(pos + Vector3.new(0, height, 0), pos))
+                            pcall(function()
+                                mob.HumanoidRootPart.CanCollide = false
+                                mob.HumanoidRootPart.AssemblyLinearVelocity = Vector3.zero
+                            end)
+                        else
+                            -- Không thấy mob → bay đến tọa độ khu vực quái
+                            TweenTo(quest.MobPos)
+                        end
+                    end
+                end)
+            end
+            ResetState()
+        end)
+    end
+})
+
+-------------------------------------------------
+-- NHÂN VẬT
+-------------------------------------------------
+Tabs.Player:AddSlider("WalkSpeed", {
+    Title = "WalkSpeed",
+    Default = 16,
+    Min = 16,
+    Max = 300,
+    Rounding = 0,
+    Callback = function(v)
+        local char = GetCharacter()
+        if char and char.Humanoid then char.Humanoid.WalkSpeed = v end
+    end
+})
+
+-------------------------------------------------
+-- SETTINGS
+-------------------------------------------------
+SaveManager:SetLibrary(Fluent)
+InterfaceManager:SetLibrary(Fluent)
+InterfaceManager:SetFolder("DatkitsBF")
+SaveManager:SetFolder("DatkitsBF")
+InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+SaveManager:BuildConfigSection(Tabs.Settings)
 
 Window:SelectTab(1)
-Fluent:Notify({Title='Datkits BF V5', Content='Stable full Auto Farm loaded.', Duration=5})
-print('[Datkits BF V5] Loaded')
+
+Fluent:Notify({
+    Title = "Datkits Premium",
+    Content = "Auto Quest 3 Sea đã sẵn sàng • Bay đúng nhiệm vụ",
+    Duration = 6
+})
+
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(1.5)
+    ResetState()
+end)
+
+print("[Datkits] Auto Quest 3 Sea - Optimized")
