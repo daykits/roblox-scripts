@@ -1,7 +1,7 @@
 repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
 
 -- =========================================================
--- DATKITS BF V2 - AUTO FARM STABLE
+-- DATKITS BF V1 - AUTO FARM STABLE
 -- Sửa các lỗi chính:
 -- 1) Không spam StartQuest khi quest chưa kịp load.
 -- 2) Không dựa hoàn toàn vào Quest.Visible để xác định quest.
@@ -676,6 +676,169 @@ RunService.Stepped:Connect(function()
 end)
 
 -- =========================
+-- AUTO CHEST (SEA 1 + SEA 2 + SEA 3)
+-- =========================
+-- Tự quét các Chest đang tồn tại trong Workspace, không phụ thuộc
+-- danh sách tọa độ cố định. Vì vậy có thể hoạt động trên cả 3 Sea
+-- miễn game đặt tên chest theo Chest1 / Chest2 / Chest3.
+getgenv().AutoChest = false
+getgenv().ChestSpeed = 350
+
+local chestTween = nil
+local chestTarget = nil
+local chestToken = 0
+
+local function IsChest(obj)
+    if not obj or not obj:IsA("Model") then return false end
+    local n = string.lower(obj.Name)
+    return n == "chest1" or n == "chest2" or n == "chest3" or string.find(n, "chest", 1, true) ~= nil
+end
+
+local function GetChestPart(chest)
+    if not chest then return nil end
+    if chest.PrimaryPart and chest.PrimaryPart:IsA("BasePart") then
+        return chest.PrimaryPart
+    end
+    return chest:FindFirstChildWhichIsA("BasePart", true)
+end
+
+local function ChestIsAlive(chest)
+    if not chest or not chest.Parent then return false end
+    -- Chest thường có TouchInterest khi có thể tương tác.
+    -- Không bắt buộc phải có TouchInterest vì một số phiên bản map
+    -- tạo/chuyển chest hơi khác nhau.
+    return GetChestPart(chest) ~= nil
+end
+
+local function FindNearestChest()
+    local char = GetChar()
+    if not char then return nil end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil end
+
+    local best, bestDist = nil, math.huge
+    for _, obj in ipairs(workspace:GetChildren()) do
+        if IsChest(obj) and ChestIsAlive(obj) then
+            local part = GetChestPart(obj)
+            if part then
+                local d = (hrp.Position - part.Position).Magnitude
+                if d < bestDist then
+                    best = obj
+                    bestDist = d
+                end
+            end
+        end
+    end
+    return best, bestDist
+end
+
+local function StopChestTween()
+    if chestTween then
+        pcall(function() chestTween:Cancel() end)
+    end
+    chestTween = nil
+    chestTarget = nil
+end
+
+local function TweenToChest(chest)
+    local char = GetChar()
+    local part = GetChestPart(chest)
+    if not char or not part then return false end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+
+    local target = CFrame.new(part.Position + Vector3.new(0, 2.5, 0))
+    local distance = (hrp.Position - target.Position).Magnitude
+
+    if distance <= 5 then
+        StopChestTween()
+        pcall(function()
+            hrp.CFrame = target
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            hrp.AssemblyAngularVelocity = Vector3.zero
+        end)
+        return true
+    end
+
+    if chestTarget == chest and chestTween then
+        return false
+    end
+
+    StopChestTween()
+    chestTarget = chest
+
+    local speed = math.max(100, tonumber(getgenv().ChestSpeed) or 350)
+    local duration = math.clamp(distance / speed, 0.15, 8)
+    chestTween = TweenService:Create(
+        hrp,
+        TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.Out),
+        {CFrame = target}
+    )
+    chestTween:Play()
+    return false
+end
+
+-- Khi đã đến gần rương, mô phỏng chạm bằng HumanoidRootPart.
+-- Dùng GetTouchingParts trước; nếu game không expose TouchInterest,
+-- việc đứng sát rương vẫn cho phép cơ chế pickup của game xử lý.
+local function TouchChest(chest)
+    local char = GetChar()
+    local part = GetChestPart(chest)
+    if not char or not part then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    pcall(function()
+        firetouchinterest(hrp, part, 0)
+        task.wait()
+        firetouchinterest(hrp, part, 1)
+    end)
+end
+
+-- Luồng Auto Chest độc lập với Auto Farm.
+-- Khi bật Auto Chest, nó ưu tiên rương; tắt thì Auto Farm hoạt động bình thường.
+task.spawn(function()
+    while task.wait(0.12) do
+        if not getgenv().AutoChest then
+            StopChestTween()
+            continue
+        end
+
+        local ok, err = pcall(function()
+            local char = GetChar()
+            if not char then
+                StopChestTween()
+                return
+            end
+
+            SetNoclip(true)
+            local chest, distance = FindNearestChest()
+            if not chest then
+                StopChestTween()
+                return
+            end
+
+            if distance and distance <= 7 then
+                TouchChest(chest)
+                task.wait(0.25)
+                -- Nếu rương biến mất sau khi nhặt, target sẽ được tìm lại.
+                if not ChestIsAlive(chest) then
+                    StopChestTween()
+                end
+            else
+                TweenToChest(chest)
+            end
+        end)
+
+        if not ok then
+            warn("[Datkits AutoChest] Error:", err)
+            StopChestTween()
+            task.wait(0.5)
+        end
+    end
+end)
+
+-- =========================
 -- MENU
 -- =========================
 Tabs.Main:AddSection("Cài đặt")
@@ -718,6 +881,43 @@ Tabs.Main:AddToggle("AutoEquip", {
     end
 })
 
+Tabs.Main:AddSection("Auto Chest - 3 Sea")
+
+Tabs.Main:AddSlider("ChestSpeed", {
+    Title = "Tốc độ di chuyển tới rương",
+    Default = 350,
+    Min = 180,
+    Max = 500,
+    Rounding = 10,
+    Callback = function(v)
+        getgenv().ChestSpeed = v
+    end
+})
+
+Tabs.Main:AddToggle("AutoChest", {
+    Title = "Auto Chest (Sea 1 + Sea 2 + Sea 3)",
+    Default = false,
+    Callback = function(value)
+        getgenv().AutoChest = value
+        chestToken = chestToken + 1
+        if not value then
+            StopChestTween()
+            SetNoclip(false)
+            Fluent:Notify({
+                Title = "Auto Chest",
+                Content = "Đã tắt Auto Chest",
+                Duration = 3
+            })
+        else
+            Fluent:Notify({
+                Title = "Auto Chest",
+                Content = "Đang tự tìm rương gần nhất trên 3 Sea",
+                Duration = 4
+            })
+        end
+    end
+})
+
 Tabs.Main:AddSection("Auto Farm")
 
 Tabs.Main:AddToggle("AutoFarm", {
@@ -732,7 +932,9 @@ Tabs.Main:AddToggle("AutoFarm", {
 
         if not value then
             StopTween()
-            SetNoclip(false)
+            if not getgenv().AutoChest then
+                SetNoclip(false)
+            end
 
             local char = GetChar()
             if char then
@@ -768,6 +970,13 @@ Tabs.Main:AddToggle("AutoFarm", {
                     if not char then
                         StopTween()
                         task.wait(0.8)
+                        return
+                    end
+
+                    -- Auto Chest được ưu tiên để tránh hai hệ thống cùng điều khiển CFrame.
+                    if getgenv().AutoChest then
+                        StopTween()
+                        task.wait(0.2)
                         return
                     end
 
@@ -890,6 +1099,7 @@ Tabs.Main:AddToggle("AutoFarm", {
 -- =========================
 LocalPlayer.CharacterAdded:Connect(function()
     StopTween()
+    StopChestTween()
     lastTarget = nil
 
     task.wait(2)
