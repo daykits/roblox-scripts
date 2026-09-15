@@ -32,7 +32,7 @@ getgenv().AutoChest = false
 getgenv().FastAttack = true
 getgenv().FarmDistance = 6
 getgenv().TweenSpeed = 260
-getgenv().TargetPrioritize = "nearest" -- "nearest", "weakest", "highest_level"
+getgenv().TargetPrioritize = "nearest"
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -43,6 +43,7 @@ local LocalPlayer = Players.LocalPlayer
 local currentTween = nil
 local lastTargetPos = nil
 local noclipConnection = nil
+local isGoingToFarmArea = false
 
 -------------------------------------------------
 -- 1. MONSTER CLASS
@@ -71,7 +72,7 @@ function MonsterClass:IsAlive()
 end
 
 -------------------------------------------------
--- 2. QUEST CLASS
+-- 2. QUEST CLASS (ĐÃ CẢI THIỆN MATCHING)
 -------------------------------------------------
 local QuestClass = {}
 QuestClass.__index = QuestClass
@@ -88,7 +89,15 @@ end
 
 function QuestClass:Matches(monster)
     if not monster or not monster:IsAlive() then return false end
-    if self.targetName and not string.find(monster.name, self.targetName) then return false end
+
+    if self.targetName then
+        local mName = string.lower(monster.name)
+        local tName = string.lower(self.targetName)
+        if not string.find(mName, tName, 1, true) then
+            return false
+        end
+    end
+
     if self.targetType and monster.type ~= self.targetType then return false end
     if self.minLevel and monster.level < self.minLevel then return false end
     if self.maxLevel and monster.level > self.maxLevel then return false end
@@ -96,7 +105,7 @@ function QuestClass:Matches(monster)
 end
 
 -------------------------------------------------
--- 3. SPATIAL GRID (QUÉT QUÁI SIÊU NHANH)
+-- 3. SPATIAL GRID
 -------------------------------------------------
 local SpatialGridClass = {}
 SpatialGridClass.__index = SpatialGridClass
@@ -147,7 +156,7 @@ function SpatialGridClass:QueryNearby(pos, radius)
 end
 
 -------------------------------------------------
--- 4. MONSTER FINDER (BỘ LỌC ƯU TIÊN MỤC TIÊU)
+-- 4. MONSTER FINDER
 -------------------------------------------------
 local MonsterFinderClass = {}
 MonsterFinderClass.__index = MonsterFinderClass
@@ -161,15 +170,19 @@ end
 function MonsterFinderClass:FindBestTarget(charPos, quest, radius, prioritize)
     radius = radius or 5000
     prioritize = prioritize or getgenv().TargetPrioritize
-    
+
     local candidates = self.grid:QueryNearby(charPos, radius)
     local valid = {}
 
     for _, monster in ipairs(candidates) do
         if quest then
-            if quest:Matches(monster) then table.insert(valid, monster) end
+            if quest:Matches(monster) then
+                table.insert(valid, monster)
+            end
         else
-            if monster:IsAlive() then table.insert(valid, monster) end
+            if monster:IsAlive() then
+                table.insert(valid, monster)
+            end
         end
     end
 
@@ -180,7 +193,7 @@ function MonsterFinderClass:FindBestTarget(charPos, quest, radius, prioritize)
             return a.hp < b.hp
         elseif prioritize == "highest_level" then
             return a.level > b.level
-        else -- "nearest"
+        else
             return (a.hrp.Position - charPos).Magnitude < (b.hrp.Position - charPos).Magnitude
         end
     end)
@@ -189,7 +202,7 @@ function MonsterFinderClass:FindBestTarget(charPos, quest, radius, prioritize)
 end
 
 -------------------------------------------------
--- HÀM DI CHUYỂN TỐI ƯU & NỘI TẠI
+-- HÀM CƠ BẢN
 -------------------------------------------------
 local globalSpatialGrid = SpatialGridClass.new(150)
 local globalMonsterFinder = MonsterFinderClass.new(globalSpatialGrid)
@@ -221,7 +234,8 @@ local function StopTween()
         currentTween = nil
     end
     lastTargetPos = nil
-    
+    isGoingToFarmArea = false
+
     local char = GetCharacter()
     if char then
         if char:FindFirstChild("Humanoid") then
@@ -240,7 +254,6 @@ local function ResetCharacterState()
     StopTween()
     local char = GetCharacter()
     if not char then return end
-
     for _, part in ipairs(char:GetDescendants()) do
         if part:IsA("BasePart") then part.CanCollide = true end
     end
@@ -266,6 +279,7 @@ local function ToggleNoclip(enable)
     end
 end
 
+-- HÀM TWEEN ĐÃ SỬA (ổn định, không bị hủy lung tung)
 local function TweenTo(cf, speed)
     speed = speed or getgenv().TweenSpeed or 260
     local char = GetCharacter()
@@ -276,58 +290,43 @@ local function TweenTo(cf, speed)
 
     hum.PlatformStand = true
 
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = false
+        end
+    end
+
     local startPos = hrp.Position
     local targetPos = cf.Position
     local dist = (startPos - targetPos).Magnitude
 
-    if dist <= 4 then
+    if dist <= 5 then
         StopTween()
         hrp.CFrame = cf
+        isGoingToFarmArea = false
         return
     end
 
-    if currentTween and lastTargetPos and (lastTargetPos - targetPos).Magnitude <= 4 then
+    -- Chống hủy tween khi đang bay đến bãi farm
+    if isGoingToFarmArea and lastTargetPos and (lastTargetPos - targetPos).Magnitude < 15 then
         return
     end
 
     lastTargetPos = targetPos
 
-    -- TỰ ĐỘNG NÂNG ĐỘ CAO (BYPASS ĐẢO / VẬT CẢN)
-    if dist > 1000 then
-        task.spawn(function()
-            local highY = math.max(startPos.Y, targetPos.Y) + 300
-            local waypoints = {
-                CFrame.new(startPos.X, highY, startPos.Z),
-                CFrame.new(targetPos.X, highY, targetPos.Z),
-                cf
-            }
-
-            for _, wayCF in ipairs(waypoints) do
-                if not (getgenv().AutoQuest or getgenv().AutoFarm or getgenv().AutoChest) then 
-                    StopTween()
-                    break 
-                end
-
-                local legDist = (hrp.Position - wayCF.Position).Magnitude
-                local legDuration = legDist / speed
-
-                if currentTween then pcall(function() currentTween:Cancel() end) end
-                currentTween = TweenService:Create(hrp, TweenInfo.new(legDuration, Enum.EasingStyle.Linear), {CFrame = wayCF})
-                currentTween:Play()
-                task.wait(legDuration)
-            end
-        end)
-    else
-        if currentTween then pcall(function() currentTween:Cancel() end) end
-        local duration = dist / speed
-        currentTween = TweenService:Create(hrp, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = cf})
-        currentTween:Play()
+    if currentTween then
+        pcall(function() currentTween:Cancel() end)
     end
+
+    local duration = math.clamp(dist / speed, 0.1, 8)
+    currentTween = TweenService:Create(hrp, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = cf})
+    currentTween:Play()
 end
 
 local function EquipWeapon()
     local char = GetCharacter()
     if not char or char:FindFirstChildOfClass("Tool") then return end
+
     for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
         if tool:IsA("Tool") then
             local n = tool.Name:lower()
@@ -430,7 +429,6 @@ task.spawn(function()
                 if net then
                     local regAttack = net:FindFirstChild("RE/RegisterAttack")
                     local regHit = net:FindFirstChild("RE/RegisterHit")
-
                     if regAttack then regAttack:FireServer(0.1) end
 
                     local hits = GetClosestHits()
@@ -451,7 +449,7 @@ task.spawn(function()
 end)
 
 -------------------------------------------------
--- VÒNG LẶP CẬP NHẬT SPATIAL GRID
+-- CẬP NHẬT SPATIAL GRID
 -------------------------------------------------
 task.spawn(function()
     while true do
@@ -473,10 +471,9 @@ task.spawn(function()
 end)
 
 -------------------------------------------------
--- TAB AUTO FARM (FLUENT UI)
+-- TAB AUTO FARM
 -------------------------------------------------
 Tabs.Main:AddSection("Cài đặt Target Engine")
-
 Tabs.Main:AddDropdown("TargetPriority", {
     Title = "Ưu tiên chọn quái",
     Values = { "Gần nhất (Nearest)", "Yếu nhất (Weakest HP)", "Cấp cao nhất (Highest Lv)" },
@@ -502,82 +499,99 @@ Tabs.Main:AddToggle("FastAttackToggle", {
 })
 
 Tabs.Main:AddSection("Auto Quest")
-
 Tabs.Main:AddToggle("AutoQuestToggle", {
     Title = "Auto Quest (Spatial Grid + Finder Engine)",
     Default = false,
     Callback = function(Value)
         getgenv().AutoQuest = Value
         ToggleNoclip(Value)
-        
+
         if not Value then
+            isGoingToFarmArea = false
             ResetCharacterState()
             return
         end
-        
+
         getgenv().AutoFarm = false
         getgenv().AutoChest = false
 
+        -- Equip vũ khí
         task.spawn(function()
             while getgenv().AutoQuest do
                 pcall(EquipWeapon)
-                task.wait(1)
+                task.wait(0.8)
             end
         end)
 
+        -- Vòng lặp Auto Quest đã sửa
         task.spawn(function()
             while getgenv().AutoQuest do
-                task.wait(0.1)
+                task.wait(0.12)
                 pcall(function()
                     local char = GetCharacter()
                     if not char then return end
                     local hrp = char.HumanoidRootPart
+
                     local questName, questLevel, mobName, npcCFrame, mobCFrame = GetQuestData()
-                    
                     local currentQuestObj = QuestClass.new(questName, mobName)
 
                     if not HasQuest() then
+                        -- Chưa có nhiệm vụ → đi nhận
+                        isGoingToFarmArea = false
                         if npcCFrame then
                             local dist = (hrp.Position - npcCFrame.Position).Magnitude
-                            if dist > 8 then
+                            if dist > 9 then
                                 TweenTo(npcCFrame * CFrame.new(0, 0, 2.5), 260)
                             else
                                 StopTween()
-                                ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", questName, questLevel)
-                                task.wait(0.5)
+                                for i = 1, 4 do
+                                    pcall(function()
+                                        ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", questName, questLevel)
+                                    end)
+                                    task.wait(0.15)
+                                end
+                                task.wait(1.2)
                             end
                         end
                     else
-                        -- Sử dụng Spatial Grid và Monster Finder để chọn quái tốt nhất
-                        local target = globalMonsterFinder:FindBestTarget(hrp.Position, currentQuestObj, 5000, getgenv().TargetPrioritize)
+                        -- Đã có nhiệm vụ
+                        local target = globalMonsterFinder:FindBestTarget(hrp.Position, currentQuestObj, 6000, getgenv().TargetPrioritize)
 
-                        if target then
+                        if target and target:IsAlive() then
+                            -- Có quái → bay đến đầu quái
+                            isGoingToFarmArea = false
                             local pos = target.hrp.Position
-                            local cf = CFrame.new(pos + Vector3.new(0, getgenv().FarmDistance, 0), pos)
-                            TweenTo(cf, 260)
-                            
-                            target.hrp.CanCollide = false
-                            target.hrp.AssemblyLinearVelocity = Vector3.zero
-                        elseif mobCFrame then
-                            TweenTo(mobCFrame, 260)
+                            local farmCF = CFrame.new(pos + Vector3.new(0, getgenv().FarmDistance or 6, 0), pos)
+                            TweenTo(farmCF, 260)
+
+                            pcall(function()
+                                target.hrp.CanCollide = false
+                                target.hrp.AssemblyLinearVelocity = Vector3.zero
+                            end)
+                        else
+                            -- Không thấy quái → BẮT BUỘC bay đến bãi farm
+                            if mobCFrame then
+                                isGoingToFarmArea = true
+                                TweenTo(mobCFrame, 260)
+                            end
                         end
                     end
                 end)
             end
+            isGoingToFarmArea = false
             ResetCharacterState()
         end)
     end
 })
 
 Tabs.Main:AddSection("Auto Farm Gần Nhất")
-
 Tabs.Main:AddToggle("AutoFarmToggle", {
     Title = "Auto Farm Gần Nhất",
     Default = false,
     Callback = function(Value)
         getgenv().AutoFarm = Value
         ToggleNoclip(Value)
-        
+
         if not Value then
             ResetCharacterState()
             return
@@ -600,14 +614,13 @@ Tabs.Main:AddToggle("AutoFarmToggle", {
                     local char = GetCharacter()
                     if not char then return end
                     local hrp = char.HumanoidRootPart
-                    
-                    local nearest = globalMonsterFinder:FindBestTarget(hrp.Position, nil, 5000, getgenv().TargetPrioritize)
 
+                    local nearest = globalMonsterFinder:FindBestTarget(hrp.Position, nil, 5000, getgenv().TargetPrioritize)
                     if nearest then
                         local pos = nearest.hrp.Position
                         local cf = CFrame.new(pos + Vector3.new(0, getgenv().FarmDistance, 0), pos)
                         TweenTo(cf, 260)
-                        
+
                         nearest.hrp.CanCollide = false
                         nearest.hrp.AssemblyLinearVelocity = Vector3.zero
                     end
@@ -619,7 +632,7 @@ Tabs.Main:AddToggle("AutoFarmToggle", {
 })
 
 -------------------------------------------------
--- TAB NHÂN VẬT & CÀI ĐẶT HỆ THỐNG
+-- TAB NHÂN VẬT & SETTINGS
 -------------------------------------------------
 Tabs.Player:AddSlider("WalkSpeed", {
     Title = "WalkSpeed",
@@ -647,4 +660,4 @@ LocalPlayer.CharacterAdded:Connect(function()
     ResetCharacterState()
 end)
 
-print("[Datkits Premium] Tích hợp Spatial Grid & Monster Finder thành công!")
+print("[Datkits Premium] Đã sửa lỗi Auto Quest - Bay đến bãi farm ổn định!")
