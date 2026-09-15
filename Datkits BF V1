@@ -71,7 +71,6 @@ local function StopTween()
     end
     lastTargetPos = nil
     isGoingToFarmArea = false
-
     local char = GetCharacter()
     if char then
         pcall(function()
@@ -119,36 +118,28 @@ local function TweenTo(cf, speed)
     speed = speed or getgenv().TweenSpeed or 270
     local char = GetCharacter()
     if not char then return end
-
     local hrp = char.HumanoidRootPart
     local hum = char.Humanoid
     hum.PlatformStand = true
-
     for _, part in ipairs(char:GetDescendants()) do
         if part:IsA("BasePart") then
             part.CanCollide = false
         end
     end
-
     hrp.AssemblyLinearVelocity = Vector3.zero
-
     local dist = (hrp.Position - cf.Position).Magnitude
     if dist <= 5 then
         StopTween()
         hrp.CFrame = cf
         return
     end
-
     if isGoingToFarmArea and lastTargetPos and (lastTargetPos - cf.Position).Magnitude < 12 then
         return
     end
-
     lastTargetPos = cf.Position
-
     if currentTween then
         pcall(function() currentTween:Cancel() end)
     end
-
     local time = math.clamp(dist / speed, 0.08, 6.5)
     currentTween = TweenService:Create(hrp, TweenInfo.new(time, Enum.EasingStyle.Linear), {CFrame = cf})
     currentTween:Play()
@@ -157,7 +148,6 @@ end
 local function EquipWeapon()
     local char = GetCharacter()
     if not char or char:FindFirstChildOfClass("Tool") then return end
-
     for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
         if tool:IsA("Tool") then
             local n = tool.Name:lower()
@@ -169,7 +159,6 @@ local function EquipWeapon()
             end
         end
     end
-
     local any = LocalPlayer.Backpack:FindFirstChildOfClass("Tool")
     if any then
         pcall(function() char.Humanoid:EquipTool(any) end)
@@ -185,10 +174,14 @@ local function HasQuest()
 end
 
 -------------------------------------------------
--- BẢNG TỌA ĐỘ NPC & BÃI FARM (DỄ SỬA)
+-- BẢNG TỌA ĐỘ NPC & BÃI FARM (DỄ TÙY CHỈNH)
+-- Cách sửa:
+-- NPC  = tọa độ NPC nhận nhiệm vụ
+-- Area = tọa độ bãi farm (khi không thấy quái sẽ bay về đây)
+-- Lấy tọa độ bằng lệnh: print(game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame)
 -------------------------------------------------
 local QuestData = {
-    -- SEA 1
+    -- ==================== SEA 1 ====================
     {Min=0,   Max=9,   Quest="BanditQuest",    Level=1, Mob="Bandit",              NPC=CFrame.new(1059.37, 16.51, 1549.26), Area=CFrame.new(1145, 17, 1634)},
     {Min=10,  Max=14,  Quest="JungleQuest",    Level=1, Mob="Monkey",              NPC=CFrame.new(-1598.08, 36.85, 153.38), Area=CFrame.new(-1610, 37, 145)},
     {Min=15,  Max=29,  Quest="JungleQuest",    Level=2, Mob="Gorilla",             NPC=CFrame.new(-1598.08, 36.85, 153.38), Area=CFrame.new(-1235, 6, -486)},
@@ -206,7 +199,7 @@ local QuestData = {
     {Min=525, Max=624, Quest="SkyQuest2",      Level=2, Mob="Shandian",            NPC=CFrame.new(-7861.34, 5545.49, -380.29),Area=CFrame.new(-7850, 5600, -220)},
     {Min=625, Max=699, Quest="FountainQuest",  Level=1, Mob="Galley Pirate",       NPC=CFrame.new(5259.82, 38.5, 4050.03),  Area=CFrame.new(5580, 38, 3990)},
 
-    -- SEA 2
+    -- ==================== SEA 2 ====================
     {Min=700, Max=724, Quest="Area1Quest",     Level=1, Mob="Raider",              NPC=CFrame.new(-429.54, 71.77, 1836.18), Area=CFrame.new(-728, 52, 2345)},
     {Min=725, Max=774, Quest="Area1Quest",     Level=2, Mob="Mercenary",           NPC=CFrame.new(-429.54, 71.77, 1836.18), Area=CFrame.new(-1004, 80, 1424)},
     {Min=775, Max=799, Quest="Area2Quest",     Level=1, Mob="Swan Pirate",         NPC=CFrame.new(638.44, 71.77, 918.28),  Area=CFrame.new(1068, 137, 1322)},
@@ -233,12 +226,10 @@ end
 local function FindBestTarget(charPos, questMobName, prioritize, maxDist)
     prioritize = prioritize or getgenv().TargetPrioritize or "nearest"
     maxDist = maxDist or 5000
-
     local enemies = workspace:FindFirstChild("Enemies")
     if not enemies then return nil end
 
     local questList, normalList = {}, {}
-
     for _, enemy in ipairs(enemies:GetChildren()) do
         local hum = enemy:FindFirstChild("Humanoid")
         local hrp = enemy:FindFirstChild("HumanoidRootPart")
@@ -273,7 +264,6 @@ local function FindBestTarget(charPos, questMobName, prioritize, maxDist)
             return (a.hrp.Position - charPos).Magnitude < (b.hrp.Position - charPos).Magnitude
         end
     end)
-
     return list[1]
 end
 
@@ -283,10 +273,8 @@ end
 local function FindNearestFruit()
     local char = GetCharacter()
     if not char then return nil end
-
     local closest, shortest = nil, math.huge
     local myPos = char.HumanoidRootPart.Position
-
     for _, obj in ipairs(workspace:GetChildren()) do
         if obj:IsA("Model") and (obj.Name:find("Fruit") or obj:FindFirstChild("Handle")) then
             local handle = obj:FindFirstChild("Handle") or obj:FindFirstChildWhichIsA("BasePart")
@@ -309,7 +297,7 @@ local function StoreFruit()
 end
 
 -------------------------------------------------
--- FAST ATTACK
+-- FAST ATTACK + AUTO EQUIP
 -------------------------------------------------
 task.spawn(function()
     while true do
@@ -319,9 +307,7 @@ task.spawn(function()
                 local char = GetCharacter()
                 if not char then return end
                 local tool = char:FindFirstChildOfClass("Tool")
-                if tool then
-                    tool:Activate()
-                end
+                if tool then tool:Activate() end
                 VirtualUser:CaptureController()
                 VirtualUser:ClickButton1(Vector2.new())
             end)
@@ -329,7 +315,6 @@ task.spawn(function()
     end
 end)
 
--- Auto Equip
 task.spawn(function()
     while true do
         if getgenv().AutoEquip then
@@ -388,32 +373,25 @@ Tabs.Main:AddToggle("AutoQuest", {
     Callback = function(Value)
         getgenv().AutoQuest = Value
         ToggleNoclip(Value)
-
         if not Value then
             ResetCharacterState()
             return
         end
-
         getgenv().AutoFruit = false
 
         task.spawn(function()
             local noMobTime = 0
-
             while getgenv().AutoQuest do
                 task.wait(0.12)
-
-                local success, err = pcall(function()
+                pcall(function()
                     local char = GetCharacter()
                     if not char then return end
                     local hrp = char.HumanoidRootPart
-
                     local questName, questLevel, mobName, npcCF, areaCF = GetQuestData()
 
-                    -- Chưa có nhiệm vụ
                     if not HasQuest() then
                         isGoingToFarmArea = false
                         noMobTime = 0
-
                         local dist = (hrp.Position - npcCF.Position).Magnitude
                         if dist > 10 then
                             TweenTo(npcCF * CFrame.new(0, 0, 2.5))
@@ -430,17 +408,13 @@ Tabs.Main:AddToggle("AutoQuest", {
                         return
                     end
 
-                    -- Đã có nhiệm vụ → tìm mục tiêu
                     local target = FindBestTarget(hrp.Position, mobName, getgenv().TargetPrioritize, 5500)
-
                     if target then
                         isGoingToFarmArea = false
                         noMobTime = 0
-
                         local pos = target.hrp.Position
                         local height = getgenv().FarmDistance or 6
                         TweenTo(CFrame.new(pos + Vector3.new(0, height, 0), pos))
-
                         pcall(function()
                             target.hrp.CanCollide = false
                             target.hrp.AssemblyLinearVelocity = Vector3.zero
@@ -469,12 +443,10 @@ Tabs.Main:AddToggle("AutoFruit", {
     Callback = function(Value)
         getgenv().AutoFruit = Value
         ToggleNoclip(Value)
-
         if not Value then
             ResetCharacterState()
             return
         end
-
         getgenv().AutoQuest = false
 
         task.spawn(function()
@@ -484,7 +456,6 @@ Tabs.Main:AddToggle("AutoFruit", {
                     local fruit = FindNearestFruit()
                     if fruit then
                         TweenTo(CFrame.new(fruit.Position + Vector3.new(0, 3.5, 0)), getgenv().FruitTweenSpeed or 320)
-
                         local char = GetCharacter()
                         if char and (char.HumanoidRootPart.Position - fruit.Position).Magnitude < 14 then
                             char.HumanoidRootPart.CFrame = CFrame.new(fruit.Position + Vector3.new(0, 2.2, 0))
@@ -544,4 +515,4 @@ LocalPlayer.CharacterAdded:Connect(function()
     ResetCharacterState()
 end)
 
-print("[Datkits Premium] Full Fixed Version - Tất cả lỗi đã được tổng hợp!")
+print("[Datkits Premium] Đã cập nhật bảng tùy chỉnh tọa độ NPC!")
