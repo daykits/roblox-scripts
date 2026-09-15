@@ -192,42 +192,45 @@ local function HasQuest()
 end
 
 -------------------------------------------------
--- QUEST DATA
+-- BẢNG TỌA ĐỘ NPC & BÃI FARM (DỄ TÙY CHỈNH)
 -------------------------------------------------
+local QuestData = {
+    -- SEA 1
+    {MinLevel = 0,   MaxLevel = 9,   Quest = "BanditQuest",     Level = 1, Mob = "Bandit",              NPC = CFrame.new(1059.37, 16.51, 1549.26), MobArea = CFrame.new(1145, 17, 1634)},
+    {MinLevel = 10,  MaxLevel = 14,  Quest = "JungleQuest",     Level = 1, Mob = "Monkey",              NPC = CFrame.new(-1598.08, 36.85, 153.38), MobArea = CFrame.new(-1610, 37, 145)},
+    {MinLevel = 15,  MaxLevel = 29,  Quest = "JungleQuest",     Level = 2, Mob = "Gorilla",             NPC = CFrame.new(-1598.08, 36.85, 153.38), MobArea = CFrame.new(-1235, 6, -486)},
+    {MinLevel = 30,  MaxLevel = 39,  Quest = "BuggyQuest1",     Level = 1, Mob = "Pirate",              NPC = CFrame.new(-1140.17, 4.75, 3827.41), MobArea = CFrame.new(-1215, 5, 3915)},
+    {MinLevel = 40,  MaxLevel = 59,  Quest = "BuggyQuest1",     Level = 2, Mob = "Brute",               NPC = CFrame.new(-1140.17, 4.75, 3827.41), MobArea = CFrame.new(-1145, 15, 4350)},
+    {MinLevel = 60,  MaxLevel = 89,  Quest = "DesertQuest",     Level = 1, Mob = "Desert Bandit",       NPC = CFrame.new(894.49, 6.44, 4384.58),  MobArea = CFrame.new(932, 6, 4485)},
+    {MinLevel = 90,  MaxLevel = 119, Quest = "SnowQuest",       Level = 1, Mob = "Snow Bandit",         NPC = CFrame.new(1385.84, 87.27, -1298.61),MobArea = CFrame.new(1285, 105, -1342)},
+    {MinLevel = 120, MaxLevel = 149, Quest = "MarineQuest2",    Level = 1, Mob = "Chief Petty Officer", NPC = CFrame.new(-5039.59, 28.65, 4324.78),MobArea = CFrame.new(-4855, 20, 4260)},
+    {MinLevel = 150, MaxLevel = 189, Quest = "SkyQuest",        Level = 1, Mob = "Sky Bandit",          NPC = CFrame.new(-4839.53, 717.67, -2629.09),MobArea = CFrame.new(-4975, 717, -2885)},
+    {MinLevel = 190, MaxLevel = 224, Quest = "PrisonerQuest",   Level = 1, Mob = "Prisoner",            NPC = CFrame.new(530.81, 1.66, 474.98),   MobArea = CFrame.new(540, 2, 485)},
+    {MinLevel = 225, MaxLevel = 299, Quest = "ColosseumQuest",  Level = 1, Mob = "Toga Warrior",        NPC = CFrame.new(-1588.34, 7.39, -2986.48),MobArea = CFrame.new(-1800, 7, -2980)},
+    {MinLevel = 300, MaxLevel = 374, Quest = "MagmaQuest",      Level = 1, Mob = "Military Soldier",    NPC = CFrame.new(-5313.37, 8.58, 8515.29),MobArea = CFrame.new(-5400, 9, 8530)},
+    {MinLevel = 375, MaxLevel = 449, Quest = "FishmanQuest",    Level = 1, Mob = "Fishman Warrior",     NPC = CFrame.new(61163.85, 18.5, 1569.26), MobArea = CFrame.new(60800, 18, 1500)},
+    {MinLevel = 450, MaxLevel = 524, Quest = "SkyQuest2",       Level = 1, Mob = "God's Guard",         NPC = CFrame.new(-7861.34, 5545.49, -380.29),MobArea = CFrame.new(-7725, 5600, -440)},
+    {MinLevel = 525, MaxLevel = 624, Quest = "SkyQuest2",       Level = 2, Mob = "Shandian",            NPC = CFrame.new(-7861.34, 5545.49, -380.29),MobArea = CFrame.new(-7850, 5600, -220)},
+    {MinLevel = 625, MaxLevel = 699, Quest = "FountainQuest",   Level = 1, Mob = "Galley Pirate",       NPC = CFrame.new(5259.82, 38.5, 4050.03),  MobArea = CFrame.new(5580, 38, 3990)},
+
+    -- SEA 2
+    {MinLevel = 700, MaxLevel = 724, Quest = "Area1Quest",      Level = 1, Mob = "Raider",              NPC = CFrame.new(-429.54, 71.77, 1836.18), MobArea = CFrame.new(-728, 52, 2345)},
+    {MinLevel = 725, MaxLevel = 774, Quest = "Area1Quest",      Level = 2, Mob = "Mercenary",           NPC = CFrame.new(-429.54, 71.77, 1836.18), MobArea = CFrame.new(-1004, 80, 1424)},
+    {MinLevel = 775, MaxLevel = 799, Quest = "Area2Quest",      Level = 1, Mob = "Swan Pirate",         NPC = CFrame.new(638.44, 71.77, 918.28),  MobArea = CFrame.new(1068, 137, 1322)},
+    {MinLevel = 800, MaxLevel = 874, Quest = "Area2Quest",      Level = 2, Mob = "Factory Staff",       NPC = CFrame.new(638.44, 71.77, 918.28),  MobArea = CFrame.new(882, 110, -49)},
+    {MinLevel = 875, MaxLevel = 899, Quest = "MarineQuest3",    Level = 1, Mob = "Marine Lieutenant",   NPC = CFrame.new(-2440.79, 71.71, -3216.07),MobArea = CFrame.new(-2552, 110, -3050)},
+    {MinLevel = 900, MaxLevel = 949, Quest = "MarineQuest3",    Level = 2, Mob = "Marine Captain",      NPC = CFrame.new(-2440.79, 71.71, -3216.07),MobArea = CFrame.new(-2552, 110, -3050)},
+    {MinLevel = 950, MaxLevel = 974, Quest = "ZombieQuest",     Level = 1, Mob = "Zombie",              NPC = CFrame.new(-5494.34, 48.52, -795.16),MobArea = CFrame.new(-5550, 48, -800)},
+    {MinLevel = 975, MaxLevel = 1499,Quest = "ZombieQuest",     Level = 2, Mob = "Vampire",             NPC = CFrame.new(-5494.34, 48.52, -795.16),MobArea = CFrame.new(-5550, 48, -800)},
+}
+
 local function GetQuestData()
     local level = GetLevel()
-    local sea = GetCurrentSea()
-
-    if sea == 1 then
-        if level <= 9 then return "BanditQuest", 1, "Bandit", CFrame.new(1059.37, 16.51, 1549.26), CFrame.new(1145, 17, 1634)
-        elseif level <= 14 then return "JungleQuest", 1, "Monkey", CFrame.new(-1598.08, 36.85, 153.38), CFrame.new(-1610, 37, 145)
-        elseif level <= 29 then return "JungleQuest", 2, "Gorilla", CFrame.new(-1598.08, 36.85, 153.38), CFrame.new(-1235, 6, -486)
-        elseif level <= 39 then return "BuggyQuest1", 1, "Pirate", CFrame.new(-1140.17, 4.75, 3827.41), CFrame.new(-1215, 5, 3915)
-        elseif level <= 59 then return "BuggyQuest1", 2, "Brute", CFrame.new(-1140.17, 4.75, 3827.41), CFrame.new(-1145, 15, 4350)
-        elseif level <= 89 then return "DesertQuest", 1, "Desert Bandit", CFrame.new(894.49, 6.44, 4384.58), CFrame.new(932, 6, 4485)
-        elseif level <= 119 then return "SnowQuest", 1, "Snow Bandit", CFrame.new(1385.84, 87.27, -1298.61), CFrame.new(1285, 105, -1342)
-        elseif level <= 149 then return "MarineQuest2", 1, "Chief Petty Officer", CFrame.new(-5039.59, 28.65, 4324.78), CFrame.new(-4855, 20, 4260)
-        elseif level <= 189 then return "SkyQuest", 1, "Sky Bandit", CFrame.new(-4839.53, 717.67, -2629.09), CFrame.new(-4975, 717, -2885)
-        elseif level <= 224 then return "PrisonerQuest", 1, "Prisoner", CFrame.new(530.81, 1.66, 474.98), CFrame.new(540, 2, 485)
-        elseif level <= 299 then return "ColosseumQuest", 1, "Toga Warrior", CFrame.new(-1588.34, 7.39, -2986.48), CFrame.new(-1800, 7, -2980)
-        elseif level <= 374 then return "MagmaQuest", 1, "Military Soldier", CFrame.new(-5313.37, 8.58, 8515.29), CFrame.new(-5400, 9, 8530)
-        elseif level <= 449 then return "FishmanQuest", 1, "Fishman Warrior", CFrame.new(61163.85, 18.5, 1569.26), CFrame.new(60800, 18, 1500)
-        elseif level <= 524 then return "SkyQuest2", 1, "God's Guard", CFrame.new(-7861.34, 5545.49, -380.29), CFrame.new(-7725, 5600, -440)
-        elseif level <= 624 then return "SkyQuest2", 2, "Shandian", CFrame.new(-7861.34, 5545.49, -380.29), CFrame.new(-7850, 5600, -220)
-        else return "FountainQuest", 1, "Galley Pirate", CFrame.new(5259.82, 38.5, 4050.03), CFrame.new(5580, 38, 3990) end
+    for _, data in ipairs(QuestData) do
+        if level >= data.MinLevel and level <= data.MaxLevel then
+            return data.Quest, data.Level, data.Mob, data.NPC, data.MobArea
+        end
     end
-
-    if sea == 2 then
-        if level < 725 then return "Area1Quest", 1, "Raider", CFrame.new(-429.54, 71.77, 1836.18), CFrame.new(-728, 52, 2345)
-        elseif level < 775 then return "Area1Quest", 2, "Mercenary", CFrame.new(-429.54, 71.77, 1836.18), CFrame.new(-1004, 80, 1424)
-        elseif level < 800 then return "Area2Quest", 1, "Swan Pirate", CFrame.new(638.44, 71.77, 918.28), CFrame.new(1068, 137, 1322)
-        elseif level < 875 then return "Area2Quest", 2, "Factory Staff", CFrame.new(638.44, 71.77, 918.28), CFrame.new(882, 110, -49)
-        elseif level < 900 then return "MarineQuest3", 1, "Marine Lieutenant", CFrame.new(-2440.79, 71.71, -3216.07), CFrame.new(-2552, 110, -3050)
-        elseif level < 950 then return "MarineQuest3", 2, "Marine Captain", CFrame.new(-2440.79, 71.71, -3216.07), CFrame.new(-2552, 110, -3050)
-        elseif level < 975 then return "ZombieQuest", 1, "Zombie", CFrame.new(-5494.34, 48.52, -795.16), CFrame.new(-5550, 48, -800)
-        else return "ZombieQuest", 2, "Vampire", CFrame.new(-5494.34, 48.52, -795.16), CFrame.new(-5550, 48, -800) end
-    end
-
     return "Area1Quest", 1, "Raider", CFrame.new(-429.54, 71.77, 1836.18), CFrame.new(-728, 52, 2345)
 end
 
@@ -399,7 +402,7 @@ Tabs.Main:AddToggle("AutoQuestToggle", {
             return
         end
 
-        getgenv().AutoFruit = false -- tắt auto fruit khi bật farm
+        getgenv().AutoFruit = false
 
         task.spawn(function()
             while getgenv().AutoQuest do
@@ -490,7 +493,7 @@ Tabs.Main:AddToggle("AutoFruitToggle", {
             return
         end
 
-        getgenv().AutoQuest = false -- tắt farm khi đi lấy trái
+        getgenv().AutoQuest = false
 
         task.spawn(function()
             while getgenv().AutoFruit do
@@ -570,4 +573,4 @@ LocalPlayer.CharacterAdded:Connect(function()
     ResetCharacterState()
 end)
 
-print("[Datkits Premium] Đã ghép Auto Collect Trái Cây thành công!")
+print("[Datkits Premium] Full script đã ghép bảng tùy chỉnh tọa độ NPC thành công!")
