@@ -1,8 +1,17 @@
---==================================================
--- DATKITS PREMIUM | BLOX FRUITS
--- Auto Farm Level + Auto Collect Fruit (Rewritten)
---==================================================
+--[[
+    ╔══════════════════════════════════════════════════════════╗
+    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v2.0           ║
+    ║   Fluent UI • Optimized Fast Attack • Sea 1/2/3          ║
+    ║   Rewritten by Professional Dev                          ║
+    ╚══════════════════════════════════════════════════════════╝
+--]]
 
+-------------------------------------------------
+-- WAIT FOR GAME
+-------------------------------------------------
+if not game:IsLoaded() then
+    game.Loaded:Wait()
+end
 repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
 
 -------------------------------------------------
@@ -12,41 +21,68 @@ local Players           = game:GetService("Players")
 local TweenService      = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService        = game:GetService("RunService")
-local VirtualUser       = game:GetService("VirtualUser")
 local LocalPlayer       = Players.LocalPlayer
 
 -------------------------------------------------
--- LOAD THƯ VIỆN FLUENT
+-- LOAD FLUENT UI
 -------------------------------------------------
-local Fluent           = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
-local SaveManager      = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
-local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+local Fluent = loadstring(game:HttpGet(
+    "https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"
+))()
+local SaveManager = loadstring(game:HttpGet(
+    "https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"
+))()
+local InterfaceManager = loadstring(game:HttpGet(
+    "https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"
+))()
 
 -------------------------------------------------
--- CẤU HÌNH MẶC ĐỊNH
+-- CONFIG MẶC ĐỊNH
 -------------------------------------------------
 local Config = {
-    AutoQuest        = false,
-    AutoFruit        = false,
-    AutoStoreFruit   = true,
-    FastAttack       = true,
-    AutoEquip        = true,
-    FarmDistance     = 6,     -- Độ cao đứng trên đầu quái
-    TweenSpeed       = 270,   -- Tốc độ bay farm
-    FruitTweenSpeed  = 320,   -- Tốc độ bay nhặt trái
-    TargetPrioritize = "nearest", -- "nearest" | "weakest" | "highest_level"
+    AutoQuest     = false,
+    AutoFarm      = false,
+    AutoChest     = false,
+    FastAttack    = true,
+    FarmDistance  = 6,
+    TweenSpeed    = 260,
+    AttackDelay   = 0.08,
+    HitboxRange   = 55,
+    WalkSpeed     = 16,
 }
 
 -------------------------------------------------
--- BIẾN NỘI BỘ
+-- WINDOW
 -------------------------------------------------
-local currentTween      = nil
-local lastTargetPos     = nil
-local noclipConnection  = nil
-local isGoingToFarmArea = false
+local Window = Fluent:CreateWindow({
+    Title       = "Datkits Premium | Blox Fruits",
+    SubTitle    = "Fluent UI • Fast Attack Redz Style • Sea 1+2",
+    TabWidth    = 160,
+    Size        = UDim2.fromOffset(580, 460),
+    Acrylic     = true,
+    Theme       = "Dark",
+    MinimizeKey = Enum.KeyCode.LeftControl,
+})
+
+local Tabs = {
+    Main     = Window:AddTab({ Title = "Auto Farm", Icon = "sword" }),
+    Player   = Window:AddTab({ Title = "Nhân Vật",  Icon = "user" }),
+    Settings = Window:AddTab({ Title = "Settings",  Icon = "settings" }),
+}
+
+local Options = Fluent.Options
 
 -------------------------------------------------
--- HÀM HỖ TRỢ NHÂN VẬT
+-- STATE
+-------------------------------------------------
+local State = {
+    currentTween  = nil,
+    lastTargetPos = nil,
+    connections   = {},
+}
+
+-------------------------------------------------
+-- HELPER: CHARACTER
 -------------------------------------------------
 local function GetCharacter()
     local char = LocalPlayer.Character
@@ -60,534 +96,498 @@ local function GetCharacter()
     return nil
 end
 
-local function GetLevel()
-    local level = 1
-    pcall(function()
-        level = LocalPlayer.Data.Level.Value
-    end)
-    return level
+local function GetHRP()
+    local char = GetCharacter()
+    return char and char:FindFirstChild("HumanoidRootPart") or nil
 end
 
-local function SetCollide(char, state)
-    for _, part in ipairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.CanCollide = state
-        end
-    end
+local function GetHumanoid()
+    local char = GetCharacter()
+    return char and char:FindFirstChildOfClass("Humanoid") or nil
 end
 
 -------------------------------------------------
--- TWEEN & NOCLIP
+-- HELPER: LEVEL / SEA
+-------------------------------------------------
+local function GetLevel()
+    local lv = 1
+    pcall(function()
+        lv = LocalPlayer.Data.Level.Value
+    end)
+    return lv
+end
+
+local function GetCurrentSea()
+    local lv = GetLevel()
+    if lv >= 1500 then return 3
+    elseif lv >= 700 then return 2
+    else return 1 end
+end
+
+-------------------------------------------------
+-- HELPER: TWEEN / MOVEMENT
 -------------------------------------------------
 local function StopTween()
-    if currentTween then
-        pcall(function() currentTween:Cancel() end)
-        currentTween = nil
+    if State.currentTween then
+        pcall(function() State.currentTween:Cancel() end)
+        State.currentTween = nil
     end
-    lastTargetPos = nil
-    isGoingToFarmArea = false
-
-    local char = GetCharacter()
-    if char then
-        pcall(function()
-            char.Humanoid.PlatformStand = false
-            char.HumanoidRootPart.AssemblyLinearVelocity  = Vector3.zero
-            char.HumanoidRootPart.AssemblyAngularVelocity = Vector3.zero
-        end)
-    end
+    State.lastTargetPos = nil
 end
 
 local function ResetCharacterState()
     StopTween()
     local char = GetCharacter()
-    if char then
-        SetCollide(char, true)
-    end
-end
+    if not char then return end
 
-local function ToggleNoclip(state)
-    if state then
-        if noclipConnection then return end
-        noclipConnection = RunService.Stepped:Connect(function()
-            local char = GetCharacter()
-            if char then
-                SetCollide(char, false)
+    for _, part in ipairs(char:GetChildren()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = true
+        end
+    end
+
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        for _, v in ipairs(hrp:GetChildren()) do
+            if v:IsA("BodyVelocity") or v.Name == "FarmFlyBV" then
+                v:Destroy()
             end
-        end)
-    else
-        if noclipConnection then
-            noclipConnection:Disconnect()
-            noclipConnection = nil
         end
     end
 end
 
-local function TweenTo(cf, speed)
+local function TweenTo(targetCFrame, speed)
     speed = speed or Config.TweenSpeed
     local char = GetCharacter()
     if not char then return end
 
     local hrp = char.HumanoidRootPart
-    char.Humanoid.PlatformStand = true
-    SetCollide(char, false)
-    hrp.AssemblyLinearVelocity = Vector3.zero
 
-    local dist = (hrp.Position - cf.Position).Magnitude
+    for _, part in ipairs(char:GetChildren()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = false
+        end
+    end
 
-    -- Đã tới nơi -> dừng hẳn
-    if dist <= 5 then
+    local bv = hrp:FindFirstChild("FarmFlyBV")
+    if not bv then
+        bv = Instance.new("BodyVelocity")
+        bv.Name      = "FarmFlyBV"
+        bv.MaxForce  = Vector3.new(4e5, 4e5, 4e5)
+        bv.Velocity  = Vector3.zero
+        bv.Parent    = hrp
+    end
+
+    local dist = (hrp.Position - targetCFrame.Position).Magnitude
+    if dist <= 3.5 then
         StopTween()
-        hrp.CFrame = cf
+        hrp.CFrame = targetCFrame
         return
     end
 
-    -- Tránh tạo tween trùng lặp khi đang bay về bãi farm
-    if isGoingToFarmArea and lastTargetPos
-        and (lastTargetPos - cf.Position).Magnitude < 12 then
-        return
-    end
-    lastTargetPos = cf.Position
+    local needNewTween = not State.currentTween
+        or not State.lastTargetPos
+        or (State.lastTargetPos - targetCFrame.Position).Magnitude > 4
 
-    if currentTween then
-        pcall(function() currentTween:Cancel() end)
-    end
+    if needNewTween then
+        State.lastTargetPos = targetCFrame.Position
+        if State.currentTween then
+            pcall(function() State.currentTween:Cancel() end)
+        end
 
-    local duration = math.clamp(dist / speed, 0.08, 6.5)
-    currentTween = TweenService:Create(
-        hrp,
-        TweenInfo.new(duration, Enum.EasingStyle.Linear),
-        { CFrame = cf }
-    )
-    currentTween:Play()
+        local duration = math.clamp(dist / speed, 0.12, 7)
+        State.currentTween = TweenService:Create(
+            hrp,
+            TweenInfo.new(duration, Enum.EasingStyle.Linear),
+            { CFrame = targetCFrame }
+        )
+        State.currentTween:Play()
+    end
 end
 
 -------------------------------------------------
--- VŨ KHÍ & NHIỆM VỤ
+-- HELPER: WEAPON
 -------------------------------------------------
 local MELEE_KEYWORDS = {
-    "combat", "step", "karate", "dragon", "god",
-    "superhuman", "death", "shark", "electric",
+    "combat", "step", "karate", "dragon", "electric",
+    "god", "claw", "superhuman", "death", "shark", "saber", "sword",
 }
 
 local function EquipWeapon()
     local char = GetCharacter()
     if not char or char:FindFirstChildOfClass("Tool") then return end
 
-    -- Ưu tiên vũ khí Melee
-    for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    if not backpack then return end
+
+    -- Ưu tiên melee
+    for _, tool in ipairs(backpack:GetChildren()) do
         if tool:IsA("Tool") then
-            local name = tool.Name:lower()
-            local isMelee = (tool.ToolTip == "Melee")
-
-            if not isMelee then
-                for _, keyword in ipairs(MELEE_KEYWORDS) do
-                    if name:find(keyword) then
-                        isMelee = true
-                        break
-                    end
-                end
-            end
-
-            if isMelee then
-                pcall(function() char.Humanoid:EquipTool(tool) end)
+            if tool.ToolTip == "Melee" then
+                GetHumanoid():EquipTool(tool)
                 return
+            end
+            local n = tool.Name:lower()
+            for _, kw in ipairs(MELEE_KEYWORDS) do
+                if n:find(kw, 1, true) then
+                    GetHumanoid():EquipTool(tool)
+                    return
+                end
             end
         end
     end
 
-    -- Không có Melee -> equip tool bất kỳ
-    local anyTool = LocalPlayer.Backpack:FindFirstChildOfClass("Tool")
-    if anyTool then
-        pcall(function() char.Humanoid:EquipTool(anyTool) end)
+    -- Fallback: bất kỳ tool nào
+    local any = backpack:FindFirstChildOfClass("Tool")
+    if any and GetHumanoid() then
+        GetHumanoid():EquipTool(any)
     end
 end
 
+-------------------------------------------------
+-- HELPER: QUEST
+-------------------------------------------------
 local function HasQuest()
-    local ok, result = pcall(function()
-        local main = LocalPlayer.PlayerGui:FindFirstChild("Main")
-        return main and main:FindFirstChild("Quest") and main.Quest.Visible
+    local ok, res = pcall(function()
+        local gui = LocalPlayer.PlayerGui:FindFirstChild("Main")
+        return gui and gui:FindFirstChild("Quest") and gui.Quest.Visible
     end)
-    return ok and result or false
+    return ok and res
 end
 
 -------------------------------------------------
--- BẢNG TỌA ĐỘ NPC & BÃI FARM (DỄ TÙY CHỈNH)
--- NPC  = tọa độ NPC nhận nhiệm vụ
--- Area = tọa độ bãi farm (không thấy quái sẽ bay về đây)
--- Lấy tọa độ: print(game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame)
+-- QUEST DATABASE
 -------------------------------------------------
 local QuestData = {
-    -- ==================== SEA 1 ====================
-    {Min=0,   Max=9,    Quest="BanditQuest",    Level=1, Mob="Bandit",              NPC=CFrame.new(1059.37, 16.51, 1549.26),   Area=CFrame.new(1145, 17, 1634)},
-    {Min=10,  Max=14,   Quest="JungleQuest",    Level=1, Mob="Monkey",              NPC=CFrame.new(-1598.08, 36.85, 153.38),   Area=CFrame.new(-1610, 37, 145)},
-    {Min=15,  Max=29,   Quest="JungleQuest",    Level=2, Mob="Gorilla",             NPC=CFrame.new(-1598.08, 36.85, 153.38),   Area=CFrame.new(-1235, 6, -486)},
-    {Min=30,  Max=39,   Quest="BuggyQuest1",    Level=1, Mob="Pirate",              NPC=CFrame.new(-1140.17, 4.75, 3827.41),   Area=CFrame.new(-1215, 5, 3915)},
-    {Min=40,  Max=59,   Quest="BuggyQuest1",    Level=2, Mob="Brute",               NPC=CFrame.new(-1140.17, 4.75, 3827.41),   Area=CFrame.new(-1145, 15, 4350)},
-    {Min=60,  Max=89,   Quest="DesertQuest",    Level=1, Mob="Desert Bandit",       NPC=CFrame.new(894.49, 6.44, 4384.58),     Area=CFrame.new(932, 6, 4485)},
-    {Min=90,  Max=119,  Quest="SnowQuest",      Level=1, Mob="Snow Bandit",         NPC=CFrame.new(1385.84, 87.27, -1298.61),  Area=CFrame.new(1285, 105, -1342)},
-    {Min=120, Max=149,  Quest="MarineQuest2",   Level=1, Mob="Chief Petty Officer", NPC=CFrame.new(-5039.59, 28.65, 4324.78),  Area=CFrame.new(-4855, 20, 4260)},
-    {Min=150, Max=189,  Quest="SkyQuest",       Level=1, Mob="Sky Bandit",          NPC=CFrame.new(-4839.53, 717.67, -2629.09),Area=CFrame.new(-4975, 717, -2885)},
-    {Min=190, Max=224,  Quest="PrisonerQuest",  Level=1, Mob="Prisoner",            NPC=CFrame.new(530.81, 1.66, 474.98),      Area=CFrame.new(540, 2, 485)},
-    {Min=225, Max=299,  Quest="ColosseumQuest", Level=1, Mob="Toga Warrior",        NPC=CFrame.new(-1588.34, 7.39, -2986.48),  Area=CFrame.new(-1800, 7, -2980)},
-    {Min=300, Max=374,  Quest="MagmaQuest",     Level=1, Mob="Military Soldier",    NPC=CFrame.new(-5313.37, 8.58, 8515.29),   Area=CFrame.new(-5400, 9, 8530)},
-    {Min=375, Max=449,  Quest="FishmanQuest",   Level=1, Mob="Fishman Warrior",     NPC=CFrame.new(61163.85, 18.5, 1569.26),   Area=CFrame.new(60800, 18, 1500)},
-    {Min=450, Max=524,  Quest="SkyQuest2",      Level=1, Mob="God's Guard",         NPC=CFrame.new(-7861.34, 5545.49, -380.29),Area=CFrame.new(-7725, 5600, -440)},
-    {Min=525, Max=624,  Quest="SkyQuest2",      Level=2, Mob="Shandian",            NPC=CFrame.new(-7861.34, 5545.49, -380.29),Area=CFrame.new(-7850, 5600, -220)},
-    {Min=625, Max=699,  Quest="FountainQuest",  Level=1, Mob="Galley Pirate",       NPC=CFrame.new(5259.82, 38.5, 4050.03),    Area=CFrame.new(5580, 38, 3990)},
-
-    -- ==================== SEA 2 ====================
-    {Min=700, Max=724,  Quest="Area1Quest",     Level=1, Mob="Raider",              NPC=CFrame.new(-429.54, 71.77, 1836.18),   Area=CFrame.new(-728, 52, 2345)},
-    {Min=725, Max=774,  Quest="Area1Quest",     Level=2, Mob="Mercenary",           NPC=CFrame.new(-429.54, 71.77, 1836.18),   Area=CFrame.new(-1004, 80, 1424)},
-    {Min=775, Max=799,  Quest="Area2Quest",     Level=1, Mob="Swan Pirate",         NPC=CFrame.new(638.44, 71.77, 918.28),     Area=CFrame.new(1068, 137, 1322)},
-    {Min=800, Max=874,  Quest="Area2Quest",     Level=2, Mob="Factory Staff",       NPC=CFrame.new(638.44, 71.77, 918.28),     Area=CFrame.new(882, 110, -49)},
-    {Min=875, Max=899,  Quest="MarineQuest3",   Level=1, Mob="Marine Lieutenant",   NPC=CFrame.new(-2440.79, 71.71, -3216.07), Area=CFrame.new(-2552, 110, -3050)},
-    {Min=900, Max=949,  Quest="MarineQuest3",   Level=2, Mob="Marine Captain",      NPC=CFrame.new(-2440.79, 71.71, -3216.07), Area=CFrame.new(-2552, 110, -3050)},
-    {Min=950, Max=974,  Quest="ZombieQuest",    Level=1, Mob="Zombie",              NPC=CFrame.new(-5494.34, 48.52, -795.16),  Area=CFrame.new(-5550, 48, -800)},
-    {Min=975, Max=1499, Quest="ZombieQuest",    Level=2, Mob="Vampire",             NPC=CFrame.new(-5494.34, 48.52, -795.16),  Area=CFrame.new(-5550, 48, -800)},
+    [1] = { -- SEA 1
+        { maxLv = 9,   quest = "BanditQuest",   lv = 1, mob = "Bandit",            npc = CFrame.new(1059.37, 16.51, 1549.26), spawn = CFrame.new(1145, 17, 1634) },
+        { maxLv = 14,  quest = "JungleQuest",   lv = 1, mob = "Monkey",            npc = CFrame.new(-1598.08, 36.85, 153.38), spawn = CFrame.new(-1610, 37, 145) },
+        { maxLv = 29,  quest = "JungleQuest",   lv = 2, mob = "Gorilla",           npc = CFrame.new(-1598.08, 36.85, 153.38), spawn = CFrame.new(-1235, 6, -486) },
+        { maxLv = 39,  quest = "BuggyQuest1",   lv = 1, mob = "Pirate",            npc = CFrame.new(-1140.17, 4.75, 3827.41), spawn = CFrame.new(-1215, 5, 3915) },
+        { maxLv = 59,  quest = "BuggyQuest1",   lv = 2, mob = "Brute",             npc = CFrame.new(-1140.17, 4.75, 3827.41), spawn = CFrame.new(-1145, 15, 4350) },
+        { maxLv = 89,  quest = "DesertQuest",   lv = 1, mob = "Desert Bandit",     npc = CFrame.new(894.49, 6.44, 4384.58),   spawn = CFrame.new(932, 6, 4485) },
+        { maxLv = 119, quest = "SnowQuest",     lv = 1, mob = "Snow Bandit",       npc = CFrame.new(1385.84, 87.27, -1298.61),spawn = CFrame.new(1285, 105, -1342) },
+        { maxLv = 149, quest = "MarineQuest2",  lv = 1, mob = "Chief Petty Officer",npc = CFrame.new(-5039.59, 28.65, 4324.78),spawn = CFrame.new(-4855, 20, 4260) },
+        { maxLv = 189, quest = "SkyQuest",      lv = 1, mob = "Sky Bandit",        npc = CFrame.new(-4839.53, 717.67, -2629.09),spawn= CFrame.new(-4975, 717, -2885) },
+        { maxLv = 224, quest = "PrisonerQuest", lv = 1, mob = "Prisoner",          npc = CFrame.new(530.81, 1.66, 474.98),    spawn = CFrame.new(540, 2, 485) },
+        { maxLv = 299, quest = "ColosseumQuest",lv = 1, mob = "Toga Warrior",      npc = CFrame.new(-1588.34, 7.39, -2986.48),spawn = CFrame.new(-1800, 7, -2980) },
+        { maxLv = 374, quest = "MagmaQuest",    lv = 1, mob = "Military Soldier",  npc = CFrame.new(-5313.37, 8.58, 8515.29), spawn = CFrame.new(-5400, 9, 8530) },
+        { maxLv = 449, quest = "FishmanQuest",  lv = 1, mob = "Fishman Warrior",   npc = CFrame.new(61163.85, 18.5, 1569.26), spawn = CFrame.new(60800, 18, 1500) },
+        { maxLv = 524, quest = "SkyQuest2",     lv = 1, mob = "God's Guard",       npc = CFrame.new(-7861.34, 5545.49, -380.29),spawn= CFrame.new(-7725, 5600, -440) },
+        { maxLv = 624, quest = "SkyQuest2",     lv = 2, mob = "Shandian",          npc = CFrame.new(-7861.34, 5545.49, -380.29),spawn= CFrame.new(-7850, 5600, -220) },
+        { maxLv = 9999,quest = "FountainQuest", lv = 1, mob = "Galley Pirate",     npc = CFrame.new(5259.82, 38.5, 4050.03),  spawn = CFrame.new(5580, 38, 3990) },
+    },
+    [2] = { -- SEA 2
+        { maxLv = 725, quest = "Area1Quest",    lv = 1, mob = "Raider",            npc = CFrame.new(-429.54, 71.77, 1836.18), spawn = CFrame.new(-728, 52, 2345) },
+        { maxLv = 775, quest = "Area1Quest",    lv = 2, mob = "Mercenary",         npc = CFrame.new(-429.54, 71.77, 1836.18), spawn = CFrame.new(-1004, 80, 1424) },
+        { maxLv = 800, quest = "Area2Quest",    lv = 1, mob = "Swan Pirate",       npc = CFrame.new(638.44, 71.77, 918.28),   spawn = CFrame.new(1068, 137, 1322) },
+        { maxLv = 875, quest = "Area2Quest",    lv = 2, mob = "Factory Staff",     npc = CFrame.new(638.44, 71.77, 918.28),   spawn = CFrame.new(882, 110, -49) },
+        { maxLv = 900, quest = "MarineQuest3",  lv = 1, mob = "Marine Lieutenant", npc = CFrame.new(-2440.79, 71.71, -3216.07),spawn = CFrame.new(-2552, 110, -3050) },
+        { maxLv = 950, quest = "MarineQuest3",  lv = 2, mob = "Marine Captain",    npc = CFrame.new(-2440.79, 71.71, -3216.07),spawn = CFrame.new(-2552, 110, -3050) },
+        { maxLv = 975, quest = "ZombieQuest",   lv = 1, mob = "Zombie",            npc = CFrame.new(-5494.34, 48.52, -795.16),spawn = CFrame.new(-5550, 48, -800) },
+        { maxLv = 9999,quest = "ZombieQuest",   lv = 2, mob = "Vampire",           npc = CFrame.new(-5494.34, 48.52, -795.16),spawn = CFrame.new(-5550, 48, -800) },
+    },
 }
-
--- Dữ liệu dự phòng nếu level nằm ngoài bảng
-local FALLBACK_QUEST = {Quest="Area1Quest", Level=1, Mob="Raider",
-    NPC=CFrame.new(-429.54, 71.77, 1836.18), Area=CFrame.new(-728, 52, 2345)}
 
 local function GetQuestData()
     local level = GetLevel()
-    for _, data in ipairs(QuestData) do
-        if level >= data.Min and level <= data.Max then
-            return data.Quest, data.Level, data.Mob, data.NPC, data.Area
+    local sea   = GetCurrentSea()
+    local list  = QuestData[sea] or QuestData[1]
+
+    for _, entry in ipairs(list) do
+        if level <= entry.maxLv then
+            return entry.quest, entry.lv, entry.mob, entry.npc, entry.spawn
         end
     end
-    return FALLBACK_QUEST.Quest, FALLBACK_QUEST.Level, FALLBACK_QUEST.Mob,
-           FALLBACK_QUEST.NPC, FALLBACK_QUEST.Area
+    return nil
 end
 
 -------------------------------------------------
--- NHẬN DIỆN MỤC TIÊU
+-- ENEMY HELPERS
 -------------------------------------------------
-local function FindBestTarget(charPos, questMobName, prioritize, maxDist)
-    prioritize = prioritize or Config.TargetPrioritize
-    maxDist    = maxDist or 5000
+local function GetClosestEnemies(maxRange, nameFilter)
+    local result = {}
+    local hrp = GetHRP()
+    if not hrp then return result end
 
-    local enemies = workspace:FindFirstChild("Enemies")
-    if not enemies then return nil end
+    local enemiesFolder = workspace:FindFirstChild("Enemies")
+    if not enemiesFolder then return result end
 
-    local questList, normalList = {}, {}
-
-    for _, enemy in ipairs(enemies:GetChildren()) do
-        local hum = enemy:FindFirstChild("Humanoid")
-        local hrp = enemy:FindFirstChild("HumanoidRootPart")
-
-        if hum and hrp and hum.Health > 0 then
-            local dist = (hrp.Position - charPos).Magnitude
-            if dist <= maxDist then
-                local data = {
-                    model = enemy,
-                    hrp   = hrp,
-                    hp    = hum.Health,
-                    level = enemy:GetAttribute("Level") or 1,
-                    name  = enemy.Name,
-                }
-                if questMobName
-                    and enemy.Name:lower():find(questMobName:lower(), 1, true) then
-                    table.insert(questList, data)
-                else
-                    table.insert(normalList, data)
+    for _, enemy in ipairs(enemiesFolder:GetChildren()) do
+        local eHum = enemy:FindFirstChildOfClass("Humanoid")
+        local eHrp = enemy:FindFirstChild("HumanoidRootPart")
+        if eHum and eHrp and eHum.Health > 0 then
+            if not nameFilter or enemy.Name:find(nameFilter, 1, true) then
+                local dist = (hrp.Position - eHrp.Position).Magnitude
+                if dist <= maxRange then
+                    table.insert(result, { enemy = enemy, hrp = eHrp, dist = dist })
                 end
             end
         end
     end
 
-    local list = (#questList > 0) and questList or normalList
-    if #list == 0 then return nil end
+    table.sort(result, function(a, b) return a.dist < b.dist end)
+    return result
+end
 
-    table.sort(list, function(a, b)
-        if prioritize == "weakest" then
-            return a.hp < b.hp
-        elseif prioritize == "highest_level" then
-            return a.level > b.level
-        end
-        return (a.hrp.Position - charPos).Magnitude < (b.hrp.Position - charPos).Magnitude
-    end)
-
-    return list[1]
+local function FreezeEnemy(enemy)
+    local hrp = enemy:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        pcall(function()
+            hrp.CanCollide = false
+            hrp.Velocity   = Vector3.zero
+        end)
+    end
 end
 
 -------------------------------------------------
--- AUTO FRUIT
+-- FAST ATTACK (REDZ STYLE) - OPTIMIZED
 -------------------------------------------------
-local function FindNearestFruit()
+local function GetNet()
+    local modules = ReplicatedStorage:FindFirstChild("Modules")
+    if not modules then return nil end
+    local net = modules:FindFirstChild("Net")
+    if not net then return nil end
+    return net:FindFirstChild("RE/RegisterAttack"), net:FindFirstChild("RE/RegisterHit")
+end
+
+local function DoFastAttack()
     local char = GetCharacter()
-    if not char then return nil end
+    if not char then return end
 
-    local closest, shortest = nil, math.huge
-    local myPos = char.HumanoidRootPart.Position
+    local tool = char:FindFirstChildOfClass("Tool")
+    if not tool then return end
 
-    for _, obj in ipairs(workspace:GetChildren()) do
-        if obj:IsA("Model") and (obj.Name:find("Fruit") or obj:FindFirstChild("Handle")) then
-            local handle = obj:FindFirstChild("Handle") or obj:FindFirstChildWhichIsA("BasePart")
-            if handle then
-                local dist = (handle.Position - myPos).Magnitude
-                if dist < shortest then
-                    shortest = dist
-                    closest  = handle
-                end
-            end
-        end
+    pcall(function() tool:Activate() end)
+
+    local regAttack, regHit = GetNet()
+    if not regAttack then return end
+
+    pcall(function() regAttack:FireServer(0.1) end)
+
+    -- LeftClickRemote (Redz style)
+    local lcRemote = tool:FindFirstChild("LeftClickRemote")
+    local hits = GetClosestEnemies(Config.HitboxRange)
+    local hrp = char.HumanoidRootPart
+
+    if lcRemote then
+        local dir = #hits > 0
+            and (hits[1].hrp.Position - hrp.Position).Unit
+            or Vector3.new(0, -1, 0)
+        pcall(function() lcRemote:FireServer(dir, 1) end)
     end
-    return closest
-end
 
-local function StoreFruit()
-    pcall(function()
-        ReplicatedStorage.Remotes.CommF_:InvokeServer("StoreFruit")
-    end)
-end
-
--------------------------------------------------
--- VÒNG LẶP NỀN: FAST ATTACK + AUTO EQUIP
--------------------------------------------------
-task.spawn(function()
-    while true do
-        task.wait(Config.FastAttack and 0.04 or 0.2)
-        if (Config.AutoQuest or Config.AutoFruit) and Config.FastAttack then
+    -- RegisterHit
+    if regHit and #hits > 0 then
+        for _, data in ipairs(hits) do
             pcall(function()
-                local char = GetCharacter()
-                if not char then return end
-                local tool = char:FindFirstChildOfClass("Tool")
-                if tool then tool:Activate() end
-                VirtualUser:CaptureController()
-                VirtualUser:ClickButton1(Vector2.new())
+                regHit:FireServer(data.hrp, { data.enemy })
             end)
         end
     end
-end)
+end
 
-task.spawn(function()
-    while true do
-        if Config.AutoEquip then
+-------------------------------------------------
+-- MAIN LOOPS (SINGLE THREAD - CLEANER)
+-------------------------------------------------
+local function FastAttackLoop()
+    while task.wait(Config.AttackDelay) do
+        if Config.FastAttack and (Config.AutoQuest or Config.AutoFarm) then
+            pcall(DoFastAttack)
+        end
+    end
+end
+
+local function EquipLoop()
+    while task.wait(0.5) do
+        if Config.AutoQuest or Config.AutoFarm then
             pcall(EquipWeapon)
         end
-        task.wait(0.55)
     end
-end)
+end
+
+local function AutoQuestLoop()
+    while task.wait(0.08) do
+        if not Config.AutoQuest then continue end
+        pcall(function()
+            local char = GetCharacter()
+            if not char then return end
+
+            local hrp = char.HumanoidRootPart
+            local quest, qlv, mob, npcCF, spawnCF = GetQuestData()
+            if not quest then return end
+
+            if not HasQuest() then
+                if npcCF then
+                    local dist = (hrp.Position - npcCF.Position).Magnitude
+                    if dist > 8 then
+                        TweenTo(npcCF * CFrame.new(0, 0, 2.5), 230)
+                    else
+                        StopTween()
+                        for _ = 1, 5 do
+                            pcall(function()
+                                ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", quest, qlv)
+                            end)
+                            task.wait(0.12)
+                        end
+                        task.wait(0.6)
+                    end
+                end
+            else
+                local hits = GetClosestEnemies(math.huge, mob)
+                if #hits > 0 then
+                    local target = hits[1]
+                    local pos = target.hrp.Position
+                    local cf = CFrame.new(pos + Vector3.new(0, Config.FarmDistance, 0), pos)
+                    TweenTo(cf, 240)
+                    FreezeEnemy(target.enemy)
+                elseif spawnCF then
+                    TweenTo(spawnCF, 240)
+                end
+            end
+        end)
+    end
+end
+
+local function AutoFarmLoop()
+    while task.wait(0.08) do
+        if not Config.AutoFarm then continue end
+        pcall(function()
+            local char = GetCharacter()
+            if not char then return end
+            local hrp = char.HumanoidRootPart
+
+            local hits = GetClosestEnemies(math.huge)
+            if #hits > 0 then
+                local target = hits[1]
+                local pos = target.hrp.Position
+                local cf = CFrame.new(pos + Vector3.new(0, Config.FarmDistance, 0), pos)
+                TweenTo(cf, 240)
+                FreezeEnemy(target.enemy)
+            end
+        end)
+    end
+end
+
+local function AutoChestLoop()
+    while task.wait(0.12) do
+        if not Config.AutoChest then continue end
+        pcall(function()
+            local char = GetCharacter()
+            if not char then return end
+            local hrp = char.HumanoidRootPart
+
+            local chests = {}
+            for _, v in ipairs(workspace:GetDescendants()) do
+                if v:IsA("Part")
+                    and v.Name:find("Chest")
+                    and v:FindFirstChild("TouchInterest")
+                then
+                    table.insert(chests, v)
+                end
+            end
+
+            if #chests == 0 then
+                task.wait(1.2)
+                return
+            end
+
+            table.sort(chests, function(a, b)
+                return (hrp.Position - a.Position).Magnitude
+                     < (hrp.Position - b.Position).Magnitude
+            end)
+
+            local target = chests[1]
+            TweenTo(target.CFrame, 290)
+
+            if (hrp.Position - target.Position).Magnitude <= 7 and firetouchinterest then
+                firetouchinterest(hrp, target, 0)
+                task.wait(0.03)
+                firetouchinterest(hrp, target, 1)
+            end
+        end)
+    end
+end
+
+-- Khởi động các vòng lặp 1 lần duy nhất
+task.spawn(FastAttackLoop)
+task.spawn(EquipLoop)
+task.spawn(AutoQuestLoop)
+task.spawn(AutoFarmLoop)
+task.spawn(AutoChestLoop)
 
 -------------------------------------------------
--- GIAO DIỆN FLUENT
+-- UI - TAB AUTO FARM
 -------------------------------------------------
-local Window = Fluent:CreateWindow({
-    Title       = "Datkits Premium | Blox Fruits",
-    SubTitle    = "Full Fixed - Stable Farm + Fruit",
-    TabWidth    = 160,
-    Size        = UDim2.fromOffset(580, 500),
-    Acrylic     = false,
-    Theme       = "Dark",
-    MinimizeKey = Enum.KeyCode.LeftControl,
-})
-
-local Tabs = {
-    Main     = Window:AddTab({ Title = "Auto Farm", Icon = "sword" }),
-    Player   = Window:AddTab({ Title = "Nhân Vật",  Icon = "user" }),
-    Settings = Window:AddTab({ Title = "Settings",  Icon = "settings" }),
-}
-
--------------------------------------------------
--- TAB AUTO FARM - CÀI ĐẶT CHUNG
--------------------------------------------------
-Tabs.Main:AddSection("Cài đặt chung")
-
-Tabs.Main:AddDropdown("TargetPriority", {
-    Title   = "Ưu tiên chọn quái",
-    Values  = {"Gần nhất (Nearest)", "Yếu nhất (Weakest)", "Cấp cao nhất (Highest Lv)"},
-    Default = "Gần nhất (Nearest)",
-    Callback = function(v)
-        if v:find("Nearest") then
-            Config.TargetPrioritize = "nearest"
-        elseif v:find("Weakest") then
-            Config.TargetPrioritize = "weakest"
-        else
-            Config.TargetPrioritize = "highest_level"
-        end
-    end,
-})
+local MainSection = Tabs.Main:AddSection("Cài đặt chung")
 
 Tabs.Main:AddSlider("FarmDistance", {
-    Title = "Độ cao trên đầu quái",
-    Default = 6, Min = 4, Max = 14, Rounding = 1,
-    Callback = function(v) Config.FarmDistance = v end,
+    Title       = "Độ cao lơ lửng",
+    Description = "Studs trên đầu quái",
+    Default     = 6,
+    Min         = 4,
+    Max         = 15,
+    Rounding    = 1,
+    Callback    = function(v) Config.FarmDistance = v end,
 })
 
-Tabs.Main:AddSlider("TweenSpeed", {
-    Title = "Tốc độ bay Farm",
-    Default = 270, Min = 180, Max = 420, Rounding = 10,
-    Callback = function(v) Config.TweenSpeed = v end,
-})
-
-Tabs.Main:AddToggle("FastAttack", {
-    Title = "Fast Attack",
-    Default = true,
+Tabs.Main:AddToggle("FastAttackToggle", {
+    Title    = "Fast Attack (Redz Style)",
+    Default  = true,
     Callback = function(v) Config.FastAttack = v end,
 })
 
-Tabs.Main:AddToggle("AutoEquip", {
-    Title = "Tự động Equip vũ khí",
-    Default = true,
-    Callback = function(v) Config.AutoEquip = v end,
+Tabs.Main:AddSection("Auto Quest")
+
+Tabs.Main:AddToggle("AutoQuestToggle", {
+    Title    = "Auto Quest (Sea 1 + Sea 2)",
+    Default  = false,
+    Callback = function(v)
+        Config.AutoQuest = v
+        if not v then ResetCharacterState() end
+    end,
 })
 
--------------------------------------------------
--- AUTO FARM LEVEL
--------------------------------------------------
-Tabs.Main:AddSection("Auto Farm Level")
+Tabs.Main:AddSection("Auto Farm Gần Nhất")
 
-Tabs.Main:AddToggle("AutoQuest", {
-    Title = "Auto Farm Level (Quest + Nearest)",
-    Default = false,
-    Callback = function(value)
-        Config.AutoQuest = value
-        ToggleNoclip(value)
+Tabs.Main:AddToggle("AutoFarmToggle", {
+    Title    = "Auto Farm Gần Nhất",
+    Default  = false,
+    Callback = function(v)
+        Config.AutoFarm = v
+        if not v then ResetCharacterState() end
+    end,
+})
 
-        if not value then
-            ResetCharacterState()
-            return
-        end
-        Config.AutoFruit = false
+Tabs.Main:AddSection("Auto Chest")
 
-        task.spawn(function()
-            local noMobTime = 0
-
-            while Config.AutoQuest do
-                task.wait(0.12)
-                pcall(function()
-                    local char = GetCharacter()
-                    if not char then return end
-
-                    local hrp = char.HumanoidRootPart
-                    local questName, questLevel, mobName, npcCF, areaCF = GetQuestData()
-
-                    -- Chưa có nhiệm vụ -> bay tới NPC nhận
-                    if not HasQuest() then
-                        isGoingToFarmArea = false
-                        noMobTime = 0
-
-                        if (hrp.Position - npcCF.Position).Magnitude > 10 then
-                            TweenTo(npcCF * CFrame.new(0, 0, 2.5))
-                        else
-                            StopTween()
-                            for _ = 1, 5 do
-                                pcall(function()
-                                    ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", questName, questLevel)
-                                end)
-                                task.wait(0.11)
-                            end
-                            task.wait(1.25)
-                        end
-                        return
-                    end
-
-                    -- Có nhiệm vụ -> tìm quái
-                    local target = FindBestTarget(hrp.Position, mobName, Config.TargetPrioritize, 5500)
-
-                    if target then
-                        isGoingToFarmArea = false
-                        noMobTime = 0
-
-                        local pos = target.hrp.Position
-                        TweenTo(CFrame.new(pos + Vector3.new(0, Config.FarmDistance, 0), pos))
-
-                        pcall(function()
-                            target.hrp.CanCollide = false
-                            target.hrp.AssemblyLinearVelocity = Vector3.zero
-                        end)
-                    else
-                        -- Không thấy quái quá lâu -> bay về bãi farm
-                        noMobTime = noMobTime + 0.12
-                        if noMobTime > 2.2 then
-                            isGoingToFarmArea = true
-                            TweenTo(areaCF)
-                        end
-                    end
-                end)
-            end
-
-            ResetCharacterState()
-        end)
+Tabs.Main:AddToggle("AutoChestToggle", {
+    Title    = "Auto Chest",
+    Default  = false,
+    Callback = function(v)
+        Config.AutoChest = v
+        if not v then ResetCharacterState() end
     end,
 })
 
 -------------------------------------------------
--- AUTO COLLECT TRÁI CÂY
--------------------------------------------------
-Tabs.Main:AddSection("Auto Collect Trái Cây")
-
-Tabs.Main:AddToggle("AutoFruit", {
-    Title = "Auto Collect Trái Cây",
-    Default = false,
-    Callback = function(value)
-        Config.AutoFruit = value
-        ToggleNoclip(value)
-
-        if not value then
-            ResetCharacterState()
-            return
-        end
-        Config.AutoQuest = false
-
-        task.spawn(function()
-            while Config.AutoFruit do
-                task.wait(0.28)
-                pcall(function()
-                    local fruit = FindNearestFruit()
-                    if not fruit then return end
-
-                    TweenTo(CFrame.new(fruit.Position + Vector3.new(0, 3.5, 0)), Config.FruitTweenSpeed)
-
-                    local char = GetCharacter()
-                    if char and (char.HumanoidRootPart.Position - fruit.Position).Magnitude < 14 then
-                        char.HumanoidRootPart.CFrame = CFrame.new(fruit.Position + Vector3.new(0, 2.2, 0))
-                        task.wait(0.35)
-
-                        if Config.AutoStoreFruit then
-                            StoreFruit()
-                            task.wait(0.35)
-                            StoreFruit()
-                        end
-                    end
-                end)
-            end
-
-            ResetCharacterState()
-        end)
-    end,
-})
-
-Tabs.Main:AddToggle("AutoStoreFruit", {
-    Title = "Tự động cất Trái (Store)",
-    Default = true,
-    Callback = function(v) Config.AutoStoreFruit = v end,
-})
-
-Tabs.Main:AddSlider("FruitSpeed", {
-    Title = "Tốc độ bay lấy trái",
-    Default = 320, Min = 200, Max = 450, Rounding = 10,
-    Callback = function(v) Config.FruitTweenSpeed = v end,
-})
-
--------------------------------------------------
--- TAB NHÂN VẬT
+-- UI - TAB NHÂN VẬT
 -------------------------------------------------
 Tabs.Player:AddSlider("WalkSpeed", {
-    Title = "WalkSpeed",
-    Default = 16, Min = 16, Max = 300, Rounding = 0,
+    Title    = "WalkSpeed",
+    Default  = 16,
+    Min      = 16,
+    Max      = 300,
+    Rounding = 0,
     Callback = function(v)
-        local char = GetCharacter()
-        if char then
-            char.Humanoid.WalkSpeed = v
-        end
+        Config.WalkSpeed = v
+        local hum = GetHumanoid()
+        if hum then hum.WalkSpeed = v end
     end,
 })
 
 -------------------------------------------------
--- TAB SETTINGS (LƯU CẤU HÌNH)
+-- UI - SETTINGS + SAVE
 -------------------------------------------------
 SaveManager:SetLibrary(Fluent)
 InterfaceManager:SetLibrary(Fluent)
@@ -598,14 +598,20 @@ SaveManager:BuildConfigSection(Tabs.Settings)
 
 Window:SelectTab(1)
 
+Fluent:Notify({
+    Title    = "Datkits Premium",
+    Content  = "Fluent UI + Fast Attack Redz Style đã sẵn sàng!",
+    Duration = 6,
+})
+
 -------------------------------------------------
--- RESET TRẠNG THÁI KHI HỒI SINH
+-- CHARACTER RESPAWN HANDLER
 -------------------------------------------------
 LocalPlayer.CharacterAdded:Connect(function()
-    task.wait(1.5)
-    ToggleNoclip(false)
-    noclipConnection = nil -- đảm bảo sạch connection cũ
+    task.wait(1.3)
     ResetCharacterState()
+    local hum = GetHumanoid()
+    if hum then hum.WalkSpeed = Config.WalkSpeed end
 end)
 
-print("[Datkits Premium] Script đã load thành công!")
+print("[Datkits] ✅ Fluent + Redz Fast Attack v2.0 loaded successfully!")
