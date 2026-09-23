@@ -1,8 +1,8 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v2.2           ║
-    ║   Fluent UI • Smooth Fly (No Stutter) • Sea 1/2/3        ║
-    ║   Fully Fixed - Production Ready                         ║
+    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v3.0           ║
+    ║   Fluent UI • Zero-Stutter Fly • Sea 1/2/3               ║
+    ║   Centralized Movement Controller                        ║
     ╚══════════════════════════════════════════════════════════╝
 --]]
 
@@ -18,7 +18,6 @@ repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
 -- SERVICES
 -------------------------------------------------
 local Players           = game:GetService("Players")
-local TweenService      = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService        = game:GetService("RunService")
 local LocalPlayer       = Players.LocalPlayer
@@ -59,7 +58,7 @@ local Config = {
 -------------------------------------------------
 local Window = Fluent:CreateWindow({
     Title       = "Datkits Premium | Blox Fruits",
-    SubTitle    = "Fluent UI • Smooth Fly • Sea 1+2+3",
+    SubTitle    = "Fluent UI • Zero-Stutter Fly • Sea 1+2+3",
     TabWidth    = 160,
     Size        = UDim2.fromOffset(580, 460),
     Acrylic     = true,
@@ -106,9 +105,7 @@ end
 -------------------------------------------------
 local function GetLevel()
     local lv = 1
-    pcall(function()
-        lv = LocalPlayer.Data.Level.Value
-    end)
+    pcall(function() lv = LocalPlayer.Data.Level.Value end)
     return lv
 end
 
@@ -120,123 +117,149 @@ local function GetCurrentSea()
 end
 
 -------------------------------------------------
--- ✅ MOVEMENT - FIXED NO STUTTER
--- Dùng AlignPosition + PlatformStand + Physics State
+-- ✅ CENTRALIZED MOVEMENT CONTROLLER
+-- 1 thread duy nhất xử lý movement - KHÔNG khựng
 -------------------------------------------------
 local Move = {
-    AlignPos = nil,
-    AlignOri = nil,
-    Attach   = nil,
-    Active   = false,
+    Active     = false,   -- Có đang bay không
+    TargetCF   = nil,     -- Target CFrame cuối cùng
+    SmoothPos  = nil,     -- Vị trí target đã làm mượt
+    BoundHRP   = nil,     -- HRP đã gắn instances
+    AlignPos   = nil,
+    AlignOri   = nil,
+    Attach     = nil,
 }
 
-local function StopMovement()
-    Move.Active = false
-    local char = GetCharacter()
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    local hum = char:FindFirstChildOfClass("Humanoid")
-
-    if hrp then
-        for _, name in ipairs({ "FarmAlignPos", "FarmAlignOri", "FarmAttach", "FarmBV" }) do
-            local obj = hrp:FindFirstChild(name)
-            if obj then obj:Destroy() end
-        end
-    end
-
-    if hum then
-        pcall(function()
-            hum.PlatformStand = false
-            hum:ChangeState(Enum.HumanoidStateType.GettingUp)
-        end)
-    end
-
+-- Cleanup instances cũ
+local function CleanupMoveInstances()
+    if Move.AlignPos then pcall(function() Move.AlignPos:Destroy() end) end
+    if Move.AlignOri then pcall(function() Move.AlignOri:Destroy() end) end
+    if Move.Attach   then pcall(function() Move.Attach:Destroy()   end) end
     Move.AlignPos = nil
     Move.AlignOri = nil
     Move.Attach   = nil
+    Move.BoundHRP = nil
 end
 
-local function SetupMovement()
-    local char = GetCharacter()
-    if not char then return false end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hrp or not hum then return false end
-
-    -- Đã setup rồi
-    if Move.AlignPos and Move.AlignPos.Parent == hrp then
+-- Tạo instances gắn vào HRP (chỉ 1 lần)
+local function EnsureMoveInstances(hrp)
+    if Move.BoundHRP == hrp and Move.AlignPos and Move.AlignPos.Parent then
         return true
     end
+    CleanupMoveInstances()
 
-    StopMovement()
-
-    -- Attachment
     local att = Instance.new("Attachment")
-    att.Name   = "FarmAttach"
+    att.Name   = "FarmAtt"
     att.Parent = hrp
 
-    -- AlignPosition - cấu hình mượt, KHÔNG overshoot
     local ap = Instance.new("AlignPosition")
-    ap.Name                = "FarmAlignPos"
+    ap.Name                = "FarmAP"
     ap.Attachment0         = att
     ap.Mode                = Enum.PositionAlignmentMode.OneAttachment
     ap.Position            = hrp.Position
-    ap.MaxForce            = 1e6
-    ap.Responsiveness      = 100       -- ✅ Giảm từ 200 → 100 (mượt hơn, không giật)
-    ap.ApplyAtCenterOfMass = false     -- ✅ FIX: false để không conflict với physics
+    ap.MaxForce            = 100000      -- ✅ Vừa đủ, không overshoot
+    ap.Responsiveness      = 70          -- ✅ Mượt
+    ap.ApplyAtCenterOfMass = true
     ap.Parent              = hrp
 
-    -- AlignOrientation - giữ hướng nhìn
     local ao = Instance.new("AlignOrientation")
-    ao.Name           = "FarmAlignOri"
+    ao.Name           = "FarmAO"
     ao.Attachment0    = att
     ao.Mode           = Enum.OrientationAlignmentMode.OneAttachment
-    ao.MaxTorque      = 1e6
-    ao.Responsiveness = 100            -- ✅ Giảm tương tự
+    ao.CFrame         = hrp.CFrame
+    ao.MaxTorque      = 100000
+    ao.Responsiveness = 70
     ao.Parent         = hrp
 
-    -- ✅ FIX QUAN TRỌNG: PlatformStand để humanoid không tự di chuyển
-    hum.PlatformStand = true
-    pcall(function()
-        hum:ChangeState(Enum.HumanoidStateType.Physics)
-    end)
-
-    -- ✅ Tắt collision các part (trừ HRP để tránh glitch)
-    for _, part in ipairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.CanCollide = false
-        end
-    end
-
+    Move.BoundHRP = hrp
     Move.AlignPos = ap
     Move.AlignOri = ao
     Move.Attach   = att
-    Move.Active   = true
     return true
 end
 
--- ✅ Di chuyển mượt, không khựng
-local function FlyTo(targetCFrame, speed)
+-- Bắt đầu bay (PlatformStand ON - giữ nguyên suốt)
+local function StartFly()
     local char = GetCharacter()
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
+    if not char then return false end
+    local hrp = char.HumanoidRootPart
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not hum then return false end
 
-    if not SetupMovement() then return end
+    if not EnsureMoveInstances(hrp) then return false end
 
-    -- Cập nhật vị trí mục tiêu (không tạo mới mỗi frame)
-    Move.AlignPos.Position = targetCFrame.Position
-    Move.AlignOri.CFrame   = targetCFrame
+    if not Move.Active then
+        -- Chỉ set 1 lần khi bắt đầu
+        hum.PlatformStand = true
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then part.CanCollide = false end
+        end
+        Move.SmoothPos = hrp.Position
+        Move.Active = true
+    end
+    return true
 end
 
+-- Dừng bay (trả lại trạng thái bình thường)
+local function StopFly()
+    if not Move.Active then return end
+    Move.Active   = false
+    Move.TargetCF = nil
+    Move.SmoothPos = nil
+
+    local char = GetCharacter()
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        pcall(function() hum.PlatformStand = false end)
+    end
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then part.CanCollide = true end
+    end
+end
+
+-- ✅ Loops CHỈ set target - KHÔNG tự di chuyển
+local function SetMoveTarget(targetCFrame)
+    if not StartFly() then return end
+    Move.TargetCF = targetCFrame
+end
+
+-- ✅ HEARTBEAT - 1 thread duy nhất xử lý toàn bộ movement
+RunService.Heartbeat:Connect(function(dt)
+    if not Move.Active then return end
+    local char = GetCharacter()
+    if not char then
+        Move.Active = false
+        return
+    end
+    local hrp = char.HumanoidRootPart
+    if not hrp or not Move.TargetCF then return end
+
+    -- Đảm bảo instances còn sống
+    if not Move.AlignPos or not Move.AlignPos.Parent then
+        if not EnsureMoveInstances(hrp) then return end
+    end
+
+    -- ✅ Làm mượt target position (loại bỏ micro-jitter khi enemy bobbing)
+    local alpha = math.clamp(dt * 15, 0, 1)
+    Move.SmoothPos = Move.SmoothPos:Lerp(Move.TargetCF.Position, alpha)
+
+    -- Cập nhật AlignPosition (mượt)
+    Move.AlignPos.Position = Move.SmoothPos
+    -- Cập nhật hướng nhìn về target
+    if (hrp.Position - Move.TargetCF.Position).Magnitude > 0.5 then
+        Move.AlignOri.CFrame = CFrame.new(hrp.Position, Move.TargetCF.Position)
+    end
+end)
+
+-- Reset khi cần
 local function ResetCharacterState()
-    StopMovement()
+    StopFly()
+    CleanupMoveInstances()
     local char = GetCharacter()
     if not char then return end
     for _, part in ipairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.CanCollide = true
-        end
+        if part:IsA("BasePart") then part.CanCollide = true end
     end
 end
 
@@ -246,16 +269,13 @@ end
 local function GetBoat()
     local char = LocalPlayer.Character
     if not char then return nil end
-
     local hum = char:FindFirstChildOfClass("Humanoid")
     if hum and hum.SeatPart then
         local seat  = hum.SeatPart
         local model = seat:FindFirstAncestorOfClass("Model")
         if model then
             local vs = model:FindFirstChildWhichIsA("VehicleSeat", true)
-            if vs and vs.Occupant == hum then
-                return model, vs
-            end
+            if vs and vs.Occupant == hum then return model, vs end
         end
     end
     return nil
@@ -265,7 +285,6 @@ local function SailTo(targetPos, speed)
     speed = speed or Config.SailSpeed
     local boat = GetBoat()
     if not boat then return false end
-
     local root = boat.PrimaryPart or boat:FindFirstChildWhichIsA("BasePart")
     if not root then return false end
 
@@ -285,7 +304,6 @@ local function SailTo(targetPos, speed)
         bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
         bv.Parent   = root
     end
-
     local bg = root:FindFirstChild("SailBG")
     if not bg then
         bg = Instance.new("BodyGyro")
@@ -298,13 +316,11 @@ local function SailTo(targetPos, speed)
 
     local delta = targetPos - root.Position
     local dist  = delta.Magnitude
-
     if dist <= 8 then
         bv.Velocity = Vector3.zero
         bg.CFrame   = root.CFrame
         return true
     end
-
     bv.Velocity = delta.Unit * speed
     bg.CFrame   = CFrame.new(root.Position, targetPos)
     return true
@@ -366,7 +382,6 @@ local function GetNearestIsland()
     if not hrp then return nil end
     local sea  = GetCurrentSea()
     local list = SeaIslands[sea] or SeaIslands[1]
-
     local nearest, minDist = nil, math.huge
     for _, island in ipairs(list) do
         local d = (hrp.Position - island.pos).Magnitude
@@ -389,10 +404,8 @@ local MELEE_KEYWORDS = {
 local function EquipWeapon()
     local char = GetCharacter()
     if not char or char:FindFirstChildOfClass("Tool") then return end
-
     local backpack = LocalPlayer:FindFirstChild("Backpack")
     if not backpack then return end
-
     local hum = GetHumanoid()
     if not hum then return end
 
@@ -411,7 +424,6 @@ local function EquipWeapon()
             end
         end
     end
-
     local any = backpack:FindFirstChildOfClass("Tool")
     if any then hum:EquipTool(any) end
 end
@@ -496,16 +508,6 @@ local function GetClosestEnemies(maxRange, nameFilter)
     return result
 end
 
-local function FreezeEnemy(enemy)
-    local hrp = enemy:FindFirstChild("HumanoidRootPart")
-    if hrp then
-        pcall(function()
-            hrp.CanCollide = false
-            hrp.Velocity   = Vector3.zero
-        end)
-    end
-end
-
 -------------------------------------------------
 -- FAST ATTACK
 -------------------------------------------------
@@ -527,7 +529,6 @@ local function DoFastAttack()
 
     local regAttack, regHit = GetNet()
     if not regAttack then return end
-
     pcall(function() regAttack:FireServer(0.1) end)
 
     local lcRemote = tool:FindFirstChild("LeftClickRemote")
@@ -570,8 +571,11 @@ local function EquipLoop()
 end
 
 local function AutoQuestLoop()
-    while task.wait(0.08) do
-        if not Config.AutoQuest then continue end
+    while task.wait(0.1) do
+        if not Config.AutoQuest then
+            if Move.Active then StopFly() end
+            continue
+        end
         pcall(function()
             local char = GetCharacter()
             if not char then return end
@@ -583,9 +587,11 @@ local function AutoQuestLoop()
                 if npcCF then
                     local dist = (hrp.Position - npcCF.Position).Magnitude
                     if dist > 8 then
-                        FlyTo(npcCF * CFrame.new(0, 0, 2.5), 230)
+                        -- ✅ Chỉ SET TARGET, không tự bay
+                        SetMoveTarget(npcCF * CFrame.new(0, 0, 2.5))
                     else
-                        StopMovement()
+                        -- Đứng yên tại chỗ, GIỮ PlatformStand (không tắt)
+                        Move.TargetCF = CFrame.new(hrp.Position)
                         for _ = 1, 5 do
                             pcall(function()
                                 ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", quest, qlv)
@@ -600,11 +606,10 @@ local function AutoQuestLoop()
                 if #hits > 0 then
                     local target = hits[1]
                     local pos = target.hrp.Position
-                    local cf = CFrame.new(pos + Vector3.new(0, Config.FarmDistance, 0), pos)
-                    FlyTo(cf, 240)
-                    FreezeEnemy(target.enemy)
+                    -- ✅ Set target mượt - Heartbeat sẽ xử lý movement
+                    SetMoveTarget(CFrame.new(pos + Vector3.new(0, Config.FarmDistance, 0), pos))
                 elseif spawnCF then
-                    FlyTo(spawnCF, 240)
+                    SetMoveTarget(spawnCF)
                 end
             end
         end)
@@ -612,46 +617,46 @@ local function AutoQuestLoop()
 end
 
 local function AutoFarmLoop()
-    while task.wait(0.08) do
-        if not Config.AutoFarm then continue end
+    while task.wait(0.1) do
+        if not Config.AutoFarm then
+            if Move.Active and not Config.AutoQuest then StopFly() end
+            continue
+        end
         pcall(function()
             local char = GetCharacter()
             if not char then return end
-            local hrp = char.HumanoidRootPart
             local hits = GetClosestEnemies(math.huge)
             if #hits > 0 then
                 local target = hits[1]
                 local pos = target.hrp.Position
-                local cf = CFrame.new(pos + Vector3.new(0, Config.FarmDistance, 0), pos)
-                FlyTo(cf, 240)
-                FreezeEnemy(target.enemy)
+                SetMoveTarget(CFrame.new(pos + Vector3.new(0, Config.FarmDistance, 0), pos))
             end
         end)
     end
 end
 
 local function AutoChestLoop()
-    while task.wait(0.12) do
+    while task.wait(0.15) do
         if not Config.AutoChest then continue end
         pcall(function()
             local char = GetCharacter()
             if not char then return end
             local hrp = char.HumanoidRootPart
 
+            -- ✅ Tìm chest nhanh hơn: chỉ scan workspace con trực tiếp
             local chests = {}
-            for _, v in ipairs(workspace:GetDescendants()) do
-                if v:IsA("Part")
-                    and v.Name:find("Chest")
-                    and v:FindFirstChild("TouchInterest")
-                then
+            for _, v in ipairs(workspace:GetChildren()) do
+                if v:IsA("Model") and v.Name:find("Chest") then
+                    local part = v:FindFirstChildWhichIsA("BasePart", true)
+                    if part and part:FindFirstChild("TouchInterest") then
+                        table.insert(chests, part)
+                    end
+                elseif v:IsA("Part") and v.Name:find("Chest") and v:FindFirstChild("TouchInterest") then
                     table.insert(chests, v)
                 end
             end
 
-            if #chests == 0 then
-                task.wait(1.2)
-                return
-            end
+            if #chests == 0 then return end
 
             table.sort(chests, function(a, b)
                 return (hrp.Position - a.Position).Magnitude
@@ -659,7 +664,7 @@ local function AutoChestLoop()
             end)
 
             local target = chests[1]
-            FlyTo(target.CFrame, 290)
+            SetMoveTarget(target.CFrame)
 
             if (hrp.Position - target.Position).Magnitude <= 7 and firetouchinterest then
                 firetouchinterest(hrp, target, 0)
@@ -753,8 +758,9 @@ Tabs.Main:AddToggle("AutoChestToggle", {
         if not v then ResetCharacterState() end
     end,
 })
+
 -------------------------------------------------
--- UI - TAB SEA TRAVEL (HOÀN CHỈNH)
+-- UI - TAB SEA TRAVEL
 -------------------------------------------------
 Tabs.Sail:AddSection("🌊 Cài đặt đi biển")
 
@@ -881,7 +887,7 @@ Window:SelectTab(1)
 
 Fluent:Notify({
     Title    = "Datkits Premium",
-    Content  = "Fluent UI + Smooth Fly + Sea Travel đã sẵn sàng!",
+    Content  = "Zero-Stutter Fly đã sẵn sàng!",
     Duration = 6,
 })
 
@@ -895,4 +901,4 @@ LocalPlayer.CharacterAdded:Connect(function()
     if hum then hum.WalkSpeed = Config.WalkSpeed end
 end)
 
-print("[Datkits] ✅ v2.1 loaded successfully!")
+print("[Datkits] ✅ v3.0 Zero-Stutter loaded successfully!")
