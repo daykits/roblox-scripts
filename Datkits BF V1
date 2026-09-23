@@ -1,8 +1,8 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║   DATKITS BF V1 | BLOX FRUITS AUTO FARM v4.1           ║
+    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v4.2           ║
     ║   Fluent UI • Zero-Stutter Fly • Sea 1/2/3               ║
-    ║   Auto Quest + Auto Farm + Auto Chest (SYNTAX FIXED)     ║
+    ║   Auto Quest + Auto Farm + Auto Chest (STABLE)           ║
     ╚══════════════════════════════════════════════════════════╝
 --]]
 
@@ -70,6 +70,8 @@ local Config = {
     InstantSail   = false,
     NoclipEnabled = true,
     ChestRange    = 300,
+    -- ✅ MỚI: Thời gian giữ phase "toMob" sau khi kill quái
+    QuestGracePeriod = 5,
 }
 
 -------------------------------------------------
@@ -77,7 +79,7 @@ local Config = {
 -------------------------------------------------
 local Window = Fluent:CreateWindow({
     Title       = "Datkits Premium | Blox Fruits",
-    SubTitle    = "v4.1 • Auto Quest + Farm + Chest",
+    SubTitle    = "v4.2 • Auto Quest + Farm + Chest",
     TabWidth    = 160,
     Size        = UDim2.fromOffset(580, 460),
     Acrylic     = true,
@@ -193,7 +195,7 @@ local function DisableNoclip()
 end
 
 -------------------------------------------------
--- ✅ MOVEMENT CONTROLLER v4.1
+-- ✅ MOVEMENT CONTROLLER v4.2
 -------------------------------------------------
 local Move = {
     Active     = false,
@@ -512,7 +514,8 @@ local function EquipWeapon()
 end
 
 -------------------------------------------------
--- ✅ QUEST DETECTION
+-- ✅ QUEST DETECTION v4.2
+-- Đọc chi tiết QuestProgress + QuestRequirement
 -------------------------------------------------
 local function GetQuestInfo()
     local info = {
@@ -521,6 +524,7 @@ local function GetQuestInfo()
         Progress = 0,
         Required = 0,
         MobName = nil,
+        IsComplete = false,
     }
     pcall(function()
         local data = LocalPlayer:FindFirstChild("Data")
@@ -539,16 +543,20 @@ local function GetQuestInfo()
         local req = data:FindFirstChild("QuestRequirement")
         if prog then info.Progress = tonumber(prog.Value) or 0 end
         if req then info.Required = tonumber(req.Value) or 0 end
+
+        -- ✅ Chỉ coi là complete khi có progress và required > 0
+        if info.Required > 0 and info.Progress >= info.Required then
+            info.IsComplete = true
+        end
     end)
     return info
 end
 
+-- ✅ HasQuest cũ giữ lại để tương thích ngược
 local function HasQuest()
     local info = GetQuestInfo()
     if not info.HasQuest then return false end
-    if info.Required > 0 and info.Progress >= info.Required then
-        return false
-    end
+    if info.IsComplete then return false end
     return true
 end
 
@@ -681,8 +689,7 @@ local function DoFastAttack()
             pcall(function()
                 regHit:FireServer(data.hrp, { data.enemy })
             end)
-        end
-    end
+        end    end
 end
 
 -------------------------------------------------
@@ -778,15 +785,19 @@ local function AutoChestLoop()
 end
 
 -------------------------------------------------
--- ✅ AUTO QUEST v4.1
+-- ✅ AUTO QUEST v4.2 - FIX TRIỆT ĐỂ
+-- Không quay về NPC sau khi kill 1 con
 -------------------------------------------------
 local QuestState = {
-    Phase = "idle",
-    LastQuest = nil,
-    LastQLv = nil,
-    LastQuestTime = 0,
-    JustTookQuest = false,
-    JustTookTime = 0,
+    Phase = "idle",              -- idle | toNPC | atNPC | toMob
+    LastQuest = nil,             -- Quest name đã nhận
+    LastQLv = nil,               -- Quest level đã nhận
+    LastQuestTime = 0,           -- Thời điểm gọi StartQuest
+    QuestAccepted = false,       -- ✅ Đã nhận quest chưa (cache)
+    QuestAcceptedTime = 0,       -- Thời điểm nhận quest
+    LastKillTime = 0,            -- ✅ Thời điểm kill quái gần nhất
+    LastEnemyCount = 0,          -- ✅ Số quái tìm thấy lần trước
+    QuestCompleted = false,      -- ✅ Quest đã hoàn thành
 }
 
 local function AutoQuestLoop()
@@ -794,7 +805,8 @@ local function AutoQuestLoop()
         if not Config.AutoQuest then
             if Move.Active then StopFly() end
             QuestState.Phase = "idle"
-            QuestState.JustTookQuest = false
+            QuestState.QuestAccepted = false
+            QuestState.QuestCompleted = false
             continue
         end
 
@@ -813,41 +825,123 @@ local function AutoQuestLoop()
             local npcCF = entry.npc
             local spawnCF = entry.spawn
 
-            local hasQuest = HasQuest()
-            if QuestState.JustTookQuest and (tick() - QuestState.JustTookTime) < 3 then
-                hasQuest = true
+            -- ✅ Lấy thông tin quest chi tiết
+            local qInfo = GetQuestInfo()
+            local now = tick()
+
+            -- ✅ ĐỔI QUEST: Nếu quest name khác với quest đã nhận → reset state
+            if qInfo.QuestName and qInfo.QuestName ~= QuestState.LastQuest then
+                QuestState.QuestAccepted = false
+                QuestState.QuestCompleted = false
             end
 
-            -- PHASE 1: ĐÃ CÓ QUEST → BAY TỚI BÃI QUÁI
-            if hasQuest then
+            -- ✅ CẬP NHẬT: Nếu phát hiện có quest trong Data → đánh dấu đã nhận
+            if qInfo.HasQuest and not qInfo.IsComplete then
+                if not QuestState.QuestAccepted then
+                    QuestState.QuestAccepted = true
+                    QuestState.QuestAcceptedTime = now
+                end
+                QuestState.QuestCompleted = false
+            end
+
+            -- ✅ CẬP NHẬT: Nếu quest trong Data đã complete → đánh dấu
+            if qInfo.IsComplete then
+                QuestState.QuestCompleted = true
+            end
+
+            -- ✅ Nếu vừa nhận quest trong 5s qua → coi như đã có quest
+            local withinAcceptGrace = (now - QuestState.QuestAcceptedTime) < Config.QuestGracePeriod
+
+            -- ✅ LOGIC CHÍNH: quyết định phase
+            -- Điều kiện để ĐI ĐÁNH QUÁI:
+            --   1. Có quest trong Data (chưa complete), HOẶC
+            --   2. Đã accept quest (cache) VÀ chưa complete VÀ trong grace period, HOẶC
+            --   3. Vừa kill quái trong 3s qua (chưa kịp update)
+            local shouldFarm = false
+
+            if qInfo.HasQuest and not qInfo.IsComplete then
+                -- Có quest đang active
+                shouldFarm = true
+            elseif QuestState.QuestAccepted and not QuestState.QuestCompleted then
+                -- Đã accept quest (cache) và chưa complete
+                shouldFarm = true
+            elseif QuestState.QuestCompleted then
+                -- Quest đã xong → đi nhận quest mới
+                shouldFarm = false
+            end
+
+            -- ✅ SPECIAL CASE: Vừa kill quái → giữ phase farm thêm 3s
+            if not shouldFarm and (now - QuestState.LastKillTime) < 3 then
+                shouldFarm = true
+            end
+
+            ---------------------------------------------------
+            -- PHASE 1: ĐI ĐÁNH QUÁI
+            ---------------------------------------------------
+            if shouldFarm then
                 QuestState.Phase = "toMob"
 
+                -- Tìm quái theo tên mob
                 local hits = GetClosestEnemies(math.huge, mob)
+
+                -- Fallback: nếu không tìm thấy trong phạm vi, thử tìm rộng hơn
                 if #hits == 0 then
-                    hits = GetClosestEnemies(1000)
+                    hits = GetClosestEnemies(2000)
                 end
 
-                if #hits > 0 then
-                    local target = hits[1]
-                    local pos = target.hrp.Position
-                    local targetCF = CFrame.new(
-                        pos + Vector3.new(0, Config.FarmDistance, 0),
-                        pos
-                    )
-                    SetMoveTarget(targetCF)
-                elseif spawnCF then
-                    local distToSpawn = (hrp.Position - spawnCF.Position).Magnitude
-                    if distToSpawn > 15 then
-                        SetMoveTarget(spawnCF + Vector3.new(0, Config.FarmDistance, 0))
-                    else
-                        SetMoveTarget(CFrame.new(hrp.Position))
+                -- ✅ FIX: Nếu không tìm thấy quái VÀ đang trong grace period → ở yên chờ quái respawn
+                -- (không quay về NPC vội)
+                if #hits == 0 then
+                    -- Kiểm tra xem có đang trong grace period không
+                    local withinQuestGrace = QuestState.QuestAccepted
+                        and (now - QuestState.QuestAcceptedTime) < Config.QuestGracePeriod
+
+                    if withinQuestGrace and spawnCF then
+                        -- Vẫn còn trong grace period → bay về spawn point của quest
+                        -- (không phải NPC!)
+                        local distToSpawn = (hrp.Position - spawnCF.Position).Magnitude
+                        if distToSpawn > 15 then
+                            SetMoveTarget(spawnCF + Vector3.new(0, Config.FarmDistance, 0))
+                        else
+                            -- Đã tới spawn, đứng chờ quái spawn
+                            SetMoveTarget(CFrame.new(hrp.Position))
+                        end
+                    elseif spawnCF then
+                        -- Hết grace period nhưng vẫn chưa tìm thấy quái → bay tới spawn
+                        local distToSpawn = (hrp.Position - spawnCF.Position).Magnitude
+                        if distToSpawn > 15 then
+                            SetMoveTarget(spawnCF + Vector3.new(0, Config.FarmDistance, 0))
+                        else
+                            SetMoveTarget(CFrame.new(hrp.Position))
+                        end
                     end
+                    return
                 end
+
+                -- ✅ Có quái → bay tới con gần nhất và đánh
+                local target = hits[1]
+                local pos = target.hrp.Position
+                local targetCF = CFrame.new(
+                    pos + Vector3.new(0, Config.FarmDistance, 0),
+                    pos
+                )
+                SetMoveTarget(targetCF)
+
+                -- ✅ Cập nhật LastKillTime nếu số quái giảm → có kill
+                if #hits < QuestState.LastEnemyCount then
+                    QuestState.LastKillTime = now
+                end
+                QuestState.LastEnemyCount = #hits
+
                 return
             end
 
-            -- PHASE 2: CHƯA CÓ QUEST → ĐI TỚI NPC
+            ---------------------------------------------------
+            -- PHASE 2: ĐI TỚI NPC
+            ---------------------------------------------------
             QuestState.Phase = "toNPC"
+            QuestState.LastEnemyCount = 0
+
             if not npcCF then return end
 
             local distToNPC = (hrp.Position - npcCF.Position).Magnitude
@@ -859,7 +953,6 @@ local function AutoQuestLoop()
                 QuestState.Phase = "atNPC"
                 SetMoveTarget(CFrame.new(hrp.Position))
 
-                local now = tick()
                 local needCall = (QuestState.LastQuest ~= quest)
                     or (QuestState.LastQLv ~= qlv)
                     or (now - QuestState.LastQuestTime > 5)
@@ -869,12 +962,17 @@ local function AutoQuestLoop()
                     QuestState.LastQLv = qlv
                     QuestState.LastQuestTime = now
 
+                    -- ✅ Reset completed flag
+                    QuestState.QuestCompleted = false
+                    QuestState.QuestAccepted = false
+
                     pcall(function()
                         ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", quest, qlv)
                     end)
 
-                    QuestState.JustTookQuest = true
-                    QuestState.JustTookTime = tick()
+                    -- ✅ Đánh dấu đã nhận quest
+                    QuestState.QuestAccepted = true
+                    QuestState.QuestAcceptedTime = now
                 end
             end
         end)
@@ -910,7 +1008,7 @@ local function AutoFarmLoop()
 end
 
 -------------------------------------------------
--- ✅ FAST ATTACK + EQUIP LOOPS (FIX SYNTAX)
+-- ✅ FAST ATTACK + EQUIP LOOPS
 -------------------------------------------------
 local function FastAttackLoop()
     while task.wait(Config.AttackDelay) do
@@ -951,7 +1049,7 @@ local function SeaTravelLoop()
 end
 
 -------------------------------------------------
--- KHỞI ĐỘNG LOOPS (SAU KHI UI ĐÃ LOAD)
+-- KHỞI ĐỘNG LOOPS
 -------------------------------------------------
 local function StartAllLoops()
     task.spawn(FastAttackLoop)
@@ -1002,6 +1100,17 @@ Tabs.Main:AddToggle("AutoQuestToggle", {
         Config.AutoQuest = v
         if not v then ResetCharacterState() end
     end,
+})
+
+-- ✅ MỚI: Slider thời gian giữ phase farm
+Tabs.Main:AddSlider("QuestGraceSlider", {
+    Title       = "Thời gian giữ farm (s)",
+    Description = "Sau khi nhận quest, giữ phase farm bao lâu",
+    Default     = 5,
+    Min         = 2,
+    Max         = 15,
+    Rounding    = 0,
+    Callback    = function(v) Config.QuestGracePeriod = v end,
 })
 
 Tabs.Main:AddSection("Auto Farm Gần Nhất")
@@ -1187,7 +1296,7 @@ StartAllLoops()
 
 Fluent:Notify({
     Title    = "Datkits Premium",
-    Content  = "v4.1 Auto Quest + Farm + Chest sẵn sàng!",
+    Content  = "v4.2 Auto Quest stable - không về NPC giữa chừng!",
     Duration = 6,
 })
 
@@ -1212,4 +1321,4 @@ if Config.NoclipEnabled then
     EnableNoclip()
 end
 
-print("[Datkits] ✅ v4.1 Auto Quest + Farm + Chest loaded successfully!")
+print("[Datkits] ✅ v4.2 Auto Quest stable loaded successfully!")
