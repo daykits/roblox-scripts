@@ -776,9 +776,8 @@ Tabs.Main:AddToggle("AutoChestToggle", {
         if not v then ResetCharacterState() end
     end,
 })
-
 -------------------------------------------------
--- UI - TAB SEA TRAVEL
+-- UI - TAB SEA TRAVEL (HOÀN CHỈNH)
 -------------------------------------------------
 Tabs.Sail:AddSection("🌊 Cài đặt đi biển")
 
@@ -811,4 +810,112 @@ Tabs.Sail:AddToggle("InstantSailToggle", {
 Tabs.Sail:AddSection("📍 Đi tới đảo")
 
 Tabs.Sail:AddButton({
-    Title    = "Tới đảo g
+    Title       = "Tới đảo gần nhất",
+    Description = "Sail tới đảo gần bạn nhất",
+    Callback    = function()
+        local island = GetNearestIsland()
+        if island then
+            local hrp = GetHRP()
+            if hrp and Config.InstantSail and not GetBoat() then
+                hrp.CFrame = CFrame.new(island.pos + Vector3.new(0, 5, 0))
+            else
+                SailTo(island.pos, Config.SailSpeed)
+            end
+            Fluent:Notify({
+                Title    = "Sea Travel",
+                Content  = "Đang tới: " .. island.name,
+                Duration = 3,
+            })
+        else
+            Fluent:Notify({
+                Title    = "Sea Travel",
+                Content  = "Không tìm thấy đảo!",
+                Duration = 3,
+            })
+        end
+    end,
+})
+
+Tabs.Sail:AddDropdown("IslandSelect", {
+    Title   = "Chọn đảo để tới",
+    Values  = (function()
+        local t = {}
+        for sea, list in pairs(SeaIslands) do
+            for _, isl in ipairs(list) do
+                table.insert(t, string.format("Sea %d - %s", sea, isl.name))
+            end
+        end
+        return t
+    end)(),
+    Multi   = false,
+    Default = 1,
+    Callback = function(selected)
+        for sea, list in pairs(SeaIslands) do
+            for _, isl in ipairs(list) do
+                local label = string.format("Sea %d - %s", sea, isl.name)
+                if label == selected then
+                    if Config.InstantSail and not GetBoat() then
+                        local hrp = GetHRP()
+                        if hrp then
+                            hrp.CFrame = CFrame.new(isl.pos + Vector3.new(0, 5, 0))
+                        end
+                    else
+                        SailTo(isl.pos, Config.SailSpeed)
+                    end
+                    Fluent:Notify({
+                        Title    = "Sea Travel",
+                        Content  = "Đang tới: " .. isl.name,
+                        Duration = 3,
+                    })
+                    return
+                end
+            end
+        end
+    end,
+})
+
+-------------------------------------------------
+-- UI - TAB NHÂN VẬT
+-------------------------------------------------
+Tabs.Player:AddSlider("WalkSpeed", {
+    Title    = "WalkSpeed",
+    Default  = 16,
+    Min      = 16,
+    Max      = 300,
+    Rounding = 0,
+    Callback = function(v)
+        Config.WalkSpeed = v
+        local hum = GetHumanoid()
+        if hum then hum.WalkSpeed = v end
+    end,
+})
+
+-------------------------------------------------
+-- UI - SETTINGS + SAVE
+-------------------------------------------------
+SaveManager:SetLibrary(Fluent)
+InterfaceManager:SetLibrary(Fluent)
+InterfaceManager:SetFolder("DatkitsBF")
+SaveManager:SetFolder("DatkitsBF")
+InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+SaveManager:BuildConfigSection(Tabs.Settings)
+
+Window:SelectTab(1)
+
+Fluent:Notify({
+    Title    = "Datkits Premium",
+    Content  = "Fluent UI + Smooth Fly + Sea Travel đã sẵn sàng!",
+    Duration = 6,
+})
+
+-------------------------------------------------
+-- CHARACTER RESPAWN HANDLER
+-------------------------------------------------
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(1.3)
+    ResetCharacterState()
+    local hum = GetHumanoid()
+    if hum then hum.WalkSpeed = Config.WalkSpeed end
+end)
+
+print("[Datkits] ✅ v2.1 loaded successfully!")
