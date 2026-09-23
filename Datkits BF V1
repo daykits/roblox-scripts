@@ -1,8 +1,8 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v2.0           ║
-    ║   Fluent UI • Optimized Fast Attack • Sea 1/2/3          ║
-    ║   Rewritten by Professional Dev                          ║
+    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v2.1           ║
+    ║   Fluent UI • Smooth AlignPosition • Sea 1/2/3           ║
+    ║   Fixed Stutter + Sea Travel                             ║
     ╚══════════════════════════════════════════════════════════╝
 --]]
 
@@ -49,6 +49,10 @@ local Config = {
     AttackDelay   = 0.08,
     HitboxRange   = 55,
     WalkSpeed     = 16,
+    -- SEA TRAVEL
+    AutoSeaTravel = false,
+    SailSpeed     = 350,
+    InstantSail   = false,
 }
 
 -------------------------------------------------
@@ -56,7 +60,7 @@ local Config = {
 -------------------------------------------------
 local Window = Fluent:CreateWindow({
     Title       = "Datkits Premium | Blox Fruits",
-    SubTitle    = "Fluent UI • Fast Attack Redz Style • Sea 1+2",
+    SubTitle    = "Fluent UI • Smooth Fly • Sea 1+2+3",
     TabWidth    = 160,
     Size        = UDim2.fromOffset(580, 460),
     Acrylic     = true,
@@ -66,6 +70,7 @@ local Window = Fluent:CreateWindow({
 
 local Tabs = {
     Main     = Window:AddTab({ Title = "Auto Farm", Icon = "sword" }),
+    Sail     = Window:AddTab({ Title = "Sea Travel", Icon = "anchor" }),
     Player   = Window:AddTab({ Title = "Nhân Vật",  Icon = "user" }),
     Settings = Window:AddTab({ Title = "Settings",  Icon = "settings" }),
 }
@@ -125,43 +130,82 @@ local function GetCurrentSea()
 end
 
 -------------------------------------------------
--- HELPER: TWEEN / MOVEMENT
+-- HELPER: MOVEMENT (ALIGN POSITION - SMOOTH FLY)
+-- ✅ FIX LỖI KHỰNG
 -------------------------------------------------
-local function StopTween()
-    if State.currentTween then
-        pcall(function() State.currentTween:Cancel() end)
-        State.currentTween = nil
-    end
-    State.lastTargetPos = nil
-end
+local MoveState = {
+    AlignPos   = nil,
+    AlignOri   = nil,
+    Attachment = nil,
+    TargetPos  = Vector3.zero,
+    Speed      = 260,
+}
 
-local function ResetCharacterState()
-    StopTween()
+local function DestroyMovement()
     local char = GetCharacter()
     if not char then return end
-
-    for _, part in ipairs(char:GetChildren()) do
-        if part:IsA("BasePart") then
-            part.CanCollide = true
-        end
-    end
-
     local hrp = char:FindFirstChild("HumanoidRootPart")
-    if hrp then
-        for _, v in ipairs(hrp:GetChildren()) do
-            if v:IsA("BodyVelocity") or v.Name == "FarmFlyBV" then
-                v:Destroy()
-            end
-        end
+    if not hrp then return end
+
+    for _, name in ipairs({ "FarmAlignPos", "FarmAlignOri", "FarmAttachment" }) do
+        local obj = hrp:FindFirstChild(name)
+        if obj then obj:Destroy() end
     end
+
+    MoveState.AlignPos   = nil
+    MoveState.AlignOri   = nil
+    MoveState.Attachment = nil
 end
 
-local function TweenTo(targetCFrame, speed)
+local function SetupMovement()
+    local char = GetCharacter()
+    if not char then return false end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+
+    if MoveState.AlignPos and MoveState.AlignPos.Parent == hrp then
+        return true
+    end
+
+    DestroyMovement()
+
+    local att = Instance.new("Attachment")
+    att.Name   = "FarmAttachment"
+    att.Parent = hrp
+
+    local ap = Instance.new("AlignPosition")
+    ap.Name                = "FarmAlignPos"
+    ap.Attachment0         = att
+    ap.Mode                = Enum.PositionAlignmentMode.OneAttachment
+    ap.Position            = hrp.Position
+    ap.MaxForce            = 1e6
+    ap.Responsiveness      = 200
+    ap.ApplyAtCenterOfMass = true
+    ap.Parent              = hrp
+
+    local ao = Instance.new("AlignOrientation")
+    ao.Name          = "FarmAlignOri"
+    ao.Attachment0   = att
+    ao.Mode          = Enum.OrientationAlignmentMode.OneAttachment
+    ao.MaxTorque     = 1e6
+    ao.Responsiveness = 200
+    ao.Parent        = hrp
+
+    MoveState.AlignPos   = ap
+    MoveState.AlignOri   = ao
+    MoveState.Attachment = att
+    return true
+end
+
+-- Di chuyển mượt, KHÔNG khựng
+local function FlyTo(targetCFrame, speed)
     speed = speed or Config.TweenSpeed
     local char = GetCharacter()
     if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
 
-    local hrp = char.HumanoidRootPart
+    if not SetupMovement() then return end
 
     for _, part in ipairs(char:GetChildren()) do
         if part:IsA("BasePart") then
@@ -169,40 +213,176 @@ local function TweenTo(targetCFrame, speed)
         end
     end
 
-    local bv = hrp:FindFirstChild("FarmFlyBV")
+    MoveState.Speed = speed
+    MoveState.AlignPos.Position = targetCFrame.Position
+    MoveState.AlignOri.CFrame   = targetCFrame
+end
+
+-- Tương thích code cũ
+local function StopTween()
+    DestroyMovement()
+end
+
+local function ResetCharacterState()
+    DestroyMovement()
+    local char = GetCharacter()
+    if not char then return end
+    for _, part in ipairs(char:GetChildren()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = true
+        end
+    end
+end
+
+-------------------------------------------------
+-- HELPER: BOAT / SAILING
+-------------------------------------------------
+local function GetBoat()
+    local char = LocalPlayer.Character
+    if not char then return nil end
+
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum and hum.SeatPart then
+        local seat = hum.SeatPart
+        local model = seat:FindFirstAncestorOfClass("Model")
+        if model then
+            local vehicleSeat = model:FindFirstChildWhichIsA("VehicleSeat", true)
+            if vehicleSeat and vehicleSeat.Occupant == hum then
+                return model, vehicleSeat
+            end
+        end
+    end
+
+    for _, folderName in ipairs({ "Boats", "Vehicles", "Boat" }) do
+        local folder = workspace:FindFirstChild(folderName)
+        if folder then
+            for _, model in ipairs(folder:GetChildren()) do
+                local seat = model:FindFirstChildWhichIsA("VehicleSeat", true)
+                if seat and hum and seat.Occupant == hum then
+                    return model, seat
+                end
+            end
+        end
+    end
+
+    return nil
+end
+
+local function SailTo(targetPos, speed)
+    speed = speed or Config.SailSpeed
+    local boat = GetBoat()
+    if not boat then return false end
+
+    local root = boat.PrimaryPart or boat:FindFirstChildWhichIsA("BasePart")
+    if not root then return false end
+
+    if Config.InstantSail then
+        local cf = root.CFrame
+        local dir = targetPos - cf.Position
+        if dir.Magnitude > 1 then
+            root.CFrame = CFrame.new(targetPos, targetPos + dir.Unit)
+        end
+        return true
+    end
+
+    local bv = root:FindFirstChild("SailBV")
     if not bv then
         bv = Instance.new("BodyVelocity")
-        bv.Name      = "FarmFlyBV"
-        bv.MaxForce  = Vector3.new(4e5, 4e5, 4e5)
-        bv.Velocity  = Vector3.zero
-        bv.Parent    = hrp
+        bv.Name     = "SailBV"
+        bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+        bv.Parent   = root
     end
 
-    local dist = (hrp.Position - targetCFrame.Position).Magnitude
-    if dist <= 3.5 then
-        StopTween()
-        hrp.CFrame = targetCFrame
-        return
+    local bg = root:FindFirstChild("SailBG")
+    if not bg then
+        bg = Instance.new("BodyGyro")
+        bg.Name      = "SailBG"
+        bg.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
+        bg.P         = 3000
+        bg.D         = 100
+        bg.Parent    = root
     end
 
-    local needNewTween = not State.currentTween
-        or not State.lastTargetPos
-        or (State.lastTargetPos - targetCFrame.Position).Magnitude > 4
+    local delta = targetPos - root.Position
+    local dist  = delta.Magnitude
 
-    if needNewTween then
-        State.lastTargetPos = targetCFrame.Position
-        if State.currentTween then
-            pcall(function() State.currentTween:Cancel() end)
+    if dist <= 8 then
+        bv.Velocity = Vector3.zero
+        bg.CFrame   = root.CFrame
+        return true
+    end
+
+    bv.Velocity = delta.Unit * speed
+    bg.CFrame   = CFrame.new(root.Position, targetPos)
+    return true
+end
+
+local function StopSail()
+    local boat = GetBoat()
+    if not boat then return end
+    local root = boat.PrimaryPart or boat:FindFirstChildWhichIsA("BasePart")
+    if not root then return end
+    for _, name in ipairs({ "SailBV", "SailBG" }) do
+        local obj = root:FindFirstChild(name)
+        if obj then obj:Destroy() end
+    end
+end
+
+-------------------------------------------------
+-- SEA ISLANDS DATABASE
+-------------------------------------------------
+local SeaIslands = {
+    [1] = {
+        { name = "Starter Island",  pos = Vector3.new(1074, 16, 1541)   },
+        { name = "Marine Fort",     pos = Vector3.new(-2580, 15, 2030)  },
+        { name = "Jungle",          pos = Vector3.new(-1600, 36, 153)   },
+        { name = "Buggy Island",    pos = Vector3.new(-1140, 5, 3827)   },
+        { name = "Desert",          pos = Vector3.new(895, 6, 4385)     },
+        { name = "Snow Island",     pos = Vector3.new(1386, 87, -1299)  },
+        { name = "Marine Ford",     pos = Vector3.new(-5040, 28, 4325)  },
+        { name = "Sky Island",      pos = Vector3.new(-4840, 717, -2629)},
+        { name = "Prison",          pos = Vector3.new(531, 1, 475)      },
+        { name = "Colosseum",       pos = Vector3.new(-1588, 7, -2986)  },
+        { name = "Magma Village",   pos = Vector3.new(-5313, 8, 8515)   },
+        { name = "Fishman Island",  pos = Vector3.new(61164, 18, 1569)  },
+        { name = "Fountain City",   pos = Vector3.new(5260, 38, 4050)   },
+    },
+    [2] = {
+        { name = "Kingdom of Rose", pos = Vector3.new(-429, 71, 1836)   },
+        { name = "Cafe",            pos = Vector3.new(638, 71, 918)     },
+        { name = "Green Zone",      pos = Vector3.new(1050, 137, 1322)  },
+        { name = "Graveyard",       pos = Vector3.new(-5494, 48, -795)  },
+        { name = "Snow Mountain",   pos = Vector3.new(1450, 87, -1350)  },
+        { name = "Hot and Cold",    pos = Vector3.new(-2440, 71, -3216) },
+        { name = "Cursed Ship",     pos = Vector3.new(923, 125, 32857)  },
+        { name = "Ice Castle",      pos = Vector3.new(5576, 300, -6300) },
+    },
+    [3] = {
+        { name = "Port Town",         pos = Vector3.new(-290, 6, 5354)     },
+        { name = "Hydra Island",      pos = Vector3.new(5705, 15, -630)    },
+        { name = "Great Tree",        pos = Vector3.new(2172, 28, -6640)   },
+        { name = "Castle on the Sea", pos = Vector3.new(-5500, 313, -3010) },
+        { name = "Floating Turtle",   pos = Vector3.new(-11000, 331, -8600)},
+        { name = "Haunted Castle",    pos = Vector3.new(-9515, 142, 5520)  },
+        { name = "Sea of Treats",     pos = Vector3.new(-1160, 14, -10750) },
+    },
+}
+
+local function GetNearestIsland()
+    local hrp = GetHRP()
+    if not hrp then return nil end
+    local sea = GetCurrentSea()
+    local list = SeaIslands[sea] or SeaIslands[1]
+
+    local nearest, minDist = nil, math.huge
+    for _, island in ipairs(list) do
+        local d = (hrp.Position - island.pos).Magnitude
+        if d < minDist then
+            minDist = d
+            nearest = island
         end
-
-        local duration = math.clamp(dist / speed, 0.12, 7)
-        State.currentTween = TweenService:Create(
-            hrp,
-            TweenInfo.new(duration, Enum.EasingStyle.Linear),
-            { CFrame = targetCFrame }
-        )
-        State.currentTween:Play()
     end
+    return nearest, minDist
 end
 
 -------------------------------------------------
@@ -220,7 +400,6 @@ local function EquipWeapon()
     local backpack = LocalPlayer:FindFirstChild("Backpack")
     if not backpack then return end
 
-    -- Ưu tiên melee
     for _, tool in ipairs(backpack:GetChildren()) do
         if tool:IsA("Tool") then
             if tool.ToolTip == "Melee" then
@@ -237,7 +416,6 @@ local function EquipWeapon()
         end
     end
 
-    -- Fallback: bất kỳ tool nào
     local any = backpack:FindFirstChildOfClass("Tool")
     if any and GetHumanoid() then
         GetHumanoid():EquipTool(any)
@@ -341,7 +519,7 @@ local function FreezeEnemy(enemy)
 end
 
 -------------------------------------------------
--- FAST ATTACK (REDZ STYLE) - OPTIMIZED
+-- FAST ATTACK (REDZ STYLE)
 -------------------------------------------------
 local function GetNet()
     local modules = ReplicatedStorage:FindFirstChild("Modules")
@@ -365,7 +543,6 @@ local function DoFastAttack()
 
     pcall(function() regAttack:FireServer(0.1) end)
 
-    -- LeftClickRemote (Redz style)
     local lcRemote = tool:FindFirstChild("LeftClickRemote")
     local hits = GetClosestEnemies(Config.HitboxRange)
     local hrp = char.HumanoidRootPart
@@ -377,7 +554,6 @@ local function DoFastAttack()
         pcall(function() lcRemote:FireServer(dir, 1) end)
     end
 
-    -- RegisterHit
     if regHit and #hits > 0 then
         for _, data in ipairs(hits) do
             pcall(function()
@@ -388,7 +564,7 @@ local function DoFastAttack()
 end
 
 -------------------------------------------------
--- MAIN LOOPS (SINGLE THREAD - CLEANER)
+-- MAIN LOOPS
 -------------------------------------------------
 local function FastAttackLoop()
     while task.wait(Config.AttackDelay) do
@@ -421,7 +597,7 @@ local function AutoQuestLoop()
                 if npcCF then
                     local dist = (hrp.Position - npcCF.Position).Magnitude
                     if dist > 8 then
-                        TweenTo(npcCF * CFrame.new(0, 0, 2.5), 230)
+                        FlyTo(npcCF * CFrame.new(0, 0, 2.5), 230)
                     else
                         StopTween()
                         for _ = 1, 5 do
@@ -439,10 +615,10 @@ local function AutoQuestLoop()
                     local target = hits[1]
                     local pos = target.hrp.Position
                     local cf = CFrame.new(pos + Vector3.new(0, Config.FarmDistance, 0), pos)
-                    TweenTo(cf, 240)
+                    FlyTo(cf, 240)
                     FreezeEnemy(target.enemy)
                 elseif spawnCF then
-                    TweenTo(spawnCF, 240)
+                    FlyTo(spawnCF, 240)
                 end
             end
         end)
@@ -462,7 +638,7 @@ local function AutoFarmLoop()
                 local target = hits[1]
                 local pos = target.hrp.Position
                 local cf = CFrame.new(pos + Vector3.new(0, Config.FarmDistance, 0), pos)
-                TweenTo(cf, 240)
+                FlyTo(cf, 240)
                 FreezeEnemy(target.enemy)
             end
         end)
@@ -498,7 +674,7 @@ local function AutoChestLoop()
             end)
 
             local target = chests[1]
-            TweenTo(target.CFrame, 290)
+            FlyTo(target.CFrame, 290)
 
             if (hrp.Position - target.Position).Magnitude <= 7 and firetouchinterest then
                 firetouchinterest(hrp, target, 0)
@@ -509,12 +685,43 @@ local function AutoChestLoop()
     end
 end
 
--- Khởi động các vòng lặp 1 lần duy nhất
+-------------------------------------------------
+-- SEA TRAVEL LOOP
+-------------------------------------------------
+local function SeaTravelLoop()
+    while task.wait(0.25) do
+        if not Config.AutoSeaTravel then continue end
+        pcall(function()
+            local boat = GetBoat()
+            if not boat then return end
+
+            local char = GetCharacter()
+            if not char then return end
+            local hrp = char.HumanoidRootPart
+
+            local _, _, _, npcCF = GetQuestData()
+            if not npcCF then return end
+
+            local targetPos = npcCF.Position
+            local dist = (hrp.Position - targetPos).Magnitude
+
+            if dist < 200 then
+                StopSail()
+                return
+            end
+
+            SailTo(targetPos, Config.SailSpeed)
+        end)
+    end
+end
+
+-- Khởi động loop
 task.spawn(FastAttackLoop)
 task.spawn(EquipLoop)
 task.spawn(AutoQuestLoop)
 task.spawn(AutoFarmLoop)
 task.spawn(AutoChestLoop)
+task.spawn(SeaTravelLoop)
 
 -------------------------------------------------
 -- UI - TAB AUTO FARM
@@ -571,47 +778,37 @@ Tabs.Main:AddToggle("AutoChestToggle", {
 })
 
 -------------------------------------------------
--- UI - TAB NHÂN VẬT
+-- UI - TAB SEA TRAVEL
 -------------------------------------------------
-Tabs.Player:AddSlider("WalkSpeed", {
-    Title    = "WalkSpeed",
-    Default  = 16,
-    Min      = 16,
-    Max      = 300,
-    Rounding = 0,
-    Callback = function(v)
-        Config.WalkSpeed = v
-        local hum = GetHumanoid()
-        if hum then hum.WalkSpeed = v end
+Tabs.Sail:AddSection("🌊 Cài đặt đi biển")
+
+Tabs.Sail:AddToggle("AutoSeaTravelToggle", {
+    Title       = "Auto Sea Travel",
+    Description = "Tự động đi thuyền tới đảo quest khi đang ngồi thuyền",
+    Default     = false,
+    Callback    = function(v)
+        Config.AutoSeaTravel = v
+        if not v then StopSail() end
     end,
 })
 
--------------------------------------------------
--- UI - SETTINGS + SAVE
--------------------------------------------------
-SaveManager:SetLibrary(Fluent)
-InterfaceManager:SetLibrary(Fluent)
-InterfaceManager:SetFolder("DatkitsBF")
-SaveManager:SetFolder("DatkitsBF")
-InterfaceManager:BuildInterfaceSection(Tabs.Settings)
-SaveManager:BuildConfigSection(Tabs.Settings)
-
-Window:SelectTab(1)
-
-Fluent:Notify({
-    Title    = "Datkits Premium",
-    Content  = "Fluent UI + Fast Attack Redz Style đã sẵn sàng!",
-    Duration = 6,
+Tabs.Sail:AddSlider("SailSpeed", {
+    Title    = "Tốc độ thuyền",
+    Default  = 350,
+    Min      = 100,
+    Max      = 1000,
+    Rounding = 0,
+    Callback = function(v) Config.SailSpeed = v end,
 })
 
--------------------------------------------------
--- CHARACTER RESPAWN HANDLER
--------------------------------------------------
-LocalPlayer.CharacterAdded:Connect(function()
-    task.wait(1.3)
-    ResetCharacterState()
-    local hum = GetHumanoid()
-    if hum then hum.WalkSpeed = Config.WalkSpeed end
-end)
+Tabs.Sail:AddToggle("InstantSailToggle", {
+    Title       = "Instant Sail (Teleport)",
+    Description = "Teleport thẳng tới đảo — nhanh nhưng dễ bị flag",
+    Default     = false,
+    Callback    = function(v) Config.InstantSail = v end,
+})
 
-print("[Datkits] ✅ Fluent + Redz Fast Attack v2.0 loaded successfully!")
+Tabs.Sail:AddSection("📍 Đi tới đảo")
+
+Tabs.Sail:AddButton({
+    Title    = "Tới đảo g
