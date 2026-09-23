@@ -1,6 +1,6 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v3.2           ║
+    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v3.3           ║
     ║   Fluent UI • Zero-Stutter Fly • Sea 1/2/3               ║
     ║   Centralized Movement Controller (FULLY FIXED)          ║
     ╚══════════════════════════════════════════════════════════╝
@@ -118,8 +118,7 @@ local function GetCurrentSea()
 end
 
 -------------------------------------------------
--- ✅ NOCLIP CONTROLLER (FIX LỖI XUYÊN TƯỜNG)
--- Chạy RIÊNG biệt, độc lập với Movement
+-- ✅ NOCLIP CONTROLLER
 -------------------------------------------------
 local Noclip = {
     Connection = nil,
@@ -127,7 +126,6 @@ local Noclip = {
 }
 
 local function EnableNoclip()
-    -- ✅ Cách 1: Connection CanCollide (chuẩn nhất)
     if Noclip.Connection then Noclip.Connection:Disconnect() end
     Noclip.Connection = RunService.Stepped:Connect(function()
         local char = GetCharacter()
@@ -139,9 +137,8 @@ local function EnableNoclip()
         end
     end)
 
-    -- ✅ Cách 2: Loop force mỗi frame (backup chống re-enable)
     if Noclip.ForceLoop then
-        task.cancel(Noclip.ForceLoop)
+        pcall(task.cancel, Noclip.ForceLoop)
     end
     Noclip.ForceLoop = task.spawn(function()
         while Config.NoclipEnabled do
@@ -178,8 +175,7 @@ local function DisableNoclip()
 end
 
 -------------------------------------------------
--- ✅ CENTRALIZED MOVEMENT CONTROLLER v3.2
--- FIX: Đảm bảo StartFly luôn thành công + di chuyển ổn định
+-- ✅ CENTRALIZED MOVEMENT CONTROLLER v3.3
 -------------------------------------------------
 local Move = {
     Active     = false,
@@ -191,9 +187,10 @@ local Move = {
     Attach     = nil,
     Heartbeat  = nil,
     LastTargetTime = 0,
+    -- ✅ FIX: Lưu target cũ để tránh overwrite
+    LockedUntil = 0,
 }
 
--- Cleanup instances
 local function CleanupMoveInstances()
     if Move.AlignPos then pcall(function() Move.AlignPos:Destroy() end) end
     if Move.AlignOri then pcall(function() Move.AlignOri:Destroy() end) end
@@ -204,7 +201,6 @@ local function CleanupMoveInstances()
     Move.BoundHRP = nil
 end
 
--- Tạo instances gắn vào HRP
 local function EnsureMoveInstances(hrp)
     if not hrp or not hrp.Parent then return false end
     if Move.BoundHRP == hrp and Move.AlignPos and Move.AlignPos.Parent then
@@ -242,7 +238,7 @@ local function EnsureMoveInstances(hrp)
     return true
 end
 
--- ✅ FIX: StartFly giờ đây KHÔNG return false khi có char
+-- ✅ FIX: StartFly đảm bảo LUÔN set PlatformStand và Collision off
 local function StartFly()
     local char = GetCharacter()
     if not char then return false end
@@ -252,14 +248,19 @@ local function StartFly()
 
     if not EnsureMoveInstances(hrp) then return false end
 
+    -- ✅ FIX: Luôn force PlatformStand = true mỗi lần StartFly
+    pcall(function() hum.PlatformStand = true end)
+    pcall(function() hum:ChangeState(Enum.HumanoidStateType.Physics) end)
+    pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Climbing, false) end)
+    pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false) end)
+    pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false) end)
+
     if not Move.Active then
-        pcall(function() hum.PlatformStand = true end)
-        pcall(function() hum:ChangeState(Enum.HumanoidStateType.Physics) end)
         Move.SmoothPos = hrp.Position
         Move.Active = true
     end
 
-    -- ✅ Force disable collision mỗi lần StartFly
+    -- ✅ FIX: Force disable collision NGAY LẬP TỨC
     for _, part in ipairs(char:GetDescendants()) do
         if part:IsA("BasePart") then
             part.CanCollide = false
@@ -268,12 +269,12 @@ local function StartFly()
     return true
 end
 
--- Dừng bay
 local function StopFly()
     if not Move.Active then return end
     Move.Active   = false
     Move.TargetCF = nil
     Move.SmoothPos = nil
+    Move.LockedUntil = 0
 
     local char = GetCharacter()
     if not char then return end
@@ -284,15 +285,24 @@ local function StopFly()
     end
 end
 
--- ✅ SetMoveTarget - Luôn force StartFly
+-- ✅ FIX: SetMoveTarget LUÔN force StartFly và update TargetCF
 local function SetMoveTarget(targetCFrame)
+    if not targetCFrame then return end
+    -- ✅ Nếu đang bị lock (ví dụ đang gọi StartQuest), không cho overwrite
+    if tick() < Move.LockedUntil then return end
+    if not StartFly() then return end
+    Move.TargetCF = targetCFrame
+    Move.LastTargetTime = tick()
+end
+
+-- ✅ Hàm riêng để SET target mà KHÔNG check lock (dùng nội bộ)
+local function ForceSetMoveTarget(targetCFrame)
     if not targetCFrame then return end
     if not StartFly() then return end
     Move.TargetCF = targetCFrame
     Move.LastTargetTime = tick()
 end
 
--- ✅ HEARTBEAT - Reconnect mỗi lần character spawn
 local function BindHeartbeat()
     if Move.Heartbeat then
         Move.Heartbeat:Disconnect()
@@ -332,7 +342,6 @@ end
 
 BindHeartbeat()
 
--- Reset character state
 local function ResetCharacterState()
     StopFly()
     CleanupMoveInstances()
@@ -479,8 +488,6 @@ local MELEE_KEYWORDS = {
 local function EquipWeapon()
     local char = GetCharacter()
     if not char then return end
-
-    -- Đã có tool thì thôi
     if char:FindFirstChildOfClass("Tool") then return end
 
     local backpack = LocalPlayer:FindFirstChild("Backpack")
@@ -488,7 +495,6 @@ local function EquipWeapon()
     local hum = GetHumanoid()
     if not hum then return end
 
-    -- Ưu tiên melee
     for _, tool in ipairs(backpack:GetChildren()) do
         if tool:IsA("Tool") then
             if tool.ToolTip == "Melee" then
@@ -504,40 +510,48 @@ local function EquipWeapon()
             end
         end
     end
-    -- Fallback: bất kỳ tool nào
     local any = backpack:FindFirstChildOfClass("Tool")
     if any then pcall(function() hum:EquipTool(any) end) end
 end
 
 -------------------------------------------------
--- ✅ QUEST (FIXED - Check chính xác hơn)
+-- ✅ QUEST (FIXED - Check chính xác)
 -------------------------------------------------
-local function HasQuest()
-    local ok, result = pcall(function()
+local function GetQuestNameFromData()
+    local ok, name = pcall(function()
         local data = LocalPlayer:FindFirstChild("Data")
-        if not data then return false end
+        if not data then return nil end
         local quest = data:FindFirstChild("Quest")
-        if not quest then return false end
-
-        -- Check QuestName
+        if not quest then return nil end
         local qName = quest:FindFirstChild("QuestName")
         if qName and typeof(qName.Value) == "string" and qName.Value ~= "" then
-            -- Check thêm Progress để chắc chắn quest chưa hoàn thành
-            local progress = data:FindFirstChild("QuestProgress")
-            if progress then
-                local req = data:FindFirstChild("QuestRequirement")
-                local current = tonumber(progress.Value) or 0
-                local required = req and tonumber(req.Value) or 0
-                -- Nếu đã đủ progress thì coi như chưa có quest
-                if required > 0 and current >= required then
-                    return false
-                end
+            return qName.Value
+        end
+        return nil
+    end)
+    return ok and name or nil
+end
+
+local function HasQuest()
+    local name = GetQuestNameFromData()
+    if not name then return false end
+
+    -- Check progress
+    local ok, done = pcall(function()
+        local data = LocalPlayer:FindFirstChild("Data")
+        if not data then return false end
+        local progress = data:FindFirstChild("QuestProgress")
+        local req = data:FindFirstChild("QuestRequirement")
+        if progress and req then
+            local cur = tonumber(progress.Value) or 0
+            local needed = tonumber(req.Value) or 0
+            if needed > 0 and cur >= needed then
+                return true
             end
-            return true
         end
         return false
     end)
-    return ok and result
+    return not done
 end
 
 local QuestData = {
@@ -584,7 +598,7 @@ local function GetQuestData()
 end
 
 -------------------------------------------------
--- ✅ ENEMY (FIXED)
+-- ✅ ENEMY
 -------------------------------------------------
 local function IsEnemyMatch(enemyName, filter)
     if not filter then return true end
@@ -619,7 +633,7 @@ local function GetClosestEnemies(maxRange, nameFilter)
 end
 
 -------------------------------------------------
--- ✅ FAST ATTACK (FIXED - Đảm bảo luôn đánh)
+-- ✅ FAST ATTACK
 -------------------------------------------------
 local function GetNet()
     local modules = ReplicatedStorage:FindFirstChild("Modules")
@@ -633,7 +647,6 @@ local function DoFastAttack()
     local char = GetCharacter()
     if not char then return end
 
-    -- ✅ Đảm bảo có tool
     local tool = char:FindFirstChildOfClass("Tool")
     if not tool then
         EquipWeapon()
@@ -641,21 +654,16 @@ local function DoFastAttack()
         if not tool then return end
     end
 
-    -- ✅ Activate tool
     pcall(function() tool:Activate() end)
 
     local regAttack, regHit = GetNet()
-
-    -- ✅ RegisterAttack
     if regAttack then
         pcall(function() regAttack:FireServer(0.1) end)
     end
 
-    -- ✅ Tìm enemy hit
     local hits = GetClosestEnemies(Config.HitboxRange)
     local hrp = char.HumanoidRootPart
 
-    -- ✅ LeftClickRemote
     local lcRemote = tool:FindFirstChild("LeftClickRemote")
         or tool:FindFirstChild("Remote")
         or tool:FindFirstChildWhichIsA("RemoteEvent")
@@ -667,7 +675,6 @@ local function DoFastAttack()
         pcall(function() lcRemote:FireServer(dir, 1) end)
     end
 
-    -- ✅ RegisterHit cho tất cả enemies
     if regHit and #hits > 0 then
         for _, data in ipairs(hits) do
             pcall(function()
@@ -693,15 +700,16 @@ local function EquipLoop()
         if Config.AutoQuest or Config.AutoFarm then
             pcall(EquipWeapon)
         end
-    end
-end
+    endend
 
--- ✅ AUTO QUEST LOOP v3.2 (FIX triệt để)
+-- ✅ AUTO QUEST LOOP v3.3 - FIX TRIỆT ĐỂ
 local QuestState = {
     Phase = "idle",
     LastQuest = nil,
     LastQLv = nil,
     LastQuestTime = 0,
+    JustTookQuest = false,  -- ✅ FIX: Cờ báo vừa nhận quest
+    JustTookTime = 0,
 }
 
 local function AutoQuestLoop()
@@ -709,6 +717,7 @@ local function AutoQuestLoop()
         if not Config.AutoQuest then
             if Move.Active then StopFly() end
             QuestState.Phase = "idle"
+            QuestState.JustTookQuest = false
             continue
         end
 
@@ -720,18 +729,23 @@ local function AutoQuestLoop()
             if not quest then return end
 
             local hasQuest = HasQuest()
-            local distToNPC = npcCF and (hrp.Position - npcCF.Position).Magnitude or math.huge
+
+            -- ✅ FIX: Nếu vừa nhận quest trong 3s qua, COI NHƯ đã có quest
+            -- (Blox Fruits delay sync Data.Quest)
+            if QuestState.JustTookQuest and (tick() - QuestState.JustTookTime) < 3 then
+                hasQuest = true
+            end
 
             -- ✅ NẾU ĐÃ CÓ QUEST → ĐI ĐÁNH QUÁI
             if hasQuest then
                 QuestState.Phase = "toMob"
 
-                -- Tìm enemy theo tên mob
-                local hits = GetClosestEnemies(math.huge, mob)
+                -- ✅ FIX: Mở khóa lock để cho phép SetMoveTarget
+                Move.LockedUntil = 0
 
-                -- Fallback: nếu không match được, thử tìm tất cả enemy trong 500 studs
+                local hits = GetClosestEnemies(math.huge, mob)
                 if #hits == 0 then
-                    hits = GetClosestEnemies(500)
+                    hits = GetClosestEnemies(1000)
                 end
 
                 if #hits > 0 then
@@ -739,7 +753,6 @@ local function AutoQuestLoop()
                     local pos = target.hrp.Position
                     SetMoveTarget(CFrame.new(pos + Vector3.new(0, Config.FarmDistance, 0), pos))
                 elseif spawnCF then
-                    -- Không có enemy → bay tới spawn point
                     SetMoveTarget(spawnCF)
                 end
             else
@@ -747,11 +760,14 @@ local function AutoQuestLoop()
                 QuestState.Phase = "toNPC"
 
                 if npcCF then
+                    local distToNPC = (hrp.Position - npcCF.Position).Magnitude
                     if distToNPC > 12 then
+                        -- ✅ FIX: Mở khóa để di chuyển tới NPC
+                        Move.LockedUntil = 0
                         SetMoveTarget(npcCF * CFrame.new(0, 0, 3))
                     else
-                        -- Đứng yên tại NPC và gọi StartQuest
-                        Move.TargetCF = CFrame.new(hrp.Position)
+                        -- ✅ FIX: TẠI NPC - lock target để không bị overwrite
+                        ForceSetMoveTarget(CFrame.new(hrp.Position))
 
                         local now = tick()
                         local needCall = (QuestState.LastQuest ~= quest)
@@ -762,9 +778,14 @@ local function AutoQuestLoop()
                             QuestState.LastQuest = quest
                             QuestState.LastQLv = qlv
                             QuestState.LastQuestTime = now
+
                             pcall(function()
                                 ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", quest, qlv)
                             end)
+
+                            -- ✅ FIX: Đánh dấu vừa nhận quest, chờ Data sync
+                            QuestState.JustTookQuest = true
+                            QuestState.JustTookTime = tick()
                         end
                     end
                 end
@@ -855,7 +876,6 @@ local function SeaTravelLoop()
     end
 end
 
--- Khởi động tất cả loops
 task.spawn(FastAttackLoop)
 task.spawn(EquipLoop)
 task.spawn(AutoQuestLoop)
@@ -1071,32 +1091,29 @@ Window:SelectTab(1)
 
 Fluent:Notify({
     Title    = "Datkits Premium",
-    Content  = "Zero-Stutter Fly v3.2 đã sẵn sàng!",
+    Content  = "Zero-Stutter Fly v3.3 đã sẵn sàng!",
     Duration = 6,
 })
 
 -------------------------------------------------
--- CHARACTER RESPAWN HANDLER (FIXED)
+-- CHARACTER RESPAWN HANDLER
 -------------------------------------------------
 LocalPlayer.CharacterAdded:Connect(function(newChar)
     task.wait(1.5)
     ResetCharacterState()
 
-    -- Re-enable noclip nếu đang bật
     if Config.NoclipEnabled then
         EnableNoclip()
     end
 
-    -- Re-bind heartbeat cho character mới
     BindHeartbeat()
 
     local hum = newChar:FindFirstChildOfClass("Humanoid")
     if hum then hum.WalkSpeed = Config.WalkSpeed end
 end)
 
--- Auto enable noclip lúc đầu
 if Config.NoclipEnabled then
     EnableNoclip()
 end
 
-print("[Datkits] ✅ v3.2 Zero-Stutter FULLY FIXED loaded successfully!")
+print("[Datkits] ✅ v3.3 Zero-Stutter FULLY FIXED loaded successfully!")
