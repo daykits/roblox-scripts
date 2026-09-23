@@ -1,8 +1,8 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v2.1           ║
-    ║   Fluent UI • Smooth AlignPosition • Sea 1/2/3           ║
-    ║   Fixed Stutter + Sea Travel                             ║
+    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v2.2           ║
+    ║   Fluent UI • Smooth Fly (No Stutter) • Sea 1/2/3        ║
+    ║   Fully Fixed - Production Ready                         ║
     ╚══════════════════════════════════════════════════════════╝
 --]]
 
@@ -37,7 +37,7 @@ local InterfaceManager = loadstring(game:HttpGet(
 ))()
 
 -------------------------------------------------
--- CONFIG MẶC ĐỊNH
+-- CONFIG
 -------------------------------------------------
 local Config = {
     AutoQuest     = false,
@@ -49,7 +49,6 @@ local Config = {
     AttackDelay   = 0.08,
     HitboxRange   = 55,
     WalkSpeed     = 16,
-    -- SEA TRAVEL
     AutoSeaTravel = false,
     SailSpeed     = 350,
     InstantSail   = false,
@@ -65,26 +64,17 @@ local Window = Fluent:CreateWindow({
     Size        = UDim2.fromOffset(580, 460),
     Acrylic     = true,
     Theme       = "Dark",
-    MinimizeKey = Enum.KeyCode.LeftControl,
+    MinimizeKey = Enum.KeyCode.RightControl,
 })
 
 local Tabs = {
-    Main     = Window:AddTab({ Title = "Auto Farm", Icon = "sword" }),
+    Main     = Window:AddTab({ Title = "Auto Farm",  Icon = "sword" }),
     Sail     = Window:AddTab({ Title = "Sea Travel", Icon = "anchor" }),
-    Player   = Window:AddTab({ Title = "Nhân Vật",  Icon = "user" }),
-    Settings = Window:AddTab({ Title = "Settings",  Icon = "settings" }),
+    Player   = Window:AddTab({ Title = "Nhân Vật",   Icon = "user" }),
+    Settings = Window:AddTab({ Title = "Settings",   Icon = "settings" }),
 }
 
 local Options = Fluent.Options
-
--------------------------------------------------
--- STATE
--------------------------------------------------
-local State = {
-    currentTween  = nil,
-    lastTargetPos = nil,
-    connections   = {},
-}
 
 -------------------------------------------------
 -- HELPER: CHARACTER
@@ -130,76 +120,103 @@ local function GetCurrentSea()
 end
 
 -------------------------------------------------
--- HELPER: MOVEMENT (ALIGN POSITION - SMOOTH FLY)
--- ✅ FIX LỖI KHỰNG
+-- ✅ MOVEMENT - FIXED NO STUTTER
+-- Dùng AlignPosition + PlatformStand + Physics State
 -------------------------------------------------
-local MoveState = {
-    AlignPos   = nil,
-    AlignOri   = nil,
-    Attachment = nil,
-    TargetPos  = Vector3.zero,
-    Speed      = 260,
+local Move = {
+    AlignPos = nil,
+    AlignOri = nil,
+    Attach   = nil,
+    Active   = false,
 }
 
-local function DestroyMovement()
+local function StopMovement()
+    Move.Active = false
     local char = GetCharacter()
     if not char then return end
     local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
 
-    for _, name in ipairs({ "FarmAlignPos", "FarmAlignOri", "FarmAttachment" }) do
-        local obj = hrp:FindFirstChild(name)
-        if obj then obj:Destroy() end
+    if hrp then
+        for _, name in ipairs({ "FarmAlignPos", "FarmAlignOri", "FarmAttach", "FarmBV" }) do
+            local obj = hrp:FindFirstChild(name)
+            if obj then obj:Destroy() end
+        end
     end
 
-    MoveState.AlignPos   = nil
-    MoveState.AlignOri   = nil
-    MoveState.Attachment = nil
+    if hum then
+        pcall(function()
+            hum.PlatformStand = false
+            hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+        end)
+    end
+
+    Move.AlignPos = nil
+    Move.AlignOri = nil
+    Move.Attach   = nil
 end
 
 local function SetupMovement()
     local char = GetCharacter()
     if not char then return false end
     local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return false end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not hum then return false end
 
-    if MoveState.AlignPos and MoveState.AlignPos.Parent == hrp then
+    -- Đã setup rồi
+    if Move.AlignPos and Move.AlignPos.Parent == hrp then
         return true
     end
 
-    DestroyMovement()
+    StopMovement()
 
+    -- Attachment
     local att = Instance.new("Attachment")
-    att.Name   = "FarmAttachment"
+    att.Name   = "FarmAttach"
     att.Parent = hrp
 
+    -- AlignPosition - cấu hình mượt, KHÔNG overshoot
     local ap = Instance.new("AlignPosition")
     ap.Name                = "FarmAlignPos"
     ap.Attachment0         = att
     ap.Mode                = Enum.PositionAlignmentMode.OneAttachment
     ap.Position            = hrp.Position
     ap.MaxForce            = 1e6
-    ap.Responsiveness      = 200
-    ap.ApplyAtCenterOfMass = true
+    ap.Responsiveness      = 100       -- ✅ Giảm từ 200 → 100 (mượt hơn, không giật)
+    ap.ApplyAtCenterOfMass = false     -- ✅ FIX: false để không conflict với physics
     ap.Parent              = hrp
 
+    -- AlignOrientation - giữ hướng nhìn
     local ao = Instance.new("AlignOrientation")
-    ao.Name          = "FarmAlignOri"
-    ao.Attachment0   = att
-    ao.Mode          = Enum.OrientationAlignmentMode.OneAttachment
-    ao.MaxTorque     = 1e6
-    ao.Responsiveness = 200
-    ao.Parent        = hrp
+    ao.Name           = "FarmAlignOri"
+    ao.Attachment0    = att
+    ao.Mode           = Enum.OrientationAlignmentMode.OneAttachment
+    ao.MaxTorque      = 1e6
+    ao.Responsiveness = 100            -- ✅ Giảm tương tự
+    ao.Parent         = hrp
 
-    MoveState.AlignPos   = ap
-    MoveState.AlignOri   = ao
-    MoveState.Attachment = att
+    -- ✅ FIX QUAN TRỌNG: PlatformStand để humanoid không tự di chuyển
+    hum.PlatformStand = true
+    pcall(function()
+        hum:ChangeState(Enum.HumanoidStateType.Physics)
+    end)
+
+    -- ✅ Tắt collision các part (trừ HRP để tránh glitch)
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = false
+        end
+    end
+
+    Move.AlignPos = ap
+    Move.AlignOri = ao
+    Move.Attach   = att
+    Move.Active   = true
     return true
 end
 
--- Di chuyển mượt, KHÔNG khựng
+-- ✅ Di chuyển mượt, không khựng
 local function FlyTo(targetCFrame, speed)
-    speed = speed or Config.TweenSpeed
     local char = GetCharacter()
     if not char then return end
     local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -207,27 +224,16 @@ local function FlyTo(targetCFrame, speed)
 
     if not SetupMovement() then return end
 
-    for _, part in ipairs(char:GetChildren()) do
-        if part:IsA("BasePart") then
-            part.CanCollide = false
-        end
-    end
-
-    MoveState.Speed = speed
-    MoveState.AlignPos.Position = targetCFrame.Position
-    MoveState.AlignOri.CFrame   = targetCFrame
-end
-
--- Tương thích code cũ
-local function StopTween()
-    DestroyMovement()
+    -- Cập nhật vị trí mục tiêu (không tạo mới mỗi frame)
+    Move.AlignPos.Position = targetCFrame.Position
+    Move.AlignOri.CFrame   = targetCFrame
 end
 
 local function ResetCharacterState()
-    DestroyMovement()
+    StopMovement()
     local char = GetCharacter()
     if not char then return end
-    for _, part in ipairs(char:GetChildren()) do
+    for _, part in ipairs(char:GetDescendants()) do
         if part:IsA("BasePart") then
             part.CanCollide = true
         end
@@ -235,7 +241,7 @@ local function ResetCharacterState()
 end
 
 -------------------------------------------------
--- HELPER: BOAT / SAILING
+-- HELPER: BOAT
 -------------------------------------------------
 local function GetBoat()
     local char = LocalPlayer.Character
@@ -243,28 +249,15 @@ local function GetBoat()
 
     local hum = char:FindFirstChildOfClass("Humanoid")
     if hum and hum.SeatPart then
-        local seat = hum.SeatPart
+        local seat  = hum.SeatPart
         local model = seat:FindFirstAncestorOfClass("Model")
         if model then
-            local vehicleSeat = model:FindFirstChildWhichIsA("VehicleSeat", true)
-            if vehicleSeat and vehicleSeat.Occupant == hum then
-                return model, vehicleSeat
+            local vs = model:FindFirstChildWhichIsA("VehicleSeat", true)
+            if vs and vs.Occupant == hum then
+                return model, vs
             end
         end
     end
-
-    for _, folderName in ipairs({ "Boats", "Vehicles", "Boat" }) do
-        local folder = workspace:FindFirstChild(folderName)
-        if folder then
-            for _, model in ipairs(folder:GetChildren()) do
-                local seat = model:FindFirstChildWhichIsA("VehicleSeat", true)
-                if seat and hum and seat.Occupant == hum then
-                    return model, seat
-                end
-            end
-        end
-    end
-
     return nil
 end
 
@@ -329,7 +322,7 @@ local function StopSail()
 end
 
 -------------------------------------------------
--- SEA ISLANDS DATABASE
+-- SEA ISLANDS
 -------------------------------------------------
 local SeaIslands = {
     [1] = {
@@ -371,7 +364,7 @@ local SeaIslands = {
 local function GetNearestIsland()
     local hrp = GetHRP()
     if not hrp then return nil end
-    local sea = GetCurrentSea()
+    local sea  = GetCurrentSea()
     local list = SeaIslands[sea] or SeaIslands[1]
 
     local nearest, minDist = nil, math.huge
@@ -386,7 +379,7 @@ local function GetNearestIsland()
 end
 
 -------------------------------------------------
--- HELPER: WEAPON
+-- WEAPON
 -------------------------------------------------
 local MELEE_KEYWORDS = {
     "combat", "step", "karate", "dragon", "electric",
@@ -400,16 +393,19 @@ local function EquipWeapon()
     local backpack = LocalPlayer:FindFirstChild("Backpack")
     if not backpack then return end
 
+    local hum = GetHumanoid()
+    if not hum then return end
+
     for _, tool in ipairs(backpack:GetChildren()) do
         if tool:IsA("Tool") then
             if tool.ToolTip == "Melee" then
-                GetHumanoid():EquipTool(tool)
+                hum:EquipTool(tool)
                 return
             end
             local n = tool.Name:lower()
             for _, kw in ipairs(MELEE_KEYWORDS) do
                 if n:find(kw, 1, true) then
-                    GetHumanoid():EquipTool(tool)
+                    hum:EquipTool(tool)
                     return
                 end
             end
@@ -417,13 +413,11 @@ local function EquipWeapon()
     end
 
     local any = backpack:FindFirstChildOfClass("Tool")
-    if any and GetHumanoid() then
-        GetHumanoid():EquipTool(any)
-    end
+    if any then hum:EquipTool(any) end
 end
 
 -------------------------------------------------
--- HELPER: QUEST
+-- QUEST
 -------------------------------------------------
 local function HasQuest()
     local ok, res = pcall(function()
@@ -433,11 +427,8 @@ local function HasQuest()
     return ok and res
 end
 
--------------------------------------------------
--- QUEST DATABASE
--------------------------------------------------
 local QuestData = {
-    [1] = { -- SEA 1
+    [1] = {
         { maxLv = 9,   quest = "BanditQuest",   lv = 1, mob = "Bandit",            npc = CFrame.new(1059.37, 16.51, 1549.26), spawn = CFrame.new(1145, 17, 1634) },
         { maxLv = 14,  quest = "JungleQuest",   lv = 1, mob = "Monkey",            npc = CFrame.new(-1598.08, 36.85, 153.38), spawn = CFrame.new(-1610, 37, 145) },
         { maxLv = 29,  quest = "JungleQuest",   lv = 2, mob = "Gorilla",           npc = CFrame.new(-1598.08, 36.85, 153.38), spawn = CFrame.new(-1235, 6, -486) },
@@ -455,7 +446,7 @@ local QuestData = {
         { maxLv = 624, quest = "SkyQuest2",     lv = 2, mob = "Shandian",          npc = CFrame.new(-7861.34, 5545.49, -380.29),spawn= CFrame.new(-7850, 5600, -220) },
         { maxLv = 9999,quest = "FountainQuest", lv = 1, mob = "Galley Pirate",     npc = CFrame.new(5259.82, 38.5, 4050.03),  spawn = CFrame.new(5580, 38, 3990) },
     },
-    [2] = { -- SEA 2
+    [2] = {
         { maxLv = 725, quest = "Area1Quest",    lv = 1, mob = "Raider",            npc = CFrame.new(-429.54, 71.77, 1836.18), spawn = CFrame.new(-728, 52, 2345) },
         { maxLv = 775, quest = "Area1Quest",    lv = 2, mob = "Mercenary",         npc = CFrame.new(-429.54, 71.77, 1836.18), spawn = CFrame.new(-1004, 80, 1424) },
         { maxLv = 800, quest = "Area2Quest",    lv = 1, mob = "Swan Pirate",       npc = CFrame.new(638.44, 71.77, 918.28),   spawn = CFrame.new(1068, 137, 1322) },
@@ -471,7 +462,6 @@ local function GetQuestData()
     local level = GetLevel()
     local sea   = GetCurrentSea()
     local list  = QuestData[sea] or QuestData[1]
-
     for _, entry in ipairs(list) do
         if level <= entry.maxLv then
             return entry.quest, entry.lv, entry.mob, entry.npc, entry.spawn
@@ -481,13 +471,12 @@ local function GetQuestData()
 end
 
 -------------------------------------------------
--- ENEMY HELPERS
+-- ENEMY
 -------------------------------------------------
 local function GetClosestEnemies(maxRange, nameFilter)
     local result = {}
     local hrp = GetHRP()
     if not hrp then return result end
-
     local enemiesFolder = workspace:FindFirstChild("Enemies")
     if not enemiesFolder then return result end
 
@@ -503,7 +492,6 @@ local function GetClosestEnemies(maxRange, nameFilter)
             end
         end
     end
-
     table.sort(result, function(a, b) return a.dist < b.dist end)
     return result
 end
@@ -519,7 +507,7 @@ local function FreezeEnemy(enemy)
 end
 
 -------------------------------------------------
--- FAST ATTACK (REDZ STYLE)
+-- FAST ATTACK
 -------------------------------------------------
 local function GetNet()
     local modules = ReplicatedStorage:FindFirstChild("Modules")
@@ -532,7 +520,6 @@ end
 local function DoFastAttack()
     local char = GetCharacter()
     if not char then return end
-
     local tool = char:FindFirstChildOfClass("Tool")
     if not tool then return end
 
@@ -588,7 +575,6 @@ local function AutoQuestLoop()
         pcall(function()
             local char = GetCharacter()
             if not char then return end
-
             local hrp = char.HumanoidRootPart
             local quest, qlv, mob, npcCF, spawnCF = GetQuestData()
             if not quest then return end
@@ -599,7 +585,7 @@ local function AutoQuestLoop()
                     if dist > 8 then
                         FlyTo(npcCF * CFrame.new(0, 0, 2.5), 230)
                     else
-                        StopTween()
+                        StopMovement()
                         for _ = 1, 5 do
                             pcall(function()
                                 ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", quest, qlv)
@@ -632,7 +618,6 @@ local function AutoFarmLoop()
             local char = GetCharacter()
             if not char then return end
             local hrp = char.HumanoidRootPart
-
             local hits = GetClosestEnemies(math.huge)
             if #hits > 0 then
                 local target = hits[1]
@@ -685,37 +670,29 @@ local function AutoChestLoop()
     end
 end
 
--------------------------------------------------
--- SEA TRAVEL LOOP
--------------------------------------------------
 local function SeaTravelLoop()
     while task.wait(0.25) do
         if not Config.AutoSeaTravel then continue end
         pcall(function()
             local boat = GetBoat()
             if not boat then return end
-
             local char = GetCharacter()
             if not char then return end
             local hrp = char.HumanoidRootPart
-
             local _, _, _, npcCF = GetQuestData()
             if not npcCF then return end
-
             local targetPos = npcCF.Position
             local dist = (hrp.Position - targetPos).Magnitude
-
             if dist < 200 then
                 StopSail()
                 return
             end
-
             SailTo(targetPos, Config.SailSpeed)
         end)
     end
 end
 
--- Khởi động loop
+-- Khởi động
 task.spawn(FastAttackLoop)
 task.spawn(EquipLoop)
 task.spawn(AutoQuestLoop)
@@ -726,7 +703,7 @@ task.spawn(SeaTravelLoop)
 -------------------------------------------------
 -- UI - TAB AUTO FARM
 -------------------------------------------------
-local MainSection = Tabs.Main:AddSection("Cài đặt chung")
+Tabs.Main:AddSection("Cài đặt chung")
 
 Tabs.Main:AddSlider("FarmDistance", {
     Title       = "Độ cao lơ lửng",
