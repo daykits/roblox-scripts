@@ -1,8 +1,8 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v4.0           ║
+    ║   DATKITS BF V1 | BLOX FRUITS AUTO FARM v4.1           ║
     ║   Fluent UI • Zero-Stutter Fly • Sea 1/2/3               ║
-    ║   Auto Quest + Auto Farm + Auto Chest (REWRITTEN)        ║
+    ║   Auto Quest + Auto Farm + Auto Chest (SYNTAX FIXED)     ║
     ╚══════════════════════════════════════════════════════════╝
 --]]
 
@@ -23,17 +23,35 @@ local RunService        = game:GetService("RunService")
 local LocalPlayer       = Players.LocalPlayer
 
 -------------------------------------------------
--- LOAD FLUENT UI
+-- LOAD FLUENT UI (với retry + pcall)
 -------------------------------------------------
-local Fluent = loadstring(game:HttpGet(
-    "https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"
-))()
-local SaveManager = loadstring(game:HttpGet(
-    "https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"
-))()
-local InterfaceManager = loadstring(game:HttpGet(
-    "https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"
-))()
+local Fluent, SaveManager, InterfaceManager
+
+local function LoadFluent()
+    local ok, err = pcall(function()
+        Fluent = loadstring(game:HttpGet(
+            "https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"
+        ))()
+        SaveManager = loadstring(game:HttpGet(
+            "https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"
+        ))()
+        InterfaceManager = loadstring(game:HttpGet(
+            "https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"
+        ))()
+    end)
+    return ok, err
+end
+
+local okLoad, loadErr = LoadFluent()
+if not okLoad then
+    task.wait(2)
+    okLoad, loadErr = LoadFluent()
+end
+
+if not okLoad or not Fluent then
+    warn("[Datkits] Không load được Fluent UI:", loadErr)
+    return
+end
 
 -------------------------------------------------
 -- CONFIG
@@ -51,7 +69,7 @@ local Config = {
     SailSpeed     = 350,
     InstantSail   = false,
     NoclipEnabled = true,
-    ChestRange    = 300,   -- ✅ Bán kính scan chest
+    ChestRange    = 300,
 }
 
 -------------------------------------------------
@@ -59,7 +77,7 @@ local Config = {
 -------------------------------------------------
 local Window = Fluent:CreateWindow({
     Title       = "Datkits Premium | Blox Fruits",
-    SubTitle    = "v4.0 • Auto Quest + Farm + Chest",
+    SubTitle    = "v4.1 • Auto Quest + Farm + Chest",
     TabWidth    = 160,
     Size        = UDim2.fromOffset(580, 460),
     Acrylic     = true,
@@ -175,8 +193,7 @@ local function DisableNoclip()
 end
 
 -------------------------------------------------
--- ✅ MOVEMENT CONTROLLER v4.0
--- Đơn giản hóa, ổn định, không conflict
+-- ✅ MOVEMENT CONTROLLER v4.1
 -------------------------------------------------
 local Move = {
     Active     = false,
@@ -283,18 +300,6 @@ local function SetMoveTarget(targetCFrame)
     if not targetCFrame then return end
     if not StartFly() then return end
     Move.TargetCF = targetCFrame
-end
-
--- ✅ Hàm teleport trực tiếp khi ở gần (tránh bị stuck)
-local function TeleportTo(targetCFrame)
-    local char = GetCharacter()
-    if not char then return false end
-    local hrp = char.HumanoidRootPart
-    if not hrp then return false end
-    pcall(function()
-        hrp.CFrame = targetCFrame
-    end)
-    return true
 end
 
 local function BindHeartbeat()
@@ -507,7 +512,7 @@ local function EquipWeapon()
 end
 
 -------------------------------------------------
--- ✅ QUEST DETECTION v4.0
+-- ✅ QUEST DETECTION
 -------------------------------------------------
 local function GetQuestInfo()
     local info = {
@@ -548,7 +553,7 @@ local function HasQuest()
 end
 
 -------------------------------------------------
--- ✅ QUEST DATA v4.0 - Có SPAWN POINT CHUẨN
+-- ✅ QUEST DATA
 -------------------------------------------------
 local QuestData = {
     [1] = {
@@ -594,7 +599,7 @@ local function GetQuestData()
 end
 
 -------------------------------------------------
--- ✅ ENEMY DETECTION v4.0
+-- ✅ ENEMY
 -------------------------------------------------
 local function IsEnemyMatch(enemyName, filter)
     if not filter then return true end
@@ -681,8 +686,7 @@ local function DoFastAttack()
 end
 
 -------------------------------------------------
--- ✅ AUTO CHEST v4.0 (REWRITTEN)
--- Scan cả folder + workspace, hỗ trợ nhiều loại chest
+-- ✅ AUTO CHEST
 -------------------------------------------------
 local function FindAllChests()
     local chests = {}
@@ -691,7 +695,6 @@ local function FindAllChests()
     local function scanContainer(container, depth)
         if depth > 3 then return end
         for _, obj in ipairs(container:GetChildren()) do
-            -- Chest model
             if obj:IsA("Model") and (obj.Name:find("Chest") or obj.Name == "Chest") then
                 local part = obj.PrimaryPart
                     or obj:FindFirstChildWhichIsA("BasePart", true)
@@ -701,7 +704,6 @@ local function FindAllChests()
                         table.insert(chests, part)
                     end
                 end
-            -- Chest part
             elseif obj:IsA("Part") and obj.Name:find("Chest") then
                 if obj:FindFirstChild("TouchInterest") then
                     if not found[obj] then
@@ -709,7 +711,6 @@ local function FindAllChests()
                         table.insert(chests, obj)
                     end
                 end
-            -- MeshPart chest
             elseif obj:IsA("MeshPart") and obj.Name:find("Chest") then
                 if obj:FindFirstChild("TouchInterest") then
                     if not found[obj] then
@@ -719,7 +720,6 @@ local function FindAllChests()
                 end
             end
 
-            -- Recurse vào folder
             if obj:IsA("Folder") or obj:IsA("Model") then
                 if obj.Name:find("Chest") or obj.Name:find("chest")
                     or obj.Name == "ChestFolder" or obj.Name == "Chests"
@@ -747,7 +747,6 @@ local function AutoChestLoop()
             local chests = FindAllChests()
             if #chests == 0 then return end
 
-            -- Lọc chest trong bán kính
             local validChests = {}
             for _, chest in ipairs(chests) do
                 local dist = (hrp.Position - chest.Position).Magnitude
@@ -762,11 +761,9 @@ local function AutoChestLoop()
             local target = validChests[1].chest
             local targetDist = validChests[1].dist
 
-            -- Nếu ở xa → bay tới
             if targetDist > 8 then
                 SetMoveTarget(target.CFrame)
             else
-                -- Gần rồi → touch
                 SetMoveTarget(target.CFrame)
                 if firetouchinterest then
                     pcall(function()
@@ -781,17 +778,15 @@ local function AutoChestLoop()
 end
 
 -------------------------------------------------
--- ✅ AUTO QUEST v4.0 (REWRITTEN)
--- State machine rõ ràng, sau khi nhận quest bay NGAY tới spawn
+-- ✅ AUTO QUEST v4.1
 -------------------------------------------------
 local QuestState = {
-    Phase = "idle",       -- "idle" | "toNPC" | "atNPC" | "toMob"
+    Phase = "idle",
     LastQuest = nil,
     LastQLv = nil,
     LastQuestTime = 0,
     JustTookQuest = false,
     JustTookTime = 0,
-    LastNPCReached = 0,
 }
 
 local function AutoQuestLoop()
@@ -818,28 +813,21 @@ local function AutoQuestLoop()
             local npcCF = entry.npc
             local spawnCF = entry.spawn
 
-            -- ✅ Xác định hasQuest (có cache 3s sau khi nhận)
             local hasQuest = HasQuest()
             if QuestState.JustTookQuest and (tick() - QuestState.JustTookTime) < 3 then
                 hasQuest = true
             end
 
-            ---------------------------------------------------
             -- PHASE 1: ĐÃ CÓ QUEST → BAY TỚI BÃI QUÁI
-            ---------------------------------------------------
             if hasQuest then
                 QuestState.Phase = "toMob"
 
-                -- Tìm quái theo tên mob
                 local hits = GetClosestEnemies(math.huge, mob)
-
-                -- Fallback: nếu không tìm thấy, scan rộng hơn
                 if #hits == 0 then
                     hits = GetClosestEnemies(1000)
                 end
 
                 if #hits > 0 then
-                    -- ✅ Có quái → bay tới con gần nhất
                     local target = hits[1]
                     local pos = target.hrp.Position
                     local targetCF = CFrame.new(
@@ -848,39 +836,29 @@ local function AutoQuestLoop()
                     )
                     SetMoveTarget(targetCF)
                 elseif spawnCF then
-                    -- ✅ Không có quái trong map → bay tới SPAWN POINT của quest
                     local distToSpawn = (hrp.Position - spawnCF.Position).Magnitude
-
                     if distToSpawn > 15 then
-                        -- Bay tới spawn point
                         SetMoveTarget(spawnCF + Vector3.new(0, Config.FarmDistance, 0))
                     else
-                        -- Đã tới spawn → đứng chờ quái respawn
                         SetMoveTarget(CFrame.new(hrp.Position))
                     end
                 end
                 return
             end
 
-            ---------------------------------------------------
             -- PHASE 2: CHƯA CÓ QUEST → ĐI TỚI NPC
-            ---------------------------------------------------
             QuestState.Phase = "toNPC"
-
             if not npcCF then return end
 
             local distToNPC = (hrp.Position - npcCF.Position).Magnitude
 
             if distToNPC > 12 then
-                -- ✅ Bay tới NPC
                 SetMoveTarget(npcCF * CFrame.new(0, 0, 3))
                 QuestState.Phase = "toNPC"
             else
-                -- ✅ Đã tới NPC → đứng yên, gọi StartQuest
                 QuestState.Phase = "atNPC"
                 SetMoveTarget(CFrame.new(hrp.Position))
 
-                -- Gọi StartQuest với cooldown
                 local now = tick()
                 local needCall = (QuestState.LastQuest ~= quest)
                     or (QuestState.LastQLv ~= qlv)
@@ -895,7 +873,6 @@ local function AutoQuestLoop()
                         ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", quest, qlv)
                     end)
 
-                    -- ✅ Đánh dấu vừa nhận → cho phép bay ngay
                     QuestState.JustTookQuest = true
                     QuestState.JustTookTime = tick()
                 end
@@ -905,7 +882,7 @@ local function AutoQuestLoop()
 end
 
 -------------------------------------------------
--- ✅ AUTO FARM GẦN NHẤT v4.0
+-- ✅ AUTO FARM GẦN NHẤT
 -------------------------------------------------
 local function AutoFarmLoop()
     while task.wait(0.15) do
@@ -933,7 +910,7 @@ local function AutoFarmLoop()
 end
 
 -------------------------------------------------
--- ✅ FAST ATTACK + EQUIP LOOPS
+-- ✅ FAST ATTACK + EQUIP LOOPS (FIX SYNTAX)
 -------------------------------------------------
 local function FastAttackLoop()
     while task.wait(Config.AttackDelay) do
@@ -973,13 +950,17 @@ local function SeaTravelLoop()
     end
 end
 
--- Khởi động tất cả loops
-task.spawn(FastAttackLoop)
-task.spawn(EquipLoop)
-task.spawn(AutoQuestLoop)
-task.spawn(AutoFarmLoop)
-task.spawn(AutoChestLoop)
-task.spawn(SeaTravelLoop)
+-------------------------------------------------
+-- KHỞI ĐỘNG LOOPS (SAU KHI UI ĐÃ LOAD)
+-------------------------------------------------
+local function StartAllLoops()
+    task.spawn(FastAttackLoop)
+    task.spawn(EquipLoop)
+    task.spawn(AutoQuestLoop)
+    task.spawn(AutoFarmLoop)
+    task.spawn(AutoChestLoop)
+    task.spawn(SeaTravelLoop)
+end
 
 -------------------------------------------------
 -- UI - TAB AUTO FARM
@@ -1188,18 +1169,25 @@ Tabs.Player:AddToggle("NoclipToggle", {
 -------------------------------------------------
 -- UI - SETTINGS + SAVE
 -------------------------------------------------
-SaveManager:SetLibrary(Fluent)
-InterfaceManager:SetLibrary(Fluent)
-InterfaceManager:SetFolder("DatkitsBF")
-SaveManager:SetFolder("DatkitsBF")
-InterfaceManager:BuildInterfaceSection(Tabs.Settings)
-SaveManager:BuildConfigSection(Tabs.Settings)
+pcall(function()
+    SaveManager:SetLibrary(Fluent)
+    InterfaceManager:SetLibrary(Fluent)
+    InterfaceManager:SetFolder("DatkitsBF")
+    SaveManager:SetFolder("DatkitsBF")
+    InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+    SaveManager:BuildConfigSection(Tabs.Settings)
+end)
 
 Window:SelectTab(1)
 
+-------------------------------------------------
+-- KHỞI ĐỘNG LOOPS SAU KHI UI ĐÃ XONG
+-------------------------------------------------
+StartAllLoops()
+
 Fluent:Notify({
     Title    = "Datkits Premium",
-    Content  = "v4.0 Auto Quest + Farm + Chest sẵn sàng!",
+    Content  = "v4.1 Auto Quest + Farm + Chest sẵn sàng!",
     Duration = 6,
 })
 
@@ -1224,4 +1212,4 @@ if Config.NoclipEnabled then
     EnableNoclip()
 end
 
-print("[Datkits] ✅ v4.0 Auto Quest + Farm + Chest loaded successfully!")
+print("[Datkits] ✅ v4.1 Auto Quest + Farm + Chest loaded successfully!")
