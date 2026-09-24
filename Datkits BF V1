@@ -1,8 +1,8 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v4.8.1         ║
+    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v4.9           ║
     ║   Fluent UI • Zero-Stutter Fly • Sea 1+2+3               ║
-    ║   Quest + Farm + Chest + Boss + Hop Boss (FIXED)        ║
+    ║   Quest + Farm + Chest + Boss + Hop Boss (SMOOTH)       ║
     ╚══════════════════════════════════════════════════════════╝
 --]]
 
@@ -94,6 +94,11 @@ local Config = {
     HopAutoSpawnFirst = true,
     HopCooldown       = 12,
     MenuVisible    = true,
+    -- ✅ MỚI: Movement tuning
+    MoveResponsiveness = 30,
+    MoveMaxForce       = 80000,
+    MoveSmoothFactor   = 6,
+    MoveDamping        = 8,
 }
 
 -------------------------------------------------
@@ -101,7 +106,7 @@ local Config = {
 -------------------------------------------------
 local Window = Fluent:CreateWindow({
     Title       = "Datkits Premium | Blox Fruits",
-    SubTitle    = "v4.8.1 • Hop Boss (Server có Boss)",
+    SubTitle    = "v4.9 • Smooth Movement",
     TabWidth    = 150,
     Size        = UDim2.fromOffset(620, 500),
     Acrylic     = true,
@@ -215,11 +220,20 @@ local function DisableNoclip()
 end
 
 -------------------------------------------------
--- MOVEMENT CONTROLLER
+-- ✅ MOVEMENT CONTROLLER v4.9 - SMOOTH
+-- FIX: Giảm Responsiveness, damping khi gần target,
+--      target priority, alpha thấp, không overshoot
 -------------------------------------------------
 local Move = {
     Active = false, TargetCF = nil, SmoothPos = nil, BoundHRP = nil,
     AlignPos = nil, AlignOri = nil, Attach = nil, Heartbeat = nil,
+    -- ✅ MỚI: Priority system chống overwrite
+    Priority = 0,       -- 0 = thấp, 10 = cao
+    LastSetTime = 0,
+    LastTargetPos = nil,
+    -- ✅ MỚI: Velocity tracking để smooth hơn
+    Velocity = Vector3.zero,
+    LastHRPPos = nil,
 }
 
 local function CleanupMoveInstances()
@@ -237,20 +251,28 @@ local function EnsureMoveInstances(hrp)
     local att = Instance.new("Attachment")
     att.Name = "FarmAtt"; att.Parent = hrp
 
+    -- ✅ FIX: Giảm MaxForce + Responsiveness để mượt
     local ap = Instance.new("AlignPosition")
     ap.Name = "FarmAP"; ap.Attachment0 = att
     ap.Mode = Enum.PositionAlignmentMode.OneAttachment
     ap.Position = hrp.Position
-    ap.MaxForce = 125000; ap.Responsiveness = 80
-    ap.ApplyAtCenterOfMass = false; ap.Parent = hrp
+    ap.MaxForce = Config.MoveMaxForce           -- 80000 (giảm từ 125000)
+    ap.Responsiveness = Config.MoveResponsiveness -- 30 (giảm từ 80)
+    ap.ApplyAtCenterOfMass = false
+    ap.MaxVelocity = nil  -- Không giới hạn
+    ap.Parent = hrp
 
+    -- ✅ FIX: AlignOrientation mượt hơn
     local ao = Instance.new("AlignOrientation")
     ao.Name = "FarmAO"; ao.Attachment0 = att
     ao.Mode = Enum.OrientationAlignmentMode.OneAttachment
-    ao.CFrame = hrp.CFrame; ao.MaxTorque = 125000
-    ao.Responsiveness = 80; ao.Parent = hrp
+    ao.CFrame = hrp.CFrame; ao.MaxTorque = 80000
+    ao.Responsiveness = 40   -- 40 thay vì 80
+    ao.Parent = hrp
 
     Move.BoundHRP = hrp; Move.AlignPos = ap; Move.AlignOri = ao; Move.Attach = att
+    Move.LastHRPPos = hrp.Position
+    Move.Velocity = Vector3.zero
     return true
 end
 
@@ -267,10 +289,13 @@ local function StartFly()
     pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Climbing, false) end)
     pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false) end)
     pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false) end)
+    pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Swimming, false) end)   -- ✅ MỚI
+    pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, false) end)    -- ✅ MỚI
 
     if not Move.Active then
         Move.SmoothPos = hrp.Position
         Move.Active = true
+        Move.Velocity = Vector3.zero
     end
     for _, part in ipairs(char:GetDescendants()) do
         if part:IsA("BasePart") then part.CanCollide = false end
@@ -281,6 +306,8 @@ end
 local function StopFly()
     if not Move.Active then return end
     Move.Active = false; Move.TargetCF = nil; Move.SmoothPos = nil
+    Move.Priority = 0
+    Move.Velocity = Vector3.zero
     local char = GetCharacter()
     if not char then return end
     local hum = char:FindFirstChildOfClass("Humanoid")
@@ -290,10 +317,24 @@ local function StopFly()
     end
 end
 
-local function SetMoveTarget(targetCFrame)
+-- ✅ FIX: SetMoveTarget với PRIORITY - chống overwrite
+-- Priority: 1 = thấp (quest/sea3), 5 = cao (farm), 10 = rất cao (boss)
+local function SetMoveTarget(targetCFrame, priority)
     if not targetCFrame then return end
+    priority = priority or 5
+
+    -- ✅ Nếu priority thấp hơn priority hiện tại VÀ vừa set gần đây → bỏ qua
+    local now = tick()
+    if Move.Active and priority < Move.Priority and (now - Move.LastSetTime) < 0.15 then
+        return
+    end
+
     if not StartFly() then return end
+
     Move.TargetCF = targetCFrame
+    Move.Priority = priority
+    Move.LastSetTime = now
+    Move.LastTargetPos = targetCFrame.Position
 end
 
 local function BindHeartbeat()
@@ -311,16 +352,42 @@ local function BindHeartbeat()
         if not Move.AlignPos or not Move.AlignPos.Parent then
             if not EnsureMoveInstances(hrp) then return end
         end
+
+        -- Force noclip
         for _, part in ipairs(char:GetDescendants()) do
             if part:IsA("BasePart") and part.CanCollide then
                 part.CanCollide = false
             end
         end
-        local alpha = math.clamp(dt * 18, 0, 1)
-        Move.SmoothPos = Move.SmoothPos:Lerp(Move.TargetCF.Position, alpha)
+
+        local targetPos = Move.TargetCF.Position
+        local currentPos = hrp.Position
+        local distance = (currentPos - targetPos).Magnitude
+
+        -- ✅ FIX 1: Smooth alpha thấp hơn (dt * 6 thay vì 18)
+        local alpha = math.clamp(dt * Config.MoveSmoothFactor, 0, 0.4)
+
+        -- ✅ FIX 2: Nếu đã ở gần target (< 2 studs) → giảm tốc mượt
+        if distance < 3 then
+            alpha = alpha * 0.5
+        end
+
+        Move.SmoothPos = Move.SmoothPos:Lerp(targetPos, alpha)
+
+        -- ✅ FIX 3: Clamp SmoothPos không vượt quá target quá xa
+        if distance > 0.1 then
+            local dir = (targetPos - Move.SmoothPos)
+            if dir.Magnitude > 50 then
+                Move.SmoothPos = targetPos - dir.Unit * 50
+            end
+        end
+
         Move.AlignPos.Position = Move.SmoothPos
-        if (hrp.Position - Move.TargetCF.Position).Magnitude > 0.5 then
-            Move.AlignOri.CFrame = CFrame.new(hrp.Position, Move.TargetCF.Position)
+
+        -- ✅ FIX 4: Orientation chỉ update khi cần
+        local lookDir = (targetPos - currentPos)
+        if lookDir.Magnitude > 1 then
+            Move.AlignOri.CFrame = CFrame.new(currentPos, currentPos + lookDir.Unit)
         end
     end)
 end
@@ -876,9 +943,9 @@ local function AutoChestLoop()
             local targetDist = validChests[1].dist
 
             if targetDist > 8 then
-                SetMoveTarget(target.CFrame)
+                SetMoveTarget(target.CFrame, 3)  -- Priority thấp
             else
-                SetMoveTarget(target.CFrame)
+                SetMoveTarget(target.CFrame, 3)
                 if firetouchinterest then
                     pcall(function()
                         firetouchinterest(hrp, target, 0)
@@ -961,16 +1028,16 @@ local function AutoQuestLoop()
                     if spawnCF then
                         local distToSpawn = (hrp.Position - spawnCF.Position).Magnitude
                         if distToSpawn > 15 then
-                            SetMoveTarget(spawnCF + Vector3.new(0, Config.FarmDistance, 0))
+                            SetMoveTarget(spawnCF + Vector3.new(0, Config.FarmDistance, 0), 4)
                         else
-                            SetMoveTarget(CFrame.new(hrp.Position))
+                            SetMoveTarget(CFrame.new(hrp.Position), 4)
                         end
                     end
                     return
                 end
                 local target = hits[1]
                 local pos = target.hrp.Position
-                SetMoveTarget(CFrame.new(pos + Vector3.new(0, Config.FarmDistance, 0), pos))
+                SetMoveTarget(CFrame.new(pos + Vector3.new(0, Config.FarmDistance, 0), pos), 4)
                 if #hits < QuestState.LastEnemyCount then
                     QuestState.LastKillTime = now
                 end
@@ -983,10 +1050,10 @@ local function AutoQuestLoop()
             if not npcCF then return end
             local distToNPC = (hrp.Position - npcCF.Position).Magnitude
             if distToNPC > 12 then
-                SetMoveTarget(npcCF * CFrame.new(0, 0, 3))
+                SetMoveTarget(npcCF * CFrame.new(0, 0, 3), 4)
             else
                 QuestState.Phase = "atNPC"
-                SetMoveTarget(CFrame.new(hrp.Position))
+                SetMoveTarget(CFrame.new(hrp.Position), 4)
                 local needCall = (QuestState.LastQuest ~= quest)
                     or (QuestState.LastQLv ~= qlv)
                     or (now - QuestState.LastQuestTime > 5)
@@ -1026,7 +1093,7 @@ local function AutoFarmLoop()
             if #hits > 0 then
                 local target = hits[1]
                 local pos = target.hrp.Position
-                SetMoveTarget(CFrame.new(pos + Vector3.new(0, Config.FarmDistance, 0), pos))
+                SetMoveTarget(CFrame.new(pos + Vector3.new(0, Config.FarmDistance, 0), pos), 5)
             end
         end)
     end
@@ -1053,7 +1120,7 @@ local function AutoSea3FarmLoop()
             if #hits > 0 then
                 local target = hits[1]
                 local pos = target.hrp.Position
-                SetMoveTarget(CFrame.new(pos + Vector3.new(0, Config.FarmDistance, 0), pos))
+                SetMoveTarget(CFrame.new(pos + Vector3.new(0, Config.FarmDistance, 0), pos), 3)
                 Sea3State.StuckCounter = 0
                 Sea3State.LastTargetPos = pos
                 return
@@ -1075,7 +1142,7 @@ local function AutoSea3FarmLoop()
             local areaData = Sea3Enemies[Sea3State.CurrentIndex]
             if areaData then
                 local targetPos = areaData.pos + Vector3.new(0, Config.FarmDistance, 0)
-                SetMoveTarget(CFrame.new(targetPos))
+                SetMoveTarget(CFrame.new(targetPos), 3)
                 Sea3State.LastTargetPos = areaData.pos
             end
         end)
@@ -1179,9 +1246,9 @@ local function AutoBossLoop()
                         if distToSpawn > 20 then
                             SetMoveTarget(CFrame.new(
                                 targetInfo.spawnPos + Vector3.new(0, Config.FarmDistance, 0)
-                            ))
+                            ), 10)  -- Priority cao nhất
                         else
-                            SetMoveTarget(CFrame.new(hrp.Position))
+                            SetMoveTarget(CFrame.new(hrp.Position), 10)
                         end
                     end
                 end
@@ -1196,7 +1263,7 @@ local function AutoBossLoop()
             SetMoveTarget(CFrame.new(
                 bossPos + Vector3.new(0, Config.BossDistance, 0),
                 bossPos
-            ))
+            ), 10)  -- Priority cao nhất
 
             if bossHum.Health <= 0 then
                 if BossState.LastKillName ~= targetBoss.boss.Name 
@@ -1220,7 +1287,7 @@ local function AutoBossLoop()
 end
 
 -------------------------------------------------
--- ✅ HOP BOSS SYSTEM (FIXED - Hop vào server có boss)
+-- HOP BOSS SYSTEM
 -------------------------------------------------
 local HopState = {
     IsHopping = false,
@@ -1339,7 +1406,6 @@ local function HopToNextServer()
     end
 end
 
--- ✅ AUTO HOP BOSS LOOP - FIX: Tách riêng khỏi comment
 local function AutoHopBossLoop()
     while task.wait(1) do
         if not Config.AutoHopBoss then
@@ -1830,7 +1896,7 @@ Tabs.Sea3:AddDropdown("Sea3AreaSelect", {
             Sea3State.LastTargetPos = nil
             if Config.AutoSea3Farm then
                 local targetPos = Sea3Enemies[idx].pos + Vector3.new(0, Config.FarmDistance, 0)
-                SetMoveTarget(CFrame.new(targetPos))
+                SetMoveTarget(CFrame.new(targetPos), 3)
             end
         end
     end,
@@ -1843,7 +1909,7 @@ Tabs.Sea3:AddButton({
         if Sea3State.CurrentIndex > #Sea3Enemies then Sea3State.CurrentIndex = 1 end
         local areaData = Sea3Enemies[Sea3State.CurrentIndex]
         if areaData and Config.AutoSea3Farm then
-            SetMoveTarget(CFrame.new(areaData.pos + Vector3.new(0, Config.FarmDistance, 0)))
+            SetMoveTarget(CFrame.new(areaData.pos + Vector3.new(0, Config.FarmDistance, 0)), 3)
         end
     end,
 })
@@ -1938,11 +2004,11 @@ Tabs.Boss:AddDropdown("BossSelect", {
                         SetMoveTarget(CFrame.new(
                             b.hrp.Position + Vector3.new(0, Config.BossDistance, 0),
                             b.hrp.Position
-                        ))
+                        ), 10)
                     elseif info.spawnPos then
                         SetMoveTarget(CFrame.new(
                             info.spawnPos + Vector3.new(0, Config.FarmDistance, 0)
-                        ))
+                        ), 10)
                     end
                 end
                 Fluent:Notify({
@@ -1969,14 +2035,14 @@ Tabs.Boss:AddButton({
             SetMoveTarget(CFrame.new(
                 b.hrp.Position + Vector3.new(0, Config.BossDistance, 0),
                 b.hrp.Position
-            ))
+            ), 10)
         else
             local allList = GetAllBossList()
             for _, info in ipairs(allList) do
                 if info.name == Config.BossSelected then
                     SetMoveTarget(CFrame.new(
                         info.spawnPos + Vector3.new(0, Config.FarmDistance, 0)
-                    ))
+                    ), 10)
                     return
                 end
             end
@@ -2245,6 +2311,63 @@ Tabs.Settings:AddButton({
     Callback = function() ToggleMenu() end,
 })
 
+-- ✅ MỚI: Movement tuning
+Tabs.Settings:AddSection("🎯 Tinh chỉnh di chuyển")
+
+Tabs.Settings:AddSlider("MoveSmoothSlider", {
+    Title       = "Độ mượt di chuyển",
+    Description = "Cao hơn = mượt hơn nhưng chậm hơn (2-20)",
+    Default     = 6, Min = 2, Max = 20, Rounding = 0,
+    Callback    = function(v) Config.MoveSmoothFactor = v end,
+})
+
+Tabs.Settings:AddSlider("MoveResponsiveSlider", {
+    Title       = "Độ phản hồi",
+    Description = "Cao hơn = nhanh hơn nhưng dễ giật (10-80)",
+    Default     = 30, Min = 10, Max = 80, Rounding = 0,
+    Callback    = function(v)
+        Config.MoveResponsiveness = v
+        if Move.AlignPos then
+            Move.AlignPos.Responsiveness = v
+        end
+        if Move.AlignOri then
+            Move.AlignOri.Responsiveness = v + 10
+        end
+    end,
+})
+
+Tabs.Settings:AddSlider("MoveMaxForceSlider", {
+    Title       = "Lực di chuyển",
+    Description = "Cao hơn = nhanh hơn nhưng dễ overshoot (30000-200000)",
+    Default     = 80000, Min = 30000, Max = 200000, Rounding = 0,
+    Callback    = function(v)
+        Config.MoveMaxForce = v
+        if Move.AlignPos then Move.AlignPos.MaxForce = v end
+        if Move.AlignOri then Move.AlignOri.MaxTorque = v end
+    end,
+})
+
+Tabs.Settings:AddButton({
+    Title       = "🔄 Reset về mặc định",
+    Description = "Reset cấu hình di chuyển về mặc định",
+    Callback    = function()
+        Config.MoveSmoothFactor = 6
+        Config.MoveResponsiveness = 30
+        Config.MoveMaxForce = 80000
+        if Move.AlignPos then
+            Move.AlignPos.Responsiveness = 30
+            Move.AlignPos.MaxForce = 80000
+        end
+        if Move.AlignOri then
+            Move.AlignOri.Responsiveness = 40
+            Move.AlignOri.MaxTorque = 80000
+        end
+        Fluent:Notify({
+            Title = "Datkits", Content = "Đã reset cấu hình di chuyển", Duration = 3,
+        })
+    end,
+})
+
 -------------------------------------------------
 -- UI - SETTINGS + SAVE
 -------------------------------------------------
@@ -2283,7 +2406,7 @@ end)
 
 Fluent:Notify({
     Title    = "Datkits Premium",
-    Content  = "v4.8.1 Hop Boss (Server có Boss) đã sẵn sàng!",
+    Content  = "v4.9 Smooth Movement đã sẵn sàng!",
     Duration = 6,
 })
 
@@ -2308,4 +2431,4 @@ if Config.NoclipEnabled then
     EnableNoclip()
 end
 
-print("[Datkits] ✅ v4.8.1 Hop Boss loaded successfully!")
+print("[Datkits] ✅ v4.9 Smooth Movement loaded successfully!")
