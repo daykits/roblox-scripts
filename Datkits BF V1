@@ -1,8 +1,8 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v4.6           ║
+    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v4.7           ║
     ║   Fluent UI • Zero-Stutter Fly • Sea 1+2+3               ║
-    ║   Quest + Farm + Chest + Boss + Menu Toggle Button       ║
+    ║   Quest + Farm + Chest + Boss + Hop Boss + Menu Toggle   ║
     ╚══════════════════════════════════════════════════════════╝
 --]]
 
@@ -22,6 +22,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService        = game:GetService("RunService")
 local UserInputService  = game:GetService("UserInputService")
 local TweenService      = game:GetService("TweenService")
+local TeleportService   = game:GetService("TeleportService")
+local HttpService       = game:GetService("HttpService")
 local LocalPlayer       = Players.LocalPlayer
 
 -------------------------------------------------
@@ -79,15 +81,19 @@ local Config = {
     FloatingButton = true,
     ButtonSize     = 50,
     ButtonOpacity  = 0.9,
-    ButtonPosX     = 20,     -- vị trí mặc định X
-    ButtonPosY     = 0.5,    -- vị trí mặc định Y
     -- Boss
     AutoBoss       = false,
     AutoSpawnBoss  = false,
     BossFarmRange  = 2000,
     BossDistance   = 8,
     BossSelected   = nil,
-    -- Menu state
+    -- ✅ MỚI: Hop Boss config
+    AutoHopBoss       = false,
+    HopDelay          = 5,      -- giây chờ trước khi hop
+    HopKillCount      = 1,      -- số boss kill trước khi hop (1 = hop sau 1 kill)
+    HopAfterNoSpawn   = 30,     -- hop nếu boss không spawn sau X giây
+    HopMethod         = "Queue", -- "Queue" hoặc "Lowest"
+    HopSameServer     = false,  -- cho phép hop lại server cũ
     MenuVisible    = true,
 }
 
@@ -96,7 +102,7 @@ local Config = {
 -------------------------------------------------
 local Window = Fluent:CreateWindow({
     Title       = "Datkits Premium | Blox Fruits",
-    SubTitle    = "v4.6 • Sea 1+2+3 + Boss + Menu Toggle",
+    SubTitle    = "v4.7 • Auto Boss + Hop Boss",
     TabWidth    = 150,
     Size        = UDim2.fromOffset(620, 500),
     Acrylic     = true,
@@ -104,11 +110,11 @@ local Window = Fluent:CreateWindow({
     MinimizeKey = Enum.KeyCode.RightControl,
 })
 
--- ✅ Tạo đầy đủ tabs, BAO GỒM Boss
 local Tabs = {
     Main     = Window:AddTab({ Title = "Auto Farm",  Icon = "sword" }),
     Sea3     = Window:AddTab({ Title = "Sea 3",      Icon = "waves" }),
     Boss     = Window:AddTab({ Title = "Auto Boss",  Icon = "skull" }),
+    HopBoss  = Window:AddTab({ Title = "Hop Boss",   Icon = "repeat" }),
     Sail     = Window:AddTab({ Title = "Sea Travel", Icon = "anchor" }),
     Player   = Window:AddTab({ Title = "Nhân Vật",   Icon = "user" }),
     Settings = Window:AddTab({ Title = "Settings",   Icon = "settings" }),
@@ -537,14 +543,7 @@ end
 -- QUEST DETECTION
 -------------------------------------------------
 local function GetQuestInfo()
-    local info = {
-        HasQuest = false,
-        QuestName = nil,
-        Progress = 0,
-        Required = 0,
-        MobName = nil,
-        IsComplete = false,
-    }
+    local info = { HasQuest = false, QuestName = nil, Progress = 0, Required = 0, MobName = nil, IsComplete = false }
     pcall(function()
         local data = LocalPlayer:FindFirstChild("Data")
         if not data then return end
@@ -562,7 +561,6 @@ local function GetQuestInfo()
         local req = data:FindFirstChild("QuestRequirement")
         if prog then info.Progress = tonumber(prog.Value) or 0 end
         if req then info.Required = tonumber(req.Value) or 0 end
-
         if info.Required > 0 and info.Progress >= info.Required then
             info.IsComplete = true
         end
@@ -667,7 +665,7 @@ local function GetQuestData()
 end
 
 -------------------------------------------------
--- BOSS DATA - CẢ 3 SEA
+-- BOSS DATA
 -------------------------------------------------
 local BossData = {
     [1] = {
@@ -1156,6 +1154,7 @@ local BossState = {
     KillCount = 0,
     LastSearchTime = 0,
     NoBossTime = 0,
+    KillSinceHop = 0,      -- ✅ MỚI: số boss đã kill từ lần hop gần nhất
 }
 
 local function TrySpawnBoss(bossName)
@@ -1206,7 +1205,6 @@ local function AutoBossLoop()
             local targetInfo = nil
 
             if Config.BossSelected then
-                -- Tìm boss theo tên đã lưu
                 local allList = GetAllBossList()
                 for _, info in ipairs(allList) do
                     if info.name == Config.BossSelected then
@@ -1278,14 +1276,211 @@ local function AutoBossLoop()
                     BossState.LastKillTime = tick()
                     BossState.LastKillName = targetBoss.boss.Name
                     BossState.KillCount = BossState.KillCount + 1
+                    BossState.KillSinceHop = BossState.KillSinceHop + 1
+
                     if targetInfo then
                         Fluent:Notify({
                             Title    = "🐲 Boss Killed",
-                            Content  = targetInfo.displayName .. " (Total: " .. BossState.KillCount .. ")",
+                            Content  = targetInfo.displayName .. " (Total: " .. BossState.KillCount 
+                                .. " | Since Hop: " .. BossState.KillSinceHop .. ")",
                             Duration = 3,
                         })
                     end
+
+                    -- ✅ Nếu Auto Hop Boss đang bật và đủ kill count → trigger hop
+                    if Config.AutoHopBoss and BossState.KillSinceHop >= Config.HopKillCount then
+                        task.spawn(function()
+                            task.wait(Config.HopDelay)
+                            if Config.AutoHopBoss then
+                                Fluent:Notify({
+                                    Title    = "🌐 Hop Boss",
+                                    Content  = "Đã kill " .. BossState.KillSinceHop .. " boss → Đang hop server...",
+                                    Duration = 5,
+                                })
+                                HopBoss()
+                            end
+                        end)
+                    end
                 end
+            end
+        end)
+    end
+end
+
+-------------------------------------------------
+-- ✅ MỚI: AUTO HOP BOSS SYSTEM
+-------------------------------------------------
+local HopState = {
+    IsHopping = false,
+    LastHopTime = 0,
+    HopCount = 0,
+    ServerList = {},
+    LastServerFetch = 0,
+}
+
+-- ✅ Lấy danh sách server qua Roblox API
+local function FetchServerList()
+    -- Cache server list 30s
+    if tick() - HopState.LastServerFetch < 30 and #HopState.ServerList > 0 then
+        return HopState.ServerList
+    end
+
+    local servers = {}
+    local placeId = game.PlaceId
+    local jobId = game.JobId
+
+    local ok, result = pcall(function()
+        local url
+        if Config.HopMethod == "Queue" then
+            -- Sort by ascending players (server ít người)
+            url = string.format(
+                "https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100",
+                placeId
+            )
+        else
+            -- Default
+            url = string.format(
+                "https://games.roblox.com/v1/games/%d/servers/Public?limit=100",
+                placeId
+            )
+        end
+        return HttpService:JSONDecode(game:HttpGet(url))
+    end)
+
+    if ok and result and result.data then
+        for _, server in ipairs(result.data) do
+            if server.id and server.id ~= jobId and server.playing < server.maxPlayers then
+                if Config.HopSameServer or server.id ~= jobId then
+                    table.insert(servers, {
+                        id = server.id,
+                        playing = server.playing or 0,
+                        maxPlayers = server.maxPlayers or 12,
+                        ping = server.ping or 999,
+                    })
+                end
+            end
+        end
+    end
+
+    -- Sort by player count ascending (ưu tiên server ít người)
+    table.sort(servers, function(a, b)
+        return a.playing < b.playing
+    end)
+
+    HopState.ServerList = servers
+    HopState.LastServerFetch = tick()
+
+    return servers
+end
+
+-- ✅ Hàm hop server
+function HopBoss()
+    if HopState.IsHopping then return end
+
+    -- Cooldown 15s giữa các lần hop
+    if tick() - HopState.LastHopTime < 15 then
+        Fluent:Notify({
+            Title    = "🌐 Hop Boss",
+            Content  = "Chờ " .. math.floor(15 - (tick() - HopState.LastHopTime)) .. "s trước khi hop tiếp",
+            Duration = 3,
+        })
+        return
+    end
+
+    HopState.IsHopping = true
+    HopState.LastHopTime = tick()
+    HopState.HopCount = HopState.HopCount + 1
+
+    local servers = FetchServerList()
+
+    if #servers == 0 then
+        Fluent:Notify({
+            Title    = "🌐 Hop Boss",
+            Content  = "Không tìm thấy server nào! Thử lại sau.",
+            Duration = 5,
+        })
+        HopState.IsHopping = false
+        return
+    end
+
+    -- Chọn server đầu tiên (ít người nhất)
+    local targetServer = servers[1]
+
+    Fluent:Notify({
+        Title    = "🌐 Hop Boss",
+        Content  = string.format("Đang hop server (Hop #%d)... Players: %d/%d",
+            HopState.HopCount, targetServer.playing, targetServer.maxPlayers),
+        Duration = 5,
+    })
+
+    -- ✅ Lưu trạng thái để auto re-enable sau khi hop
+    local rejoinData = {
+        placeId = game.PlaceId,
+        jobId = targetServer.id,
+        timestamp = tick(),
+        -- Lưu config để restore
+        bossSelected = Config.BossSelected,
+        autoBoss = Config.AutoBoss,
+        autoHop = Config.AutoHopBoss,
+        autoSpawn = Config.AutoSpawnBoss,
+    }
+
+    -- Teleport
+    local ok, err = pcall(function()
+        TeleportService:TeleportToPlaceInstance(
+            game.PlaceId,
+            targetServer.id,
+            LocalPlayer
+        )
+    end)
+
+    if not ok then
+        Fluent:Notify({
+            Title    = "🌐 Hop Boss",
+            Content  = "Lỗi teleport: " .. tostring(err),
+            Duration = 5,
+        })
+        HopState.IsHopping = false
+    end
+end
+
+-- ✅ Auto Hop Loop - Hop khi không có boss sau X giây
+local function AutoHopBossLoop()
+    while task.wait(1) do
+        if not Config.AutoHopBoss then continue end
+        if not Config.AutoBoss then continue end
+        if HopState.IsHopping then continue end
+
+        pcall(function()
+            local char = GetCharacter()
+            if not char then return end
+            local hrp = char.HumanoidRootPart
+            if not hrp then return end
+
+            -- Chỉ hop khi đã chọn boss
+            if not Config.BossSelected then return end
+
+            -- Kiểm tra xem boss có tồn tại không
+            local found = FindBoss(Config.BossSelected)
+            local hasBoss = #found > 0
+
+            -- Nếu không có boss trong workspace
+            if not hasBoss then
+                BossState.NoBossTime = BossState.NoBossTime + 1
+
+                -- Nếu không có boss quá lâu → hop
+                if BossState.NoBossTime >= Config.HopAfterNoSpawn then
+                    BossState.NoBossTime = 0
+                    Fluent:Notify({
+                        Title    = "🌐 Hop Boss",
+                        Content  = "Không có boss sau " .. Config.HopAfterNoSpawn .. "s → Hop server",
+                        Duration = 5,
+                    })
+                    HopBoss()
+                end
+            else
+                -- Có boss → reset timer
+                BossState.NoBossTime = 0
             end
         end)
     end
@@ -1351,45 +1546,34 @@ local function SeaTravelLoop()
 end
 
 -------------------------------------------------
--- ✅ MỚI: FLOATING BUTTON - BẬT/TẮT MENU DATKITS
--- Nút này chỉ để ẨN/HIỆN menu Fluent UI
+-- FLOATING BUTTON - BẬT/TẮT MENU
 -------------------------------------------------
 local FloatingUI = {
     ScreenGui = nil,
     MainButton = nil,
     StatusLabel = nil,
-    IconLabel = nil,
     IsDragging = false,
     DragStart = nil,
     StartPos = nil,
-    MenuOpen = true,   -- Trạng thái menu (mở/đóng)
+    MenuOpen = true,
 }
 
--- ✅ Hàm ẩn/hiện Fluent Window
 local function SetMenuVisible(visible)
     FloatingUI.MenuOpen = visible
 
-    -- Cách 1: Dùng API chính thức của Fluent (nếu có)
     pcall(function()
-        if visible then
-            Window:SelectTab(1)
-        end
+        if visible then Window:SelectTab(1) end
     end)
 
-    -- Cách 2: Tìm và ẩn/hiện ScreenGui của Fluent trực tiếp
-    local ok = pcall(function()
+    pcall(function()
         local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
         if not playerGui then return end
-
-        -- Tìm ScreenGui của Fluent
         for _, gui in ipairs(playerGui:GetChildren()) do
             if gui:IsA("ScreenGui") and (gui.Name == "Fluent" 
                 or gui.Name:lower():find("fluent")) then
                 gui.Enabled = visible
             end
         end
-
-        -- Fallback: Tìm MainFrame trong CoreGui
         local coreGui = game:GetService("CoreGui")
         for _, gui in ipairs(coreGui:GetChildren()) do
             if gui:IsA("ScreenGui") and (gui.Name == "Fluent" 
@@ -1399,7 +1583,6 @@ local function SetMenuVisible(visible)
         end
     end)
 
-    -- ✅ Nếu Fluent dùng MainFrame khác, thử toggle trực tiếp
     pcall(function()
         if Window and Window.MainFrame then
             if Window.MainFrame.Instance then
@@ -1410,16 +1593,12 @@ local function SetMenuVisible(visible)
         end
     end)
 
-    -- Update button visual
-    if FloatingUI.UpdateVisual then
-        FloatingUI.UpdateVisual()
-    end
+    if FloatingUI.UpdateVisual then FloatingUI.UpdateVisual() end
 end
 
 local function ToggleMenu()
     local newState = not FloatingUI.MenuOpen
     SetMenuVisible(newState)
-
     Fluent:Notify({
         Title    = "Datkits",
         Content  = newState and "✅ Menu đã MỞ" or "❌ Menu đã ĐÓNG",
@@ -1438,7 +1617,7 @@ local function CreateFloatingButton()
     sg.ResetOnSpawn = false
     sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     sg.IgnoreGuiInset = true
-    sg.DisplayOrder = 999999  -- Luôn trên cùng
+    sg.DisplayOrder = 999999
 
     local ok = pcall(function()
         sg.Parent = LocalPlayer:WaitForChild("PlayerGui", 5)
@@ -1449,11 +1628,10 @@ local function CreateFloatingButton()
         end)
     end
 
-    -- Main button (tròn)
     local btn = Instance.new("TextButton")
     btn.Name = "MainButton"
     btn.Size = UDim2.fromOffset(Config.ButtonSize, Config.ButtonSize)
-    btn.Position = UDim2.new(0, Config.ButtonPosX, Config.ButtonPosY, -Config.ButtonSize / 2)
+    btn.Position = UDim2.new(0, 20, 0.5, -Config.ButtonSize / 2)
     btn.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
     btn.BackgroundTransparency = 1 - Config.ButtonOpacity
     btn.BorderSizePixel = 0
@@ -1467,7 +1645,7 @@ local function CreateFloatingButton()
     corner.Parent = btn
 
     local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(60, 255, 120)  -- xanh = menu mở
+    stroke.Color = Color3.fromRGB(60, 255, 120)
     stroke.Thickness = 2
     stroke.Transparency = 0.2
     stroke.Parent = btn
@@ -1476,7 +1654,7 @@ local function CreateFloatingButton()
     icon.Name = "Icon"
     icon.Size = UDim2.new(1, 0, 1, 0)
     icon.BackgroundTransparency = 1
-    icon.Text = "≡"  -- dấu 3 gạch (menu icon)
+    icon.Text = "≡"
     icon.TextColor3 = Color3.fromRGB(60, 255, 120)
     icon.TextScaled = true
     icon.Font = Enum.Font.GothamBlack
@@ -1522,10 +1700,8 @@ local function CreateFloatingButton()
     FloatingUI.StatusDot = dot
     FloatingUI.IconLabel = icon
 
-    -- ✅ Update visual theo trạng thái menu
     local function UpdateButtonVisual()
         if FloatingUI.MenuOpen then
-            -- Menu mở → xanh
             stroke.Color = Color3.fromRGB(60, 255, 120)
             icon.TextColor3 = Color3.fromRGB(60, 255, 120)
             icon.Text = "≡"
@@ -1533,7 +1709,6 @@ local function CreateFloatingButton()
             label.Text = "✅ Menu: Đang MỞ"
             label.TextColor3 = Color3.fromRGB(60, 255, 120)
         else
-            -- Menu đóng → đỏ
             stroke.Color = Color3.fromRGB(255, 60, 60)
             icon.TextColor3 = Color3.fromRGB(255, 60, 60)
             icon.Text = "✕"
@@ -1546,7 +1721,6 @@ local function CreateFloatingButton()
     FloatingUI.UpdateVisual = UpdateButtonVisual
     UpdateButtonVisual()
 
-    -- ✅ Drag handler
     local function OnInputBegan(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1
             or input.UserInputType == Enum.UserInputType.Touch
@@ -1581,7 +1755,6 @@ local function CreateFloatingButton()
                 if FloatingUI.DragStart then
                     local delta = input.Position - FloatingUI.DragStart
                     if delta.Magnitude < 5 then
-                        -- ✅ Click → Toggle menu
                         ToggleMenu()
                     end
                 end
@@ -1641,6 +1814,7 @@ local function StartAllLoops()
     task.spawn(SeaTravelLoop)
     task.spawn(AutoSea3FarmLoop)
     task.spawn(AutoBossLoop)
+    task.spawn(AutoHopBossLoop)   -- ✅ MỚI
 end
 
 -------------------------------------------------
@@ -1687,7 +1861,6 @@ Tabs.Main:AddToggle("AutoQuestToggle", {
 
 Tabs.Main:AddSlider("QuestGraceSlider", {
     Title       = "Thời gian giữ farm (s)",
-    Description = "Sau khi nhận quest, giữ phase farm bao lâu",
     Default     = 5,
     Min         = 2,
     Max         = 15,
@@ -1719,7 +1892,6 @@ Tabs.Main:AddToggle("AutoChestToggle", {
 
 Tabs.Main:AddSlider("ChestRange", {
     Title       = "Bán kính nhặt rương",
-    Description = "Chỉ nhặt rương trong phạm vi này",
     Default     = 300,
     Min         = 50,
     Max         = 2000,
@@ -1739,7 +1911,6 @@ Tabs.Sea3:AddParagraph({
 
 Tabs.Sea3:AddToggle("AutoSea3FarmToggle", {
     Title       = "Auto Farm Sea 3 (All Areas)",
-    Description = "Tự động bay qua các khu vực Sea 3 để đánh quái",
     Default     = false,
     Callback    = function(v)
         Config.AutoSea3Farm = v
@@ -1754,13 +1925,12 @@ Tabs.Sea3:AddToggle("AutoSea3FarmToggle", {
 })
 
 Tabs.Sea3:AddSlider("Sea3FarmRange", {
-    Title       = "Bán kính tìm quái",
-    Description = "Tìm quái trong phạm vi này trước khi di chuyển khu vực",
-    Default     = 500,
-    Min         = 100,
-    Max         = 3000,
-    Rounding    = 0,
-    Callback    = function(v) Config.Sea3FarmRange = v end,
+    Title    = "Bán kính tìm quái",
+    Default  = 500,
+    Min      = 100,
+    Max      = 3000,
+    Rounding = 0,
+    Callback = function(v) Config.Sea3FarmRange = v end,
 })
 
 Tabs.Sea3:AddSection("📍 Khu vực Sea 3")
@@ -1786,18 +1956,12 @@ Tabs.Sea3:AddDropdown("Sea3AreaSelect", {
                 local targetPos = Sea3Enemies[idx].pos + Vector3.new(0, Config.FarmDistance, 0)
                 SetMoveTarget(CFrame.new(targetPos))
             end
-            Fluent:Notify({
-                Title    = "Sea 3",
-                Content  = "Chuyển tới: " .. Sea3Enemies[idx].name,
-                Duration = 3,
-            })
         end
     end,
 })
 
 Tabs.Sea3:AddButton({
     Title       = "Tới khu vực tiếp theo",
-    Description = "Chuyển sang khu vực Sea 3 kế tiếp",
     Callback    = function()
         Sea3State.CurrentIndex = Sea3State.CurrentIndex + 1
         if Sea3State.CurrentIndex > #Sea3Enemies then
@@ -1808,31 +1972,20 @@ Tabs.Sea3:AddButton({
             local targetPos = areaData.pos + Vector3.new(0, Config.FarmDistance, 0)
             SetMoveTarget(CFrame.new(targetPos))
         end
-        Fluent:Notify({
-            Title    = "Sea 3",
-            Content  = "Chuyển tới: " .. (areaData and areaData.name or "?"),
-            Duration = 3,
-        })
     end,
 })
 
 Tabs.Sea3:AddButton({
     Title       = "Reset về khu vực 1",
-    Description = "Quay lại khu vực đầu tiên của Sea 3",
     Callback    = function()
         Sea3State.CurrentIndex = 1
         Sea3State.StuckCounter = 0
         Sea3State.LastTargetPos = nil
-        Fluent:Notify({
-            Title    = "Sea 3",
-            Content  = "Đã reset về khu vực 1",
-            Duration = 3,
-        })
     end,
 })
 
 -------------------------------------------------
--- ✅ UI - TAB AUTO BOSS
+-- UI - TAB AUTO BOSS
 -------------------------------------------------
 Tabs.Boss:AddSection("🐲 Auto Boss - Cả 3 Sea")
 
@@ -1862,23 +2015,21 @@ Tabs.Boss:AddToggle("AutoSpawnBossToggle", {
 })
 
 Tabs.Boss:AddSlider("BossFarmRange", {
-    Title       = "Bán kính tìm boss",
-    Description = "Tìm boss trong phạm vi này (studs)",
-    Default     = 2000,
-    Min         = 200,
-    Max         = 10000,
-    Rounding    = 0,
-    Callback    = function(v) Config.BossFarmRange = v end,
+    Title    = "Bán kính tìm boss",
+    Default  = 2000,
+    Min      = 200,
+    Max      = 10000,
+    Rounding = 0,
+    Callback = function(v) Config.BossFarmRange = v end,
 })
 
 Tabs.Boss:AddSlider("BossDistance", {
-    Title       = "Khoảng cách đánh boss",
-    Description = "Khoảng cách tối đa để đánh boss",
-    Default     = 8,
-    Min         = 4,
-    Max         = 30,
-    Rounding    = 0,
-    Callback    = function(v) Config.BossDistance = v end,
+    Title    = "Khoảng cách đánh boss",
+    Default  = 8,
+    Min      = 4,
+    Max      = 30,
+    Rounding = 0,
+    Callback = function(v) Config.BossDistance = v end,
 })
 
 Tabs.Boss:AddSection("📍 Chọn Boss")
@@ -1896,17 +2047,11 @@ Tabs.Boss:AddDropdown("BossSeaSelect", {
             for _, info in ipairs(bossList) do
                 table.insert(names, info.displayName)
             end
-            -- Update dropdown boss theo sea đã chọn
             if Options and Options.BossSelect then
                 pcall(function()
                     Options.BossSelect:SetValues(names)
                 end)
             end
-            Fluent:Notify({
-                Title    = "Auto Boss",
-                Content  = "Đã chọn " .. selected .. " (" .. #names .. " boss)",
-                Duration = 3,
-            })
         end
     end,
 })
@@ -1923,7 +2068,6 @@ Tabs.Boss:AddDropdown("BossSelect", {
     Multi   = false,
     Default = 1,
     Callback = function(selected)
-        -- Tìm boss theo displayName
         local allList = GetAllBossList()
         for _, info in ipairs(allList) do
             if info.displayName == selected then
@@ -1957,14 +2101,9 @@ Tabs.Boss:AddSection("🎯 Hành động nhanh")
 
 Tabs.Boss:AddButton({
     Title       = "📍 Bay tới boss đã chọn",
-    Description = "Di chuyển tới vị trí boss đang chọn",
     Callback    = function()
         if not Config.BossSelected then
-            Fluent:Notify({
-                Title    = "Auto Boss",
-                Content  = "Chưa chọn boss!",
-                Duration = 3,
-            })
+            Fluent:Notify({ Title = "Auto Boss", Content = "Chưa chọn boss!", Duration = 3 })
             return
         end
         local found = FindBoss(Config.BossSelected)
@@ -1974,11 +2113,6 @@ Tabs.Boss:AddButton({
                 b.hrp.Position + Vector3.new(0, Config.BossDistance, 0),
                 b.hrp.Position
             ))
-            Fluent:Notify({
-                Title    = "Auto Boss",
-                Content  = "Đang bay tới boss!",
-                Duration = 3,
-            })
         else
             local allList = GetAllBossList()
             for _, info in ipairs(allList) do
@@ -1986,11 +2120,6 @@ Tabs.Boss:AddButton({
                     SetMoveTarget(CFrame.new(
                         info.spawnPos + Vector3.new(0, Config.FarmDistance, 0)
                     ))
-                    Fluent:Notify({
-                        Title    = "Auto Boss",
-                        Content  = "Boss chưa spawn → tới vị trí chờ",
-                        Duration = 3,
-                    })
                     return
                 end
             end
@@ -2000,32 +2129,129 @@ Tabs.Boss:AddButton({
 
 Tabs.Boss:AddButton({
     Title       = "🔄 Reset Kill Counter",
-    Description = "Đặt lại số boss đã kill",
     Callback    = function()
         BossState.KillCount = 0
+        BossState.KillSinceHop = 0
+        Fluent:Notify({ Title = "Auto Boss", Content = "Đã reset kill counter", Duration = 3 })
+    end,
+})
+
+-------------------------------------------------
+-- ✅ UI - TAB HOP BOSS (MỚI)
+-------------------------------------------------
+Tabs.HopBoss:AddSection("🌐 Auto Hop Boss - Chuyển Server")
+
+Tabs.HopBoss:AddParagraph({
+    Title = "Hướng dẫn Hop Boss",
+    Content = "Tự động chuyển server khi: (1) Kill đủ số boss, hoặc (2) Boss không spawn sau thời gian chờ.",
+})
+
+Tabs.HopBoss:AddToggle("AutoHopBossToggle", {
+    Title       = "Auto Hop Boss (Chuyển server)",
+    Description = "Tự động hop khi kill đủ boss hoặc boss không spawn",
+    Default     = false,
+    Callback    = function(v)
+        Config.AutoHopBoss = v
+        if v then
+            BossState.KillSinceHop = 0
+        end
+    end,
+})
+
+Tabs.HopBoss:AddSlider("HopKillCountSlider", {
+    Title       = "Số boss kill trước khi hop",
+    Description = "1 = hop sau mỗi lần kill boss",
+    Default     = 1,
+    Min         = 1,
+    Max         = 20,
+    Rounding    = 0,
+    Callback    = function(v) Config.HopKillCount = v end,
+})
+
+Tabs.HopBoss:AddSlider("HopDelaySlider", {
+    Title       = "Delay trước khi hop (giây)",
+    Description = "Chờ X giây sau khi kill boss rồi mới hop",
+    Default     = 5,
+    Min         = 2,
+    Max         = 30,
+    Rounding    = 0,
+    Callback    = function(v) Config.HopDelay = v end,
+})
+
+Tabs.HopBoss:AddSlider("HopAfterNoSpawnSlider", {
+    Title       = "Hop khi không có boss sau (giây)",
+    Description = "Nếu boss không spawn sau X giây → hop",
+    Default     = 30,
+    Min         = 10,
+    Max         = 300,
+    Rounding    = 0,
+    Callback    = function(v) Config.HopAfterNoSpawn = v end,
+})
+
+Tabs.HopBoss:AddDropdown("HopMethodSelect", {
+    Title       = "Phương thức hop",
+    Description = "Queue = sort by ít người, Lowest = default",
+    Values      = { "Queue", "Lowest" },
+    Multi       = false,
+    Default     = 1,
+    Callback    = function(selected)
+        Config.HopMethod = selected
+    end,
+})
+
+Tabs.HopBoss:AddToggle("HopSameServerToggle", {
+    Title       = "Cho phép hop lại server cũ",
+    Default     = false,
+    Callback    = function(v) Config.HopSameServer = v end,
+})
+
+Tabs.HopBoss:AddSection("🎯 Hành động thủ công")
+
+Tabs.HopBoss:AddButton({
+    Title       = "🌐 Hop Server ngay",
+    Description = "Chuyển sang server khác ngay lập tức",
+    Callback    = function()
+        HopBoss()
+    end,
+})
+
+Tabs.HopBoss:AddButton({
+    Title       = "🔄 Reset Hop Counter",
+    Callback    = function()
+        HopState.HopCount = 0
+        BossState.KillSinceHop = 0
         Fluent:Notify({
-            Title    = "Auto Boss",
-            Content  = "Đã reset kill counter",
+            Title    = "Hop Boss",
+            Content  = "Đã reset hop counter",
             Duration = 3,
         })
     end,
 })
 
-Tabs.Boss:AddSection("📋 Danh sách Boss")
-
-Tabs.Boss:AddParagraph({
-    Title = "Boss Sea 1 (3 boss)",
-    Content = "Saber Expert, The Gorilla King, Bobby",
+Tabs.HopBoss:AddButton({
+    Title       = "📊 Refresh Server List",
+    Description = "Lấy danh sách server mới",
+    Callback    = function()
+        HopState.LastServerFetch = 0
+        local servers = FetchServerList()
+        Fluent:Notify({
+            Title    = "Hop Boss",
+            Content  = "Tìm thấy " .. #servers .. " server",
+            Duration = 3,
+        })
+    end,
 })
 
-Tabs.Boss:AddParagraph({
-    Title = "Boss Sea 2 (5 boss)",
-    Content = "Cyborg, Diamond, Jeremy, Fajita, Smoke Admiral",
+Tabs.HopBoss:AddSection("⚙️ Thông tin")
+
+Tabs.HopBoss:AddParagraph({
+    Title = "Cách hoạt động",
+    Content = "1. Kill boss → tăng KillSinceHop → đủ HopKillCount → hop\n2. Không thấy boss trong 30s → hop\n3. Cooldown 15s giữa các lần hop",
 })
 
-Tabs.Boss:AddParagraph({
-    Title = "Boss Sea 3 (9 boss)",
-    Content = "Stone, Hydra Leader, Island Empress, Kilo Admiral, Captain Elephant, Beautiful Pirate, Cake Queen, Longma, Soul Reaper",
+Tabs.HopBoss:AddParagraph({
+    Title = "Lưu ý",
+    Content = "• Cần bật Auto Boss trước\n• Hop cần chọn boss cụ thể\n• Server list cache 30s",
 })
 
 -------------------------------------------------
@@ -2035,7 +2261,6 @@ Tabs.Sail:AddSection("🌊 Cài đặt đi biển")
 
 Tabs.Sail:AddToggle("AutoSeaTravelToggle", {
     Title       = "Auto Sea Travel",
-    Description = "Tự động đi thuyền tới đảo quest/boss khi đang ngồi thuyền",
     Default     = false,
     Callback    = function(v)
         Config.AutoSeaTravel = v
@@ -2054,7 +2279,6 @@ Tabs.Sail:AddSlider("SailSpeed", {
 
 Tabs.Sail:AddToggle("InstantSailToggle", {
     Title       = "Instant Sail (Teleport)",
-    Description = "Teleport thẳng tới đảo — nhanh nhưng dễ bị flag",
     Default     = false,
     Callback    = function(v) Config.InstantSail = v end,
 })
@@ -2063,7 +2287,6 @@ Tabs.Sail:AddSection("📍 Đi tới đảo")
 
 Tabs.Sail:AddButton({
     Title       = "Tới đảo gần nhất",
-    Description = "Sail tới đảo gần bạn nhất",
     Callback    = function()
         local island = GetNearestIsland()
         if island then
@@ -2076,12 +2299,6 @@ Tabs.Sail:AddButton({
             Fluent:Notify({
                 Title    = "Sea Travel",
                 Content  = "Đang tới: " .. island.name,
-                Duration = 3,
-            })
-        else
-            Fluent:Notify({
-                Title    = "Sea Travel",
-                Content  = "Không tìm thấy đảo!",
                 Duration = 3,
             })
         end
@@ -2146,7 +2363,6 @@ Tabs.Player:AddSlider("WalkSpeed", {
 
 Tabs.Player:AddToggle("NoclipToggle", {
     Title       = "Noclip (Xuyên tường)",
-    Description = "Cho phép đi xuyên tường",
     Default     = true,
     Callback    = function(v)
         Config.NoclipEnabled = v
@@ -2161,26 +2377,20 @@ Tabs.Settings:AddSection("🎛️ Nút Menu Floating")
 
 Tabs.Settings:AddToggle("FloatingButtonToggle", {
     Title       = "Hiện nút bật/tắt Menu",
-    Description = "Nút nổi để ẩn/hiện Menu Datkits Premium",
     Default     = true,
     Callback    = function(v)
         Config.FloatingButton = v
-        if v then
-            CreateFloatingButton()
-        else
-            DestroyFloatingButton()
-        end
+        if v then CreateFloatingButton() else DestroyFloatingButton() end
     end,
 })
 
 Tabs.Settings:AddSlider("ButtonSizeSlider", {
-    Title       = "Kích thước nút",
-    Description = "Kích thước nút nổi (pixel)",
-    Default     = 50,
-    Min         = 30,
-    Max         = 100,
-    Rounding    = 0,
-    Callback    = function(v)
+    Title    = "Kích thước nút",
+    Default  = 50,
+    Min      = 30,
+    Max      = 100,
+    Rounding = 0,
+    Callback = function(v)
         Config.ButtonSize = v
         if FloatingUI.MainButton then
             FloatingUI.MainButton.Size = UDim2.fromOffset(v, v)
@@ -2189,13 +2399,12 @@ Tabs.Settings:AddSlider("ButtonSizeSlider", {
 })
 
 Tabs.Settings:AddSlider("ButtonOpacitySlider", {
-    Title       = "Độ mờ nút",
-    Description = "0 = trong suốt, 100 = đậm",
-    Default     = 90,
-    Min         = 30,
-    Max         = 100,
-    Rounding    = 0,
-    Callback    = function(v)
+    Title    = "Độ mờ nút",
+    Default  = 90,
+    Min      = 30,
+    Max      = 100,
+    Rounding = 0,
+    Callback = function(v)
         Config.ButtonOpacity = v / 100
         if FloatingUI.MainButton then
             FloatingUI.MainButton.BackgroundTransparency = 1 - (v / 100)
@@ -2205,22 +2414,15 @@ Tabs.Settings:AddSlider("ButtonOpacitySlider", {
 
 Tabs.Settings:AddButton({
     Title       = "🔄 Reset vị trí nút",
-    Description = "Đưa nút về vị trí mặc định",
     Callback    = function()
         if FloatingUI.MainButton then
             FloatingUI.MainButton.Position = UDim2.new(0, 20, 0.5, -Config.ButtonSize / 2)
-            Fluent:Notify({
-                Title    = "Datkits",
-                Content  = "Đã reset vị trí nút",
-                Duration = 3,
-            })
         end
     end,
 })
 
 Tabs.Settings:AddButton({
     Title       = "⌨️ Toggle Menu (RightCtrl)",
-    Description = "Bấm nút này hoặc RightCtrl để ẩn/hiện menu",
     Callback    = function()
         ToggleMenu()
     end,
@@ -2254,7 +2456,7 @@ end
 
 Fluent:Notify({
     Title    = "Datkits Premium",
-    Content  = "v4.6 Menu Toggle + Auto Boss đã sẵn sàng!",
+    Content  = "v4.7 Auto Hop Boss đã sẵn sàng!",
     Duration = 6,
 })
 
@@ -2279,4 +2481,4 @@ if Config.NoclipEnabled then
     EnableNoclip()
 end
 
-print("[Datkits] ✅ v4.6 Menu Toggle + Auto Boss loaded successfully!")
+print("[Datkits] ✅ v4.7 Auto Hop Boss loaded successfully!")
