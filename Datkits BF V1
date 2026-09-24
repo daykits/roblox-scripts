@@ -1,8 +1,8 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v4.2           ║
-    ║   Fluent UI • Zero-Stutter Fly • Sea 1/2/3               ║
-    ║   Auto Quest + Auto Farm + Auto Chest (STABLE)           ║
+    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v4.3           ║
+    ║   Fluent UI • Zero-Stutter Fly • Sea 1+2+3               ║
+    ║   Auto Quest + Auto Farm + Auto Chest (FULL SEA 3)       ║
     ╚══════════════════════════════════════════════════════════╝
 --]]
 
@@ -70,8 +70,10 @@ local Config = {
     InstantSail   = false,
     NoclipEnabled = true,
     ChestRange    = 300,
-    -- ✅ MỚI: Thời gian giữ phase "toMob" sau khi kill quái
     QuestGracePeriod = 5,
+    -- ✅ MỚI: Sea 3 specific
+    AutoSea3Farm  = false,
+    Sea3FarmRange = 500,
 }
 
 -------------------------------------------------
@@ -79,9 +81,9 @@ local Config = {
 -------------------------------------------------
 local Window = Fluent:CreateWindow({
     Title       = "Datkits Premium | Blox Fruits",
-    SubTitle    = "v4.2 • Auto Quest + Farm + Chest",
+    SubTitle    = "v4.3 • Sea 1+2+3 Auto Farm",
     TabWidth    = 160,
-    Size        = UDim2.fromOffset(580, 460),
+    Size        = UDim2.fromOffset(600, 480),
     Acrylic     = true,
     Theme       = "Dark",
     MinimizeKey = Enum.KeyCode.RightControl,
@@ -89,6 +91,7 @@ local Window = Fluent:CreateWindow({
 
 local Tabs = {
     Main     = Window:AddTab({ Title = "Auto Farm",  Icon = "sword" }),
+    Sea3     = Window:AddTab({ Title = "Sea 3",      Icon = "waves" }),
     Sail     = Window:AddTab({ Title = "Sea Travel", Icon = "anchor" }),
     Player   = Window:AddTab({ Title = "Nhân Vật",   Icon = "user" }),
     Settings = Window:AddTab({ Title = "Settings",   Icon = "settings" }),
@@ -195,7 +198,7 @@ local function DisableNoclip()
 end
 
 -------------------------------------------------
--- ✅ MOVEMENT CONTROLLER v4.2
+-- ✅ MOVEMENT CONTROLLER
 -------------------------------------------------
 local Move = {
     Active     = false,
@@ -514,8 +517,7 @@ local function EquipWeapon()
 end
 
 -------------------------------------------------
--- ✅ QUEST DETECTION v4.2
--- Đọc chi tiết QuestProgress + QuestRequirement
+-- QUEST DETECTION
 -------------------------------------------------
 local function GetQuestInfo()
     local info = {
@@ -544,7 +546,6 @@ local function GetQuestInfo()
         if prog then info.Progress = tonumber(prog.Value) or 0 end
         if req then info.Required = tonumber(req.Value) or 0 end
 
-        -- ✅ Chỉ coi là complete khi có progress và required > 0
         if info.Required > 0 and info.Progress >= info.Required then
             info.IsComplete = true
         end
@@ -552,7 +553,6 @@ local function GetQuestInfo()
     return info
 end
 
--- ✅ HasQuest cũ giữ lại để tương thích ngược
 local function HasQuest()
     local info = GetQuestInfo()
     if not info.HasQuest then return false end
@@ -561,9 +561,12 @@ local function HasQuest()
 end
 
 -------------------------------------------------
--- ✅ QUEST DATA
+-- ✅ QUEST DATA - SEA 1 + SEA 2 + SEA 3
 -------------------------------------------------
 local QuestData = {
+    -------------------------------------------------
+    -- SEA 1 (Level 1 - 699)
+    -------------------------------------------------
     [1] = {
         { maxLv = 9,   quest = "BanditQuest",   lv = 1, mob = "Bandit",            npc = CFrame.new(1059.37, 16.51, 1549.26), spawn = CFrame.new(1145, 17, 1634) },
         { maxLv = 14,  quest = "JungleQuest",   lv = 1, mob = "Monkey",            npc = CFrame.new(-1598.08, 36.85, 153.38), spawn = CFrame.new(-1610, 37, 145) },
@@ -580,8 +583,12 @@ local QuestData = {
         { maxLv = 449, quest = "FishmanQuest",  lv = 1, mob = "Fishman Warrior",   npc = CFrame.new(61163.85, 18.5, 1569.26), spawn = CFrame.new(60800, 18, 1500) },
         { maxLv = 524, quest = "SkyQuest2",     lv = 1, mob = "God's Guard",       npc = CFrame.new(-7861.34, 5545.49, -380.29),spawn= CFrame.new(-7725, 5600, -440) },
         { maxLv = 624, quest = "SkyQuest2",     lv = 2, mob = "Shandian",          npc = CFrame.new(-7861.34, 5545.49, -380.29),spawn= CFrame.new(-7850, 5600, -220) },
-        { maxLv = 9999,quest = "FountainQuest", lv = 1, mob = "Galley Pirate",     npc = CFrame.new(5259.82, 38.5, 4050.03),  spawn = CFrame.new(5580, 38, 3990) },
+        { maxLv = 699, quest = "FountainQuest", lv = 1, mob = "Galley Pirate",     npc = CFrame.new(5259.82, 38.5, 4050.03),  spawn = CFrame.new(5580, 38, 3990) },
     },
+
+    -------------------------------------------------
+    -- SEA 2 (Level 700 - 1499)
+    -------------------------------------------------
     [2] = {
         { maxLv = 725, quest = "Area1Quest",    lv = 1, mob = "Raider",            npc = CFrame.new(-429.54, 71.77, 1836.18), spawn = CFrame.new(-728, 52, 2345) },
         { maxLv = 775, quest = "Area1Quest",    lv = 2, mob = "Mercenary",         npc = CFrame.new(-429.54, 71.77, 1836.18), spawn = CFrame.new(-1004, 80, 1424) },
@@ -590,8 +597,69 @@ local QuestData = {
         { maxLv = 900, quest = "MarineQuest3",  lv = 1, mob = "Marine Lieutenant", npc = CFrame.new(-2440.79, 71.71, -3216.07),spawn = CFrame.new(-2552, 110, -3050) },
         { maxLv = 950, quest = "MarineQuest3",  lv = 2, mob = "Marine Captain",    npc = CFrame.new(-2440.79, 71.71, -3216.07),spawn = CFrame.new(-2552, 110, -3050) },
         { maxLv = 975, quest = "ZombieQuest",   lv = 1, mob = "Zombie",            npc = CFrame.new(-5494.34, 48.52, -795.16),spawn = CFrame.new(-5550, 48, -800) },
-        { maxLv = 9999,quest = "ZombieQuest",   lv = 2, mob = "Vampire",           npc = CFrame.new(-5494.34, 48.52, -795.16),spawn = CFrame.new(-5550, 48, -800) },
+        { maxLv = 999, quest = "ZombieQuest",   lv = 2, mob = "Vampire",           npc = CFrame.new(-5494.34, 48.52, -795.16),spawn = CFrame.new(-5550, 48, -800) },
+        { maxLv = 1050,quest = "SnowMountainQuest", lv = 1, mob = "Snow Trooper",   npc = CFrame.new(1385.84, 87.27, -1298.61), spawn = CFrame.new(1285, 105, -1342) },
+        { maxLv = 1125,quest = "SnowMountainQuest", lv = 2, mob = "Winter Warrior",  npc = CFrame.new(1385.84, 87.27, -1298.61), spawn = CFrame.new(1285, 105, -1342) },
+        { maxLv = 1200,quest = "MarineQuest3",  lv = 3, mob = "Lab Subordinate",    npc = CFrame.new(-2440.79, 71.71, -3216.07),spawn = CFrame.new(-2552, 110, -3050) },
+        { maxLv = 1275,quest = "MarineQuest3",  lv = 4, mob = "Horned Warrior",    npc = CFrame.new(-2440.79, 71.71, -3216.07),spawn = CFrame.new(-2552, 110, -3050) },
+        { maxLv = 1350,quest = "CursedShipQuest",lv = 1, mob = "Living Zombie",    npc = CFrame.new(923.85, 125.29, 32857.45),spawn = CFrame.new(1060, 128, 32900) },
+        { maxLv = 1425,quest = "CursedShipQuest",lv = 2, mob = "Demonic Soul",     npc = CFrame.new(923.85, 125.29, 32857.45),spawn = CFrame.new(1060, 128, 32900) },
+        { maxLv = 1499,quest = "IceCastleQuest", lv = 1, mob = "Ice Legion",       npc = CFrame.new(5576.23, 300.16, -6300.44),spawn = CFrame.new(5620, 300, -6280) },
     },
+
+    -------------------------------------------------
+    -- SEA 3 (Level 1500+) ✅ MỚI
+    -------------------------------------------------
+    [3] = {
+        -- Port Town (1500 - 1624)
+        { maxLv = 1549, quest = "PirateQuest",   lv = 1, mob = "Pirate",            npc = CFrame.new(-285.71, 6.16, 5353.14),  spawn = CFrame.new(-200, 6, 5340) },
+        { maxLv = 1624, quest = "PirateQuest",   lv = 2, mob = "Brute",             npc = CFrame.new(-285.71, 6.16, 5353.14),  spawn = CFrame.new(-200, 6, 5340) },
+
+        -- Hydra Island (1625 - 1724)
+        { maxLv = 1674, quest = "HydraQuest",    lv = 1, mob = "Mercenary",         npc = CFrame.new(5705.43, 15.36, -630.42), spawn = CFrame.new(5670, 15, -650) },
+        { maxLv = 1724, quest = "HydraQuest",    lv = 2, mob = "Raider",            npc = CFrame.new(5705.43, 15.36, -630.42), spawn = CFrame.new(5670, 15, -650) },
+
+        -- Great Tree (1725 - 1824)
+        { maxLv = 1774, quest = "GreatTreeQuest",lv = 1, mob = "Forest Pirate",     npc = CFrame.new(2150.34, 27.66, -6650.59),spawn = CFrame.new(2150, 28, -6680) },
+        { maxLv = 1824, quest = "GreatTreeQuest",lv = 2, mob = "Mythological Pirate",npc = CFrame.new(2150.34, 27.66, -6650.59),spawn = CFrame.new(2150, 28, -6680) },
+
+        -- Castle on the Sea (1825 - 1924)
+        { maxLv = 1874, quest = "CastleQuest",   lv = 1, mob = "Pirate",            npc = CFrame.new(-5500.14, 313.66, -3010.76),spawn = CFrame.new(-5530, 313, -3020) },
+        { maxLv = 1924, quest = "CastleQuest",   lv = 2, mob = "Musketeer",         npc = CFrame.new(-5500.14, 313.66, -3010.76),spawn = CFrame.new(-5530, 313, -3020) },
+
+        -- Floating Turtle (1925 - 2024)
+        { maxLv = 1974, quest = "FloatingTurtleQuest", lv = 1, mob = "Fishman",     npc = CFrame.new(-11000.5, 331.5, -8600.5), spawn = CFrame.new(-11030, 331, -8600) },
+        { maxLv = 2024, quest = "FloatingTurtleQuest", lv = 2, mob = "Fishman Captain", npc = CFrame.new(-11000.5, 331.5, -8600.5), spawn = CFrame.new(-11030, 331, -8600) },
+
+        -- Haunted Castle (2025 - 2124)
+        { maxLv = 2074, quest = "HauntedQuest",  lv = 1, mob = "Reborn Skeleton",   npc = CFrame.new(-9515.5, 142.5, 5520.5),  spawn = CFrame.new(-9540, 142, 5530) },
+        { maxLv = 2124, quest = "HauntedQuest",  lv = 2, mob = "Living Zombie",     npc = CFrame.new(-9515.5, 142.5, 5520.5),  spawn = CFrame.new(-9540, 142, 5530) },
+
+        -- Sea of Treats (2125+)
+        { maxLv = 2224, quest = "CandyQuest",    lv = 1, mob = "Candy Pirate",      npc = CFrame.new(-1160.5, 14.5, -10750.5), spawn = CFrame.new(-1180, 14, -10750) },
+        { maxLv = 2324, quest = "CandyQuest",    lv = 2, mob = "Cookie Crafter",    npc = CFrame.new(-1160.5, 14.5, -10750.5), spawn = CFrame.new(-1180, 14, -10750) },
+        { maxLv = 2424, quest = "CandyQuest",    lv = 3, mob = "Cake Guard",        npc = CFrame.new(-1160.5, 14.5, -10750.5), spawn = CFrame.new(-1180, 14, -10750) },
+        { maxLv = 9999, quest = "CandyQuest",    lv = 4, mob = "Candy Rebel",       npc = CFrame.new(-1160.5, 14.5, -10750.5), spawn = CFrame.new(-1180, 14, -10750) },
+    },
+}
+
+-- ✅ Danh sách enemy Sea 3 để auto farm không cần quest
+local Sea3Enemies = {
+    { name = "Pirate",              pos = Vector3.new(-200, 6, 5340)     },
+    { name = "Brute",               pos = Vector3.new(-200, 6, 5340)     },
+    { name = "Mercenary",           pos = Vector3.new(5670, 15, -650)    },
+    { name = "Raider",              pos = Vector3.new(5670, 15, -650)    },
+    { name = "Forest Pirate",       pos = Vector3.new(2150, 28, -6680)   },
+    { name = "Mythological Pirate", pos = Vector3.new(2150, 28, -6680)   },
+    { name = "Musketeer",           pos = Vector3.new(-5530, 313, -3020) },
+    { name = "Fishman",             pos = Vector3.new(-11030, 331, -8600)},
+    { name = "Fishman Captain",     pos = Vector3.new(-11030, 331, -8600)},
+    { name = "Reborn Skeleton",     pos = Vector3.new(-9540, 142, 5530)  },
+    { name = "Living Zombie",       pos = Vector3.new(-9540, 142, 5530)  },
+    { name = "Candy Pirate",        pos = Vector3.new(-1180, 14, -10750) },
+    { name = "Cookie Crafter",      pos = Vector3.new(-1180, 14, -10750) },
+    { name = "Cake Guard",          pos = Vector3.new(-1180, 14, -10750) },
+    { name = "Candy Rebel",         pos = Vector3.new(-1180, 14, -10750) },
 }
 
 local function GetQuestData()
@@ -607,7 +675,7 @@ local function GetQuestData()
 end
 
 -------------------------------------------------
--- ✅ ENEMY
+-- ENEMY
 -------------------------------------------------
 local function IsEnemyMatch(enemyName, filter)
     if not filter then return true end
@@ -642,7 +710,7 @@ local function GetClosestEnemies(maxRange, nameFilter)
 end
 
 -------------------------------------------------
--- ✅ FAST ATTACK
+-- FAST ATTACK
 -------------------------------------------------
 local function GetNet()
     local modules = ReplicatedStorage:FindFirstChild("Modules")
@@ -689,11 +757,12 @@ local function DoFastAttack()
             pcall(function()
                 regHit:FireServer(data.hrp, { data.enemy })
             end)
-        end    end
+        end
+    end
 end
 
 -------------------------------------------------
--- ✅ AUTO CHEST
+-- AUTO CHEST
 -------------------------------------------------
 local function FindAllChests()
     local chests = {}
@@ -785,19 +854,18 @@ local function AutoChestLoop()
 end
 
 -------------------------------------------------
--- ✅ AUTO QUEST v4.2 - FIX TRIỆT ĐỂ
--- Không quay về NPC sau khi kill 1 con
+-- ✅ AUTO QUEST v4.3 - HỖ TRỢ SEA 1 + 2 + 3
 -------------------------------------------------
 local QuestState = {
-    Phase = "idle",              -- idle | toNPC | atNPC | toMob
-    LastQuest = nil,             -- Quest name đã nhận
-    LastQLv = nil,               -- Quest level đã nhận
-    LastQuestTime = 0,           -- Thời điểm gọi StartQuest
-    QuestAccepted = false,       -- ✅ Đã nhận quest chưa (cache)
-    QuestAcceptedTime = 0,       -- Thời điểm nhận quest
-    LastKillTime = 0,            -- ✅ Thời điểm kill quái gần nhất
-    LastEnemyCount = 0,          -- ✅ Số quái tìm thấy lần trước
-    QuestCompleted = false,      -- ✅ Quest đã hoàn thành
+    Phase = "idle",
+    LastQuest = nil,
+    LastQLv = nil,
+    LastQuestTime = 0,
+    QuestAccepted = false,
+    QuestAcceptedTime = 0,
+    LastKillTime = 0,
+    LastEnemyCount = 0,
+    QuestCompleted = false,
 }
 
 local function AutoQuestLoop()
@@ -825,17 +893,16 @@ local function AutoQuestLoop()
             local npcCF = entry.npc
             local spawnCF = entry.spawn
 
-            -- ✅ Lấy thông tin quest chi tiết
             local qInfo = GetQuestInfo()
             local now = tick()
 
-            -- ✅ ĐỔI QUEST: Nếu quest name khác với quest đã nhận → reset state
+            -- Đổi quest → reset
             if qInfo.QuestName and qInfo.QuestName ~= QuestState.LastQuest then
                 QuestState.QuestAccepted = false
                 QuestState.QuestCompleted = false
             end
 
-            -- ✅ CẬP NHẬT: Nếu phát hiện có quest trong Data → đánh dấu đã nhận
+            -- Cập nhật quest state
             if qInfo.HasQuest and not qInfo.IsComplete then
                 if not QuestState.QuestAccepted then
                     QuestState.QuestAccepted = true
@@ -844,33 +911,19 @@ local function AutoQuestLoop()
                 QuestState.QuestCompleted = false
             end
 
-            -- ✅ CẬP NHẬT: Nếu quest trong Data đã complete → đánh dấu
             if qInfo.IsComplete then
                 QuestState.QuestCompleted = true
             end
 
-            -- ✅ Nếu vừa nhận quest trong 5s qua → coi như đã có quest
-            local withinAcceptGrace = (now - QuestState.QuestAcceptedTime) < Config.QuestGracePeriod
-
-            -- ✅ LOGIC CHÍNH: quyết định phase
-            -- Điều kiện để ĐI ĐÁNH QUÁI:
-            --   1. Có quest trong Data (chưa complete), HOẶC
-            --   2. Đã accept quest (cache) VÀ chưa complete VÀ trong grace period, HOẶC
-            --   3. Vừa kill quái trong 3s qua (chưa kịp update)
+            -- Quyết định farm hay không
             local shouldFarm = false
-
             if qInfo.HasQuest and not qInfo.IsComplete then
-                -- Có quest đang active
                 shouldFarm = true
             elseif QuestState.QuestAccepted and not QuestState.QuestCompleted then
-                -- Đã accept quest (cache) và chưa complete
                 shouldFarm = true
-            elseif QuestState.QuestCompleted then
-                -- Quest đã xong → đi nhận quest mới
-                shouldFarm = false
             end
 
-            -- ✅ SPECIAL CASE: Vừa kill quái → giữ phase farm thêm 3s
+            -- Vừa kill → giữ farm
             if not shouldFarm and (now - QuestState.LastKillTime) < 3 then
                 shouldFarm = true
             end
@@ -881,33 +934,16 @@ local function AutoQuestLoop()
             if shouldFarm then
                 QuestState.Phase = "toMob"
 
-                -- Tìm quái theo tên mob
                 local hits = GetClosestEnemies(math.huge, mob)
-
-                -- Fallback: nếu không tìm thấy trong phạm vi, thử tìm rộng hơn
                 if #hits == 0 then
                     hits = GetClosestEnemies(2000)
                 end
 
-                -- ✅ FIX: Nếu không tìm thấy quái VÀ đang trong grace period → ở yên chờ quái respawn
-                -- (không quay về NPC vội)
                 if #hits == 0 then
-                    -- Kiểm tra xem có đang trong grace period không
                     local withinQuestGrace = QuestState.QuestAccepted
                         and (now - QuestState.QuestAcceptedTime) < Config.QuestGracePeriod
 
-                    if withinQuestGrace and spawnCF then
-                        -- Vẫn còn trong grace period → bay về spawn point của quest
-                        -- (không phải NPC!)
-                        local distToSpawn = (hrp.Position - spawnCF.Position).Magnitude
-                        if distToSpawn > 15 then
-                            SetMoveTarget(spawnCF + Vector3.new(0, Config.FarmDistance, 0))
-                        else
-                            -- Đã tới spawn, đứng chờ quái spawn
-                            SetMoveTarget(CFrame.new(hrp.Position))
-                        end
-                    elseif spawnCF then
-                        -- Hết grace period nhưng vẫn chưa tìm thấy quái → bay tới spawn
+                    if spawnCF then
                         local distToSpawn = (hrp.Position - spawnCF.Position).Magnitude
                         if distToSpawn > 15 then
                             SetMoveTarget(spawnCF + Vector3.new(0, Config.FarmDistance, 0))
@@ -918,7 +954,6 @@ local function AutoQuestLoop()
                     return
                 end
 
-                -- ✅ Có quái → bay tới con gần nhất và đánh
                 local target = hits[1]
                 local pos = target.hrp.Position
                 local targetCF = CFrame.new(
@@ -927,7 +962,6 @@ local function AutoQuestLoop()
                 )
                 SetMoveTarget(targetCF)
 
-                -- ✅ Cập nhật LastKillTime nếu số quái giảm → có kill
                 if #hits < QuestState.LastEnemyCount then
                     QuestState.LastKillTime = now
                 end
@@ -962,7 +996,6 @@ local function AutoQuestLoop()
                     QuestState.LastQLv = qlv
                     QuestState.LastQuestTime = now
 
-                    -- ✅ Reset completed flag
                     QuestState.QuestCompleted = false
                     QuestState.QuestAccepted = false
 
@@ -970,7 +1003,6 @@ local function AutoQuestLoop()
                         ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", quest, qlv)
                     end)
 
-                    -- ✅ Đánh dấu đã nhận quest
                     QuestState.QuestAccepted = true
                     QuestState.QuestAcceptedTime = now
                 end
@@ -985,7 +1017,7 @@ end
 local function AutoFarmLoop()
     while task.wait(0.15) do
         if not Config.AutoFarm then
-            if Move.Active and not Config.AutoQuest and not Config.AutoChest then
+            if Move.Active and not Config.AutoQuest and not Config.AutoChest and not Config.AutoSea3Farm then
                 StopFly()
             end
             continue
@@ -1008,11 +1040,85 @@ local function AutoFarmLoop()
 end
 
 -------------------------------------------------
--- ✅ FAST ATTACK + EQUIP LOOPS
+-- ✅ MỚI: SEA 3 AUTO FARM LOOP
+-- Bay qua các khu vực Sea 3 để đánh quái tự động
+-------------------------------------------------
+local Sea3State = {
+    CurrentIndex = 1,
+    LastTargetPos = nil,
+    StuckCounter = 0,
+    LastCheckTime = 0,
+}
+
+local function AutoSea3FarmLoop()
+    while task.wait(0.3) do
+        if not Config.AutoSea3Farm then
+            if Sea3State.LastTargetPos then
+                Sea3State.LastTargetPos = nil
+            end
+            continue
+        end
+
+        pcall(function()
+            local char = GetCharacter()
+            if not char then return end
+            local hrp = char.HumanoidRootPart
+            if not hrp then return end
+
+            -- ✅ Ưu tiên 1: Tìm quái trong bán kính Sea3FarmRange
+            local hits = GetClosestEnemies(Config.Sea3FarmRange)
+            if #hits > 0 then
+                local target = hits[1]
+                local pos = target.hrp.Position
+                local targetCF = CFrame.new(
+                    pos + Vector3.new(0, Config.FarmDistance, 0),
+                    pos
+                )
+                SetMoveTarget(targetCF)
+
+                -- Reset stuck counter khi tìm thấy quái
+                Sea3State.StuckCounter = 0
+                Sea3State.LastTargetPos = pos
+                return
+            end
+
+            -- ✅ Ưu tiên 2: Không có quái gần → bay tới khu vực tiếp theo
+            local currentPos = hrp.Position
+
+            -- Nếu đã tới vị trí target cũ mà vẫn không có quái → chuyển khu vực
+            if Sea3State.LastTargetPos then
+                local distToLast = (currentPos - Sea3State.LastTargetPos).Magnitude
+                if distToLast < 30 then
+                    Sea3State.StuckCounter = Sea3State.StuckCounter + 1
+                    if Sea3State.StuckCounter >= 3 then
+                        -- Chuyển sang khu vực tiếp theo
+                        Sea3State.CurrentIndex = Sea3State.CurrentIndex + 1
+                        if Sea3State.CurrentIndex > #Sea3Enemies then
+                            Sea3State.CurrentIndex = 1
+                        end
+                        Sea3State.StuckCounter = 0
+                    end
+                end
+            end
+
+            -- Bay tới khu vực hiện tại
+            local areaData = Sea3Enemies[Sea3State.CurrentIndex]
+            if areaData then
+                local targetPos = areaData.pos + Vector3.new(0, Config.FarmDistance, 0)
+                local targetCF = CFrame.new(targetPos)
+                SetMoveTarget(targetCF)
+                Sea3State.LastTargetPos = areaData.pos
+            end
+        end)
+    end
+end
+
+-------------------------------------------------
+-- FAST ATTACK + EQUIP + SEA TRAVEL LOOPS
 -------------------------------------------------
 local function FastAttackLoop()
     while task.wait(Config.AttackDelay) do
-        if Config.FastAttack and (Config.AutoQuest or Config.AutoFarm) then
+        if Config.FastAttack and (Config.AutoQuest or Config.AutoFarm or Config.AutoSea3Farm) then
             pcall(DoFastAttack)
         end
     end
@@ -1020,7 +1126,7 @@ end
 
 local function EquipLoop()
     while task.wait(0.3) do
-        if Config.AutoQuest or Config.AutoFarm then
+        if Config.AutoQuest or Config.AutoFarm or Config.AutoSea3Farm then
             pcall(EquipWeapon)
         end
     end
@@ -1058,6 +1164,7 @@ local function StartAllLoops()
     task.spawn(AutoFarmLoop)
     task.spawn(AutoChestLoop)
     task.spawn(SeaTravelLoop)
+    task.spawn(AutoSea3FarmLoop)  -- ✅ MỚI
 end
 
 -------------------------------------------------
@@ -1094,7 +1201,7 @@ Tabs.Main:AddToggle("FastAttackToggle", {
 Tabs.Main:AddSection("Auto Quest")
 
 Tabs.Main:AddToggle("AutoQuestToggle", {
-    Title    = "Auto Quest (Sea 1 + Sea 2)",
+    Title    = "Auto Quest (Sea 1 + 2 + 3)",
     Default  = false,
     Callback = function(v)
         Config.AutoQuest = v
@@ -1102,7 +1209,6 @@ Tabs.Main:AddToggle("AutoQuestToggle", {
     end,
 })
 
--- ✅ MỚI: Slider thời gian giữ phase farm
 Tabs.Main:AddSlider("QuestGraceSlider", {
     Title       = "Thời gian giữ farm (s)",
     Description = "Sau khi nhận quest, giữ phase farm bao lâu",
@@ -1143,6 +1249,118 @@ Tabs.Main:AddSlider("ChestRange", {
     Max         = 2000,
     Rounding    = 0,
     Callback    = function(v) Config.ChestRange = v end,
+})
+
+-------------------------------------------------
+-- ✅ UI - TAB SEA 3 (MỚI)
+-------------------------------------------------
+Tabs.Sea3:AddSection("🌊 Sea 3 Auto Farm")
+
+Tabs.Sea3:AddParagraph({
+    Title = "Hướng dẫn Sea 3",
+    Content = "Sea 3 yêu cầu level 1500+. Bật Auto Farm để tự động bay qua các khu vực và đánh quái.",
+})
+
+Tabs.Sea3:AddToggle("AutoSea3FarmToggle", {
+    Title       = "Auto Farm Sea 3 (All Areas)",
+    Description = "Tự động bay qua các khu vực Sea 3 để đánh quái",
+    Default     = false,
+    Callback    = function(v)
+        Config.AutoSea3Farm = v
+        if v then
+            -- Reset state khi bật
+            Sea3State.CurrentIndex = 1
+            Sea3State.StuckCounter = 0
+            Sea3State.LastTargetPos = nil
+        else
+            ResetCharacterState()
+        end
+    end,
+})
+
+Tabs.Sea3:AddSlider("Sea3FarmRange", {
+    Title       = "Bán kính tìm quái",
+    Description = "Tìm quái trong phạm vi này trước khi di chuyển khu vực",
+    Default     = 500,
+    Min         = 100,
+    Max         = 3000,
+    Rounding    = 0,
+    Callback    = function(v) Config.Sea3FarmRange = v end,
+})
+
+Tabs.Sea3:AddSection("📍 Khu vực Sea 3")
+
+Tabs.Sea3:AddDropdown("Sea3AreaSelect", {
+    Title   = "Chọn khu vực",
+    Values  = (function()
+        local t = {}
+        for i, area in ipairs(Sea3Enemies) do
+            table.insert(t, string.format("%d. %s", i, area.name))
+        end
+        return t
+    end)(),
+    Multi   = false,
+    Default = 1,
+    Callback = function(selected)
+        -- Parse index từ chuỗi "1. Pirate"
+        local idx = tonumber(selected:match("^(%d+)"))
+        if idx and Sea3Enemies[idx] then
+            Sea3State.CurrentIndex = idx
+            Sea3State.StuckCounter = 0
+            Sea3State.LastTargetPos = nil
+
+            -- Nếu đang bật Auto Sea 3, di chuyển ngay tới đó
+            if Config.AutoSea3Farm then
+                local targetPos = Sea3Enemies[idx].pos + Vector3.new(0, Config.FarmDistance, 0)
+                SetMoveTarget(CFrame.new(targetPos))
+            end
+
+            Fluent:Notify({
+                Title    = "Sea 3",
+                Content  = "Chuyển tới: " .. Sea3Enemies[idx].name,
+                Duration = 3,
+            })
+        end
+    end,
+})
+
+Tabs.Sea3:AddButton({
+    Title       = "Tới khu vực tiếp theo",
+    Description = "Chuyển sang khu vực Sea 3 kế tiếp",
+    Callback    = function()
+        Sea3State.CurrentIndex = Sea3State.CurrentIndex + 1
+        if Sea3State.CurrentIndex > #Sea3Enemies then
+            Sea3State.CurrentIndex = 1
+        end
+
+        local areaData = Sea3Enemies[Sea3State.CurrentIndex]
+        if areaData and Config.AutoSea3Farm then
+            local targetPos = areaData.pos + Vector3.new(0, Config.FarmDistance, 0)
+            SetMoveTarget(CFrame.new(targetPos))
+        end
+
+        Fluent:Notify({
+            Title    = "Sea 3",
+            Content  = "Chuyển tới: " .. (areaData and areaData.name or "?"),
+            Duration = 3,
+        })
+    end,
+})
+
+Tabs.Sea3:AddButton({
+    Title       = "Reset về khu vực 1",
+    Description = "Quay lại khu vực đầu tiên của Sea 3",
+    Callback    = function()
+        Sea3State.CurrentIndex = 1
+        Sea3State.StuckCounter = 0
+        Sea3State.LastTargetPos = nil
+
+        Fluent:Notify({
+            Title    = "Sea 3",
+            Content  = "Đã reset về khu vực 1",
+            Duration = 3,
+        })
+    end,
 })
 
 -------------------------------------------------
@@ -1290,13 +1508,13 @@ end)
 Window:SelectTab(1)
 
 -------------------------------------------------
--- KHỞI ĐỘNG LOOPS SAU KHI UI ĐÃ XONG
+-- KHỞI ĐỘNG LOOPS
 -------------------------------------------------
 StartAllLoops()
 
 Fluent:Notify({
     Title    = "Datkits Premium",
-    Content  = "v4.2 Auto Quest stable - không về NPC giữa chừng!",
+    Content  = "v4.3 Sea 1+2+3 Auto Farm sẵn sàng!",
     Duration = 6,
 })
 
@@ -1321,4 +1539,4 @@ if Config.NoclipEnabled then
     EnableNoclip()
 end
 
-print("[Datkits] ✅ v4.2 Auto Quest stable loaded successfully!")
+print("[Datkits] ✅ v4.3 Sea 1+2+3 Auto Farm loaded successfully!")
