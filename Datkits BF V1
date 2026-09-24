@@ -1,8 +1,8 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v4.8           ║
+    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v4.8.1         ║
     ║   Fluent UI • Zero-Stutter Fly • Sea 1+2+3               ║
-    ║   Quest + Farm + Chest + Boss + Hop Boss (Có Boss)      ║
+    ║   Quest + Farm + Chest + Boss + Hop Boss (FIXED)        ║
     ╚══════════════════════════════════════════════════════════╝
 --]]
 
@@ -61,7 +61,6 @@ end
 -- CONFIG
 -------------------------------------------------
 local Config = {
-    -- Auto Farm
     AutoQuest     = false,
     AutoFarm      = false,
     AutoChest     = false,
@@ -78,25 +77,22 @@ local Config = {
     QuestGracePeriod = 5,
     AutoSea3Farm  = false,
     Sea3FarmRange = 500,
-    -- Floating button
     FloatingButton = true,
     ButtonSize     = 50,
     ButtonOpacity  = 0.9,
-    -- Boss
     AutoBoss       = false,
     AutoSpawnBoss  = false,
     BossFarmRange  = 2000,
     BossDistance   = 8,
     BossSelected   = nil,
-    -- ✅ Hop Boss MỚI - Hop vào server có boss
+    -- Hop Boss
     AutoHopBoss       = false,
-    HopDelay          = 8,       -- Chờ sau khi hop để check boss
-    HopAfterNoSpawn   = 15,      -- Hop nếu boss không spawn sau X giây
-    HopMethod         = "Queue", -- Queue / Ascending / Descending
+    HopDelay          = 8,
+    HopAfterNoSpawn   = 15,
+    HopMethod         = "Queue",
     HopSameServer     = false,
-    HopAutoSpawnFirst = true,    -- Thử spawn boss trước khi hop
-    HopMaxAttempts    = 0,       -- 0 = không giới hạn
-    HopCooldown       = 12,      -- Cooldown giữa các lần hop (giây)
+    HopAutoSpawnFirst = true,
+    HopCooldown       = 12,
     MenuVisible    = true,
 }
 
@@ -105,7 +101,7 @@ local Config = {
 -------------------------------------------------
 local Window = Fluent:CreateWindow({
     Title       = "Datkits Premium | Blox Fruits",
-    SubTitle    = "v4.8 • Hop Boss (Server có Boss)",
+    SubTitle    = "v4.8.1 • Hop Boss (Server có Boss)",
     TabWidth    = 150,
     Size        = UDim2.fromOffset(620, 500),
     Acrylic     = true,
@@ -1224,7 +1220,7 @@ local function AutoBossLoop()
 end
 
 -------------------------------------------------
--- ✅ MỚI: AUTO HOP BOSS - Hop vào server CÓ BOSS
+-- ✅ HOP BOSS SYSTEM (FIXED - Hop vào server có boss)
 -------------------------------------------------
 local HopState = {
     IsHopping = false,
@@ -1232,14 +1228,12 @@ local HopState = {
     HopCount = 0,
     ServerList = {},
     LastServerFetch = 0,
-    JustHoppedTime = 0,      -- Thời điểm vừa hop xong
-    NoBossTimer = 0,         -- Timer đếm thời gian không có boss
-    JoinedServerList = {},   -- Danh sách server đã join (tránh join lại)
+    JustHoppedTime = 0,
+    NoBossTimer = 0,
+    JoinedServerList = {},
 }
 
--- ✅ Lấy danh sách server qua Roblox API
 local function FetchServerList()
-    -- Cache 20s để tránh spam API
     if tick() - HopState.LastServerFetch < 20 and #HopState.ServerList > 0 then
         return HopState.ServerList
     end
@@ -1272,7 +1266,6 @@ local function FetchServerList()
     if ok and result and result.data then
         for _, server in ipairs(result.data) do
             if server.id and server.id ~= jobId and server.playing < server.maxPlayers then
-                -- Loại bỏ server đã join
                 if not HopState.JoinedServerList[server.id] then
                     if Config.HopSameServer or server.id ~= jobId then
                         table.insert(servers, {
@@ -1286,10 +1279,7 @@ local function FetchServerList()
         end
     end
 
-    -- Sort by player count ascending (ít người nhất trước - boss dễ còn)
-    table.sort(servers, function(a, b)
-        return a.playing < b.playing
-    end)
+    table.sort(servers, function(a, b) return a.playing < b.playing end)
 
     HopState.ServerList = servers
     HopState.LastServerFetch = tick()
@@ -1297,11 +1287,9 @@ local function FetchServerList()
     return servers
 end
 
--- ✅ Hop tới server khác (không cần có boss - sẽ check sau khi vào)
 local function HopToNextServer()
     if HopState.IsHopping then return end
 
-    -- Cooldown giữa các lần hop
     if tick() - HopState.LastHopTime < Config.HopCooldown then
         return
     end
@@ -1322,7 +1310,6 @@ local function HopToNextServer()
         return
     end
 
-    -- Chọn server đầu tiên (ít người nhất)
     local targetServer = servers[1]
 
     Fluent:Notify({
@@ -1332,10 +1319,8 @@ local function HopToNextServer()
         Duration = 4,
     })
 
-    -- Lưu server đã join để không join lại
     HopState.JoinedServerList[targetServer.id] = true
 
-    -- Teleport
     local ok, err = pcall(function()
         TeleportService:TeleportToPlaceInstance(
             game.PlaceId,
@@ -1354,45 +1339,35 @@ local function HopToNextServer()
     end
 end
 
--- ✅ AUTO HOP BOSS LOOP - Logic chính:
--- 1. Check boss trong server hiện tại
--- 2. Nếu không có boss → chờ X giây → hop
--- 3. Sau khi hop → chờ HopDelay → check lạilocal function AutoHopBossLoop()
+-- ✅ AUTO HOP BOSS LOOP - FIX: Tách riêng khỏi comment
+local function AutoHopBossLoop()
     while task.wait(1) do
         if not Config.AutoHopBoss then
             HopState.NoBossTimer = 0
             continue
         end
 
-        -- Đang hop → không làm gì
         if HopState.IsHopping then continue end
-
-        -- Chỉ hop khi đã chọn boss
         if not Config.BossSelected then continue end
 
         pcall(function()
             local char = GetCharacter()
             if not char then return end
 
-            -- Kiểm tra xem boss có tồn tại không
             local found = FindBoss(Config.BossSelected)
             local hasBoss = #found > 0
 
             if hasBoss then
-                -- ✅ Có boss → reset timer, không hop
                 HopState.NoBossTimer = 0
                 return
             end
 
-            -- ✅ Không có boss → tăng timer
             HopState.NoBossTimer = HopState.NoBossTimer + 1
 
-            -- Nếu đã thử spawn boss trước (nếu bật HopAutoSpawnFirst)
             if Config.HopAutoSpawnFirst and HopState.NoBossTimer == 3 then
                 TrySpawnBoss(Config.BossSelected)
             end
 
-            -- Nếu không có boss sau HopAfterNoSpawn giây → hop
             if HopState.NoBossTimer >= Config.HopAfterNoSpawn then
                 HopState.NoBossTimer = 0
 
@@ -1408,10 +1383,6 @@ end
     end
 end
 
--- ✅ Logic khi vừa hop vào server mới:
--- - Đợi HopDelay giây để game load
--- - Reset IsHopping = false
--- - Reset timer
 local function InitAfterHop()
     HopState.JustHoppedTime = tick()
 
@@ -1420,7 +1391,6 @@ local function InitAfterHop()
         HopState.IsHopping = false
         HopState.NoBossTimer = 0
 
-        -- Check boss sau khi hop
         local found = FindBoss(Config.BossSelected)
         if #found > 0 then
             Fluent:Notify({
@@ -1498,7 +1468,7 @@ local function SeaTravelLoop()
 end
 
 -------------------------------------------------
--- FLOATING BUTTON - BẬT/TẮT MENU
+-- FLOATING BUTTON
 -------------------------------------------------
 local FloatingUI = {
     ScreenGui = nil, MainButton = nil, StatusLabel = nil,
@@ -1815,6 +1785,7 @@ Tabs.Main:AddSlider("ChestRange", {
 -- UI - TAB SEA 3
 -------------------------------------------------
 Tabs.Sea3:AddSection("🌊 Sea 3 Auto Farm")
+
 Tabs.Sea3:AddParagraph({
     Title = "Hướng dẫn Sea 3",
     Content = "Sea 3 yêu cầu level 1500+. Bật Auto Farm để tự động bay qua các khu vực và đánh quái.",
@@ -1890,6 +1861,7 @@ Tabs.Sea3:AddButton({
 -- UI - TAB AUTO BOSS
 -------------------------------------------------
 Tabs.Boss:AddSection("🐲 Auto Boss - Cả 3 Sea")
+
 Tabs.Boss:AddParagraph({
     Title = "Hướng dẫn Auto Boss",
     Content = "Bước 1: Chọn Sea → Bước 2: Chọn boss → Bước 3: Bật Auto Boss.",
@@ -1957,7 +1929,6 @@ Tabs.Boss:AddDropdown("BossSelect", {
         for _, info in ipairs(allList) do
             if info.displayName == selected then
                 Config.BossSelected = info.name
-                -- Reset hop timer khi đổi boss
                 HopState.NoBossTimer = 0
 
                 if Config.AutoBoss then
@@ -2022,18 +1993,18 @@ Tabs.Boss:AddButton({
 })
 
 -------------------------------------------------
--- ✅ UI - TAB HOP BOSS (SỬA LẠI)
+-- UI - TAB HOP BOSS
 -------------------------------------------------
 Tabs.HopBoss:AddSection("🌐 Auto Hop Boss - Hop vào server CÓ BOSS")
 
 Tabs.HopBoss:AddParagraph({
-    Title = "Cách hoạt động MỚI",
-    Content = "Tool sẽ check boss trong server hiện tại. Nếu KHÔNG có boss → hop sang server khác. Sau khi hop → check lại. Lặp lại cho đến khi tìm được server có boss.",
+    Title = "Cách hoạt động",
+    Content = "Tool check boss trong server hiện tại. Nếu KHÔNG có boss → hop sang server khác. Sau khi hop → check lại. Lặp cho đến khi tìm được server có boss.",
 })
 
 Tabs.HopBoss:AddToggle("AutoHopBossToggle", {
     Title       = "Auto Hop Boss (Tìm server có boss)",
-    Description = "Hop liên tục cho đến khi tìm được server có boss đang spawn",
+    Description = "Hop liên tục cho đến khi tìm được server có boss",
     Default     = false,
     Callback    = function(v)
         Config.AutoHopBoss = v
@@ -2045,48 +2016,34 @@ Tabs.HopBoss:AddToggle("AutoHopBossToggle", {
 })
 
 Tabs.HopBoss:AddSlider("HopAfterNoSpawnSlider", {
-    Title       = "Thời gian chờ trước khi hop (giây)",
-    Description = "Nếu không có boss sau X giây → hop sang server khác",
-    Default     = 15,
-    Min         = 5,
-    Max         = 120,
-    Rounding    = 0,
+    Title       = "Chờ trước khi hop (giây)",
+    Description = "Nếu không có boss sau X giây → hop",
+    Default     = 15, Min = 5, Max = 120, Rounding = 0,
     Callback    = function(v) Config.HopAfterNoSpawn = v end,
 })
 
 Tabs.HopBoss:AddSlider("HopDelaySlider", {
     Title       = "Delay sau khi hop (giây)",
-    Description = "Chờ X giây sau khi vào server mới rồi mới check boss",
-    Default     = 8,
-    Min         = 3,
-    Max         = 30,
-    Rounding    = 0,
+    Default     = 8, Min = 3, Max = 30, Rounding = 0,
     Callback    = function(v) Config.HopDelay = v end,
 })
 
 Tabs.HopBoss:AddSlider("HopCooldownSlider", {
     Title       = "Cooldown giữa các lần hop (giây)",
-    Description = "Chờ X giây giữa các lần hop để tránh bị Roblox flag",
-    Default     = 12,
-    Min         = 5,
-    Max         = 60,
-    Rounding    = 0,
+    Default     = 12, Min = 5, Max = 60, Rounding = 0,
     Callback    = function(v) Config.HopCooldown = v end,
 })
 
 Tabs.HopBoss:AddToggle("HopAutoSpawnFirstToggle", {
     Title       = "Thử spawn boss trước khi hop",
-    Description = "Thử dùng BossSpawn trước, nếu không được mới hop",
     Default     = true,
     Callback    = function(v) Config.HopAutoSpawnFirst = v end,
 })
 
 Tabs.HopBoss:AddDropdown("HopMethodSelect", {
     Title       = "Phương thức hop",
-    Description = "Queue = sort by ít người (khuyến nghị), Lowest = default",
     Values      = { "Queue", "Lowest", "Descending" },
-    Multi       = false,
-    Default     = 1,
+    Multi       = false, Default = 1,
     Callback    = function(selected) Config.HopMethod = selected end,
 })
 
@@ -2099,7 +2056,6 @@ Tabs.HopBoss:AddSection("🎯 Hành động thủ công")
 
 Tabs.HopBoss:AddButton({
     Title       = "🌐 Hop ngay lập tức",
-    Description = "Hop sang server mới ngay (bỏ qua cooldown)",
     Callback    = function()
         HopState.LastHopTime = 0
         HopToNextServer()
@@ -2113,14 +2069,13 @@ Tabs.HopBoss:AddButton({
         HopState.NoBossTimer = 0
         HopState.JoinedServerList = {}
         Fluent:Notify({
-            Title = "Hop Boss", Content = "Đã reset hop counter + danh sách server", Duration = 3,
+            Title = "Hop Boss", Content = "Đã reset hop counter", Duration = 3,
         })
     end,
 })
 
 Tabs.HopBoss:AddButton({
     Title       = "📊 Refresh Server List",
-    Description = "Lấy danh sách server mới (xoá cache)",
     Callback    = function()
         HopState.LastServerFetch = 0
         HopState.JoinedServerList = {}
@@ -2134,13 +2089,13 @@ Tabs.HopBoss:AddButton({
 Tabs.HopBoss:AddSection("⚙️ Thông tin")
 
 Tabs.HopBoss:AddParagraph({
-    Title = "Flow hoạt động",
-    Content = "1. Check boss trong server hiện tại\n2. Không có boss → chờ 15s → thử spawn\n3. Vẫn không có → Hop sang server khác\n4. Chờ 8s sau khi hop → check lại boss\n5. Có boss → AutoBoss đánh | Không → tiếp tục hop",
+    Title = "Flow",
+    Content = "1. Check boss\n2. Không có → chờ 15s → thử spawn\n3. Vẫn không có → Hop\n4. Chờ 8s sau hop → check lại\n5. Có boss → đánh | Không → tiếp tục",
 })
 
 Tabs.HopBoss:AddParagraph({
-    Title = "Mẹo tối ưu",
-    Content = "• Bật Auto Spawn Boss + Auto Boss + Auto Hop Boss cùng lúc\n• Set HopAfterNoSpawn = 15s để hop nhanh\n• Set HopCooldown = 12s để tránh bị flag\n• Ưu tiên server ít người (Queue mode)",
+    Title = "Mẹo",
+    Content = "• Bật Auto Spawn Boss + Auto Boss + Auto Hop Boss\n• HopAfterNoSpawn = 15s\n• HopCooldown = 12s\n• Queue mode = ưu tiên server ít người",
 })
 
 -------------------------------------------------
@@ -2317,11 +2272,10 @@ if Config.FloatingButton then
 end
 
 -------------------------------------------------
--- ✅ INIT AFTER HOP (nếu vừa hop xong)
+-- INIT AFTER HOP
 -------------------------------------------------
 task.spawn(function()
     task.wait(3)
-    -- Nếu đang bật AutoHopBoss, init sau 3s
     if Config.AutoHopBoss then
         InitAfterHop()
     end
@@ -2329,7 +2283,7 @@ end)
 
 Fluent:Notify({
     Title    = "Datkits Premium",
-    Content  = "v4.8 Hop Boss (Server có Boss) đã sẵn sàng!",
+    Content  = "v4.8.1 Hop Boss (Server có Boss) đã sẵn sàng!",
     Duration = 6,
 })
 
@@ -2354,4 +2308,4 @@ if Config.NoclipEnabled then
     EnableNoclip()
 end
 
-print("[Datkits] ✅ v4.8 Hop Boss (Server có Boss) loaded successfully!")
+print("[Datkits] ✅ v4.8.1 Hop Boss loaded successfully!")
