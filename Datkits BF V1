@@ -1,8 +1,8 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v4.5           ║
+    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v4.6           ║
     ║   Fluent UI • Zero-Stutter Fly • Sea 1+2+3               ║
-    ║   Auto Quest + Farm + Chest + Boss + Floating Button     ║
+    ║   Quest + Farm + Chest + Boss + Menu Toggle Button       ║
     ╚══════════════════════════════════════════════════════════╝
 --]]
 
@@ -21,6 +21,7 @@ local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService        = game:GetService("RunService")
 local UserInputService  = game:GetService("UserInputService")
+local TweenService      = game:GetService("TweenService")
 local LocalPlayer       = Players.LocalPlayer
 
 -------------------------------------------------
@@ -74,15 +75,20 @@ local Config = {
     QuestGracePeriod = 5,
     AutoSea3Farm  = false,
     Sea3FarmRange = 500,
+    -- Floating button
     FloatingButton = true,
-    ButtonSize     = 45,
+    ButtonSize     = 50,
     ButtonOpacity  = 0.9,
-    -- ✅ MỚI: Boss config
+    ButtonPosX     = 20,     -- vị trí mặc định X
+    ButtonPosY     = 0.5,    -- vị trí mặc định Y
+    -- Boss
     AutoBoss       = false,
     AutoSpawnBoss  = false,
     BossFarmRange  = 2000,
     BossDistance   = 8,
     BossSelected   = nil,
+    -- Menu state
+    MenuVisible    = true,
 }
 
 -------------------------------------------------
@@ -90,14 +96,15 @@ local Config = {
 -------------------------------------------------
 local Window = Fluent:CreateWindow({
     Title       = "Datkits Premium | Blox Fruits",
-    SubTitle    = "v4.5 • Sea 1+2+3 Auto Farm + Boss",
-    TabWidth    = 160,
+    SubTitle    = "v4.6 • Sea 1+2+3 + Boss + Menu Toggle",
+    TabWidth    = 150,
     Size        = UDim2.fromOffset(620, 500),
     Acrylic     = true,
     Theme       = "Dark",
     MinimizeKey = Enum.KeyCode.RightControl,
 })
 
+-- ✅ Tạo đầy đủ tabs, BAO GỒM Boss
 local Tabs = {
     Main     = Window:AddTab({ Title = "Auto Farm",  Icon = "sword" }),
     Sea3     = Window:AddTab({ Title = "Sea 3",      Icon = "waves" }),
@@ -571,7 +578,7 @@ local function HasQuest()
 end
 
 -------------------------------------------------
--- QUEST DATA - SEA 1 + SEA 2 + SEA 3
+-- QUEST DATA
 -------------------------------------------------
 local QuestData = {
     [1] = {
@@ -660,209 +667,50 @@ local function GetQuestData()
 end
 
 -------------------------------------------------
--- ✅ MỚI: BOSS DATA - CẢ 3 SEA
+-- BOSS DATA - CẢ 3 SEA
 -------------------------------------------------
--- Mỗi boss có: name, displayName, sea, level, pos (vị trí spawn), spawnButton (nếu có)
 local BossData = {
-    -------------------------------------------------
-    -- SEA 1 BOSSES
-    -------------------------------------------------
     [1] = {
-        {
-            name = "Saber Expert",
-            displayName = "Saber Expert",
-            level = 200,
-            pos = Vector3.new(-1405, 30, 4075),
-            spawnPos = Vector3.new(-1405, 30, 4075),
-            spawnButton = nil,  -- Không cần spawn, spawn tự nhiên
-            sea = 1,
-            health = 25000,
-        },
-        {
-            name = "The Gorilla King",
-            displayName = "The Gorilla King",
-            level = 30,
-            pos = Vector3.new(-1180, 5, -500),
-            spawnPos = Vector3.new(-1180, 5, -500),
-            spawnButton = "The Gorilla King",
-            sea = 1,
-            health = 10000,
-        },
-        {
-            name = "Bobby",
-            displayName = "Bobby (Boss)",
-            level = 30,
-            pos = Vector3.new(-1150, 5, 3800),
-            spawnPos = Vector3.new(-1150, 5, 3800),
-            spawnButton = nil,
-            sea = 1,
-            health = 8000,
-        },
+        { name = "Saber Expert",       displayName = "Saber Expert (Sea 1)",       level = 200, pos = Vector3.new(-1405, 30, 4075),  spawnPos = Vector3.new(-1405, 30, 4075) },
+        { name = "The Gorilla King",   displayName = "The Gorilla King (Sea 1)",   level = 30,  pos = Vector3.new(-1180, 5, -500),    spawnPos = Vector3.new(-1180, 5, -500) },
+        { name = "Bobby",              displayName = "Bobby (Sea 1)",              level = 30,  pos = Vector3.new(-1150, 5, 3800),    spawnPos = Vector3.new(-1150, 5, 3800) },
     },
-
-    -------------------------------------------------
-    -- SEA 2 BOSSES
-    -------------------------------------------------
     [2] = {
-        {
-            name = "Cyborg",
-            displayName = "Cyborg",
-            level = 950,
-            pos = Vector3.new(882, 110, -49),
-            spawnPos = Vector3.new(882, 110, -49),
-            spawnButton = nil,
-            sea = 2,
-            health = 50000,
-        },
-        {
-            name = "Diamond",
-            displayName = "Diamond",
-            level = 750,
-            pos = Vector3.new(1050, 137, 1322),
-            spawnPos = Vector3.new(1050, 137, 1322),
-            spawnButton = nil,
-            sea = 2,
-            health = 40000,
-        },
-        {
-            name = "Jeremy",
-            displayName = "Jeremy",
-            level = 850,
-            pos = Vector3.new(-2000, 71, -3200),
-            spawnPos = Vector3.new(-2000, 71, -3200),
-            spawnButton = nil,
-            sea = 2,
-            health = 45000,
-        },
-        {
-            name = "Fajita",
-            displayName = "Fajita",
-            level = 925,
-            pos = Vector3.new(-2550, 110, -3050),
-            spawnPos = Vector3.new(-2550, 110, -3050),
-            spawnButton = nil,
-            sea = 2,
-            health = 48000,
-        },
-        {
-            name = "Smoke Admiral",
-            displayName = "Smoke Admiral",
-            level = 1100,
-            pos = Vector3.new(-5500, 48, -800),
-            spawnPos = Vector3.new(-5500, 48, -800),
-            spawnButton = nil,
-            sea = 2,
-            health = 60000,
-        },
+        { name = "Cyborg",             displayName = "Cyborg (Sea 2)",             level = 950, pos = Vector3.new(882, 110, -49),     spawnPos = Vector3.new(882, 110, -49) },
+        { name = "Diamond",            displayName = "Diamond (Sea 2)",            level = 750, pos = Vector3.new(1050, 137, 1322),   spawnPos = Vector3.new(1050, 137, 1322) },
+        { name = "Jeremy",             displayName = "Jeremy (Sea 2)",             level = 850, pos = Vector3.new(-2000, 71, -3200),  spawnPos = Vector3.new(-2000, 71, -3200) },
+        { name = "Fajita",             displayName = "Fajita (Sea 2)",             level = 925, pos = Vector3.new(-2550, 110, -3050), spawnPos = Vector3.new(-2550, 110, -3050) },
+        { name = "Smoke Admiral",      displayName = "Smoke Admiral (Sea 2)",      level = 1100,pos = Vector3.new(-5500, 48, -800),    spawnPos = Vector3.new(-5500, 48, -800) },
     },
-
-    -------------------------------------------------
-    -- SEA 3 BOSSES ✅ MỚI
-    -------------------------------------------------
     [3] = {
-        {
-            name = "Stone",
-            displayName = "Stone (Boss)",
-            level = 1550,
-            pos = Vector3.new(-200, 6, 5340),
-            spawnPos = Vector3.new(-200, 6, 5340),
-            spawnButton = nil,
-            sea = 3,
-            health = 100000,
-        },
-        {
-            name = "Hydra Leader",
-            displayName = "Hydra Leader",
-            level = 1650,
-            pos = Vector3.new(5670, 15, -650),
-            spawnPos = Vector3.new(5670, 15, -650),
-            spawnButton = nil,
-            sea = 3,
-            health = 150000,
-        },
-        {
-            name = "Island Empress",
-            displayName = "Island Empress",
-            level = 1750,
-            pos = Vector3.new(2150, 28, -6680),
-            spawnPos = Vector3.new(2150, 28, -6680),
-            spawnButton = nil,
-            sea = 3,
-            health = 200000,
-        },
-        {
-            name = "Kilo Admiral",
-            displayName = "Kilo Admiral",
-            level = 1850,
-            pos = Vector3.new(-5530, 313, -3020),
-            spawnPos = Vector3.new(-5530, 313, -3020),
-            spawnButton = nil,
-            sea = 3,
-            health = 250000,
-        },
-        {
-            name = "Captain Elephant",
-            displayName = "Captain Elephant",
-            level = 1950,
-            pos = Vector3.new(-11030, 331, -8600),
-            spawnPos = Vector3.new(-11030, 331, -8600),
-            spawnButton = nil,
-            sea = 3,
-            health = 300000,
-        },
-        {
-            name = "Beautiful Pirate",
-            displayName = "Beautiful Pirate",
-            level = 2050,
-            pos = Vector3.new(-9540, 142, 5530),
-            spawnPos = Vector3.new(-9540, 142, 5530),
-            spawnButton = nil,
-            sea = 3,
-            health = 350000,
-        },
-        {
-            name = "Cake Queen",
-            displayName = "Cake Queen",
-            level = 2175,
-            pos = Vector3.new(-1180, 14, -10750),
-            spawnPos = Vector3.new(-1180, 14, -10750),
-            spawnButton = nil,
-            sea = 3,
-            health = 400000,
-        },
-        {
-            name = "Longma",
-            displayName = "Longma",
-            level = 2200,
-            pos = Vector3.new(-1180, 14, -10750),
-            spawnPos = Vector3.new(-1180, 14, -10750),
-            spawnButton = nil,
-            sea = 3,
-            health = 450000,
-        },
-        {
-            name = "Soul Reaper",
-            displayName = "Soul Reaper",
-            level = 2100,
-            pos = Vector3.new(-9540, 142, 5530),
-            spawnPos = Vector3.new(-9540, 142, 5530),
-            spawnButton = "Soul Reaper",
-            sea = 3,
-            health = 500000,
-        },
+        { name = "Stone",              displayName = "Stone (Sea 3)",              level = 1550,pos = Vector3.new(-200, 6, 5340),     spawnPos = Vector3.new(-200, 6, 5340) },
+        { name = "Hydra Leader",       displayName = "Hydra Leader (Sea 3)",       level = 1650,pos = Vector3.new(5670, 15, -650),    spawnPos = Vector3.new(5670, 15, -650) },
+        { name = "Island Empress",     displayName = "Island Empress (Sea 3)",     level = 1750,pos = Vector3.new(2150, 28, -6680),   spawnPos = Vector3.new(2150, 28, -6680) },
+        { name = "Kilo Admiral",       displayName = "Kilo Admiral (Sea 3)",       level = 1850,pos = Vector3.new(-5530, 313, -3020), spawnPos = Vector3.new(-5530, 313, -3020) },
+        { name = "Captain Elephant",   displayName = "Captain Elephant (Sea 3)",   level = 1950,pos = Vector3.new(-11030, 331, -8600),spawnPos = Vector3.new(-11030, 331, -8600) },
+        { name = "Beautiful Pirate",   displayName = "Beautiful Pirate (Sea 3)",   level = 2050,pos = Vector3.new(-9540, 142, 5530),  spawnPos = Vector3.new(-9540, 142, 5530) },
+        { name = "Cake Queen",         displayName = "Cake Queen (Sea 3)",         level = 2175,pos = Vector3.new(-1180, 14, -10750), spawnPos = Vector3.new(-1180, 14, -10750) },
+        { name = "Longma",             displayName = "Longma (Sea 3)",             level = 2200,pos = Vector3.new(-1180, 14, -10750), spawnPos = Vector3.new(-1180, 14, -10750) },
+        { name = "Soul Reaper",        displayName = "Soul Reaper (Sea 3)",        level = 2100,pos = Vector3.new(-9540, 142, 5530),  spawnPos = Vector3.new(-9540, 142, 5530) },
     },
 }
 
--- ✅ Hàm lấy danh sách boss theo sea hiện tại
 local function GetBossListBySea(sea)
     return BossData[sea] or {}
 end
 
--- ✅ Hàm tìm boss trong workspace
+local function GetAllBossList()
+    local list = {}
+    for sea = 1, 3 do
+        for _, info in ipairs(BossData[sea]) do
+            table.insert(list, info)
+        end
+    end
+    return list
+end
+
 local function FindBoss(bossName)
     local found = {}
-    
-    -- Tìm trong workspace trực tiếp
     for _, obj in ipairs(workspace:GetChildren()) do
         if obj.Name == bossName then
             local hum = obj:FindFirstChildOfClass("Humanoid")
@@ -872,8 +720,6 @@ local function FindBoss(bossName)
             end
         end
     end
-    
-    -- Tìm trong các folder phổ biến
     local foldersToSearch = { "Bosses", "Enemies", "Characters", "NPCs", "Mobs" }
     for _, folderName in ipairs(foldersToSearch) do
         local folder = workspace:FindFirstChild(folderName)
@@ -889,35 +735,27 @@ local function FindBoss(bossName)
             end
         end
     end
-    
     return found
 end
 
--- ✅ Hàm tìm tất cả boss trong bán kính
 local function FindAllBossesInRange(maxRange)
     local result = {}
     local hrp = GetHRP()
     if not hrp then return result end
-    
     local sea = GetCurrentSea()
     local bossList = GetBossListBySea(sea)
-    
     for _, bossInfo in ipairs(bossList) do
         local bosses = FindBoss(bossInfo.name)
         for _, b in ipairs(bosses) do
             local dist = (hrp.Position - b.hrp.Position).Magnitude
             if dist <= maxRange then
                 table.insert(result, {
-                    boss = b.boss,
-                    hum = b.hum,
-                    hrp = b.hrp,
-                    dist = dist,
-                    info = bossInfo,
+                    boss = b.boss, hum = b.hum, hrp = b.hrp,
+                    dist = dist, info = bossInfo,
                 })
             end
         end
     end
-    
     table.sort(result, function(a, b) return a.dist < b.dist end)
     return result
 end
@@ -986,7 +824,6 @@ local function DoFastAttack()
         pcall(function() regAttack:FireServer(0.1) end)
     end
 
-    -- ✅ Ưu tiên boss nếu AutoBoss đang bật
     local hits
     if Config.AutoBoss then
         local bosses = FindAllBossesInRange(Config.HitboxRange)
@@ -997,13 +834,11 @@ local function DoFastAttack()
             end
         end
     end
-    
     if not hits then
         hits = GetClosestEnemies(Config.HitboxRange)
     end
-    
-    local hrp = char.HumanoidRootPart
 
+    local hrp = char.HumanoidRootPart
     local lcRemote = tool:FindFirstChild("LeftClickRemote")
         or tool:FindFirstChild("Remote")
         or tool:FindFirstChildWhichIsA("RemoteEvent")
@@ -1030,13 +865,11 @@ end
 local function FindAllChests()
     local chests = {}
     local found = {}
-
     local function scanContainer(container, depth)
         if depth > 3 then return end
         for _, obj in ipairs(container:GetChildren()) do
             if obj:IsA("Model") and (obj.Name:find("Chest") or obj.Name == "Chest") then
-                local part = obj.PrimaryPart
-                    or obj:FindFirstChildWhichIsA("BasePart", true)
+                local part = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart", true)
                 if part and part:FindFirstChild("TouchInterest") then
                     if not found[part] then
                         found[part] = true
@@ -1058,7 +891,6 @@ local function FindAllChests()
                     end
                 end
             end
-
             if obj:IsA("Folder") or obj:IsA("Model") then
                 if obj.Name:find("Chest") or obj.Name:find("chest")
                     or obj.Name == "ChestFolder" or obj.Name == "Chests"
@@ -1069,7 +901,6 @@ local function FindAllChests()
             end
         end
     end
-
     scanContainer(workspace, 0)
     return chests
 end
@@ -1093,7 +924,6 @@ local function AutoChestLoop()
                     table.insert(validChests, { chest = chest, dist = dist })
                 end
             end
-
             if #validChests == 0 then return end
 
             table.sort(validChests, function(a, b) return a.dist < b.dist end)
@@ -1117,7 +947,7 @@ local function AutoChestLoop()
 end
 
 -------------------------------------------------
--- AUTO QUEST v4.5
+-- AUTO QUEST
 -------------------------------------------------
 local QuestState = {
     Phase = "idle",
@@ -1182,19 +1012,16 @@ local function AutoQuestLoop()
             elseif QuestState.QuestAccepted and not QuestState.QuestCompleted then
                 shouldFarm = true
             end
-
             if not shouldFarm and (now - QuestState.LastKillTime) < 3 then
                 shouldFarm = true
             end
 
             if shouldFarm then
                 QuestState.Phase = "toMob"
-
                 local hits = GetClosestEnemies(math.huge, mob)
                 if #hits == 0 then
                     hits = GetClosestEnemies(2000)
                 end
-
                 if #hits == 0 then
                     if spawnCF then
                         local distToSpawn = (hrp.Position - spawnCF.Position).Magnitude
@@ -1206,53 +1033,37 @@ local function AutoQuestLoop()
                     end
                     return
                 end
-
                 local target = hits[1]
                 local pos = target.hrp.Position
-                local targetCF = CFrame.new(
-                    pos + Vector3.new(0, Config.FarmDistance, 0),
-                    pos
-                )
-                SetMoveTarget(targetCF)
-
+                SetMoveTarget(CFrame.new(pos + Vector3.new(0, Config.FarmDistance, 0), pos))
                 if #hits < QuestState.LastEnemyCount then
                     QuestState.LastKillTime = now
                 end
                 QuestState.LastEnemyCount = #hits
-
                 return
             end
 
             QuestState.Phase = "toNPC"
             QuestState.LastEnemyCount = 0
-
             if not npcCF then return end
-
             local distToNPC = (hrp.Position - npcCF.Position).Magnitude
-
             if distToNPC > 12 then
                 SetMoveTarget(npcCF * CFrame.new(0, 0, 3))
-                QuestState.Phase = "toNPC"
             else
                 QuestState.Phase = "atNPC"
                 SetMoveTarget(CFrame.new(hrp.Position))
-
                 local needCall = (QuestState.LastQuest ~= quest)
                     or (QuestState.LastQLv ~= qlv)
                     or (now - QuestState.LastQuestTime > 5)
-
                 if needCall then
                     QuestState.LastQuest = quest
                     QuestState.LastQLv = qlv
                     QuestState.LastQuestTime = now
-
                     QuestState.QuestCompleted = false
                     QuestState.QuestAccepted = false
-
                     pcall(function()
                         ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", quest, qlv)
                     end)
-
                     QuestState.QuestAccepted = true
                     QuestState.QuestAcceptedTime = now
                 end
@@ -1262,7 +1073,7 @@ local function AutoQuestLoop()
 end
 
 -------------------------------------------------
--- AUTO FARM GẦN NHẤT
+-- AUTO FARM
 -------------------------------------------------
 local function AutoFarmLoop()
     while task.wait(0.15) do
@@ -1280,35 +1091,23 @@ local function AutoFarmLoop()
             if #hits > 0 then
                 local target = hits[1]
                 local pos = target.hrp.Position
-                local targetCF = CFrame.new(
-                    pos + Vector3.new(0, Config.FarmDistance, 0),
-                    pos
-                )
-                SetMoveTarget(targetCF)
+                SetMoveTarget(CFrame.new(pos + Vector3.new(0, Config.FarmDistance, 0), pos))
             end
         end)
     end
 end
 
 -------------------------------------------------
--- SEA 3 AUTO FARM LOOP
+-- SEA 3 AUTO FARM
 -------------------------------------------------
-local Sea3State = {
-    CurrentIndex = 1,
-    LastTargetPos = nil,
-    StuckCounter = 0,
-    LastCheckTime = 0,
-}
+local Sea3State = { CurrentIndex = 1, LastTargetPos = nil, StuckCounter = 0 }
 
 local function AutoSea3FarmLoop()
     while task.wait(0.3) do
         if not Config.AutoSea3Farm then
-            if Sea3State.LastTargetPos then
-                Sea3State.LastTargetPos = nil
-            end
+            if Sea3State.LastTargetPos then Sea3State.LastTargetPos = nil end
             continue
         end
-
         pcall(function()
             local char = GetCharacter()
             if not char then return end
@@ -1319,19 +1118,12 @@ local function AutoSea3FarmLoop()
             if #hits > 0 then
                 local target = hits[1]
                 local pos = target.hrp.Position
-                local targetCF = CFrame.new(
-                    pos + Vector3.new(0, Config.FarmDistance, 0),
-                    pos
-                )
-                SetMoveTarget(targetCF)
-
+                SetMoveTarget(CFrame.new(pos + Vector3.new(0, Config.FarmDistance, 0), pos))
                 Sea3State.StuckCounter = 0
                 Sea3State.LastTargetPos = pos
                 return
             end
-
             local currentPos = hrp.Position
-
             if Sea3State.LastTargetPos then
                 local distToLast = (currentPos - Sea3State.LastTargetPos).Magnitude
                 if distToLast < 30 then
@@ -1345,12 +1137,10 @@ local function AutoSea3FarmLoop()
                     end
                 end
             end
-
             local areaData = Sea3Enemies[Sea3State.CurrentIndex]
             if areaData then
                 local targetPos = areaData.pos + Vector3.new(0, Config.FarmDistance, 0)
-                local targetCF = CFrame.new(targetPos)
-                SetMoveTarget(targetCF)
+                SetMoveTarget(CFrame.new(targetPos))
                 Sea3State.LastTargetPos = areaData.pos
             end
         end)
@@ -1358,7 +1148,7 @@ local function AutoSea3FarmLoop()
 end
 
 -------------------------------------------------
--- ✅ MỚI: AUTO BOSS LOOP
+-- AUTO BOSS
 -------------------------------------------------
 local BossState = {
     LastKillTime = 0,
@@ -1368,23 +1158,16 @@ local BossState = {
     NoBossTime = 0,
 }
 
--- ✅ Hàm thử spawn boss (nếu có spawn button)
 local function TrySpawnBoss(bossName)
     local spawned = false
-    
-    -- Thử gọi qua CommF_ (cách phổ biến)
     pcall(function()
         ReplicatedStorage.Remotes.CommF_:InvokeServer("BossSpawn", bossName)
     end)
-    
-    -- Thử qua CommE_
     pcall(function()
         if ReplicatedStorage.Remotes:FindFirstChild("CommE_") then
             ReplicatedStorage.Remotes.CommE_:InvokeServer("BossSpawn", bossName)
         end
     end)
-    
-    -- Thử fire remote trong workspace
     pcall(function()
         local questNpc = workspace:FindFirstChild(bossName .. "Quest", true)
         if questNpc then
@@ -1400,7 +1183,6 @@ local function TrySpawnBoss(bossName)
             end
         end
     end)
-    
     return spawned
 end
 
@@ -1420,23 +1202,21 @@ local function AutoBossLoop()
             local sea = GetCurrentSea()
             local bossList = GetBossListBySea(sea)
 
-            -- ✅ Tìm boss theo selection
             local targetBoss = nil
             local targetInfo = nil
 
             if Config.BossSelected then
-                -- Tìm boss đã chọn
-                for _, info in ipairs(bossList) do
+                -- Tìm boss theo tên đã lưu
+                local allList = GetAllBossList()
+                for _, info in ipairs(allList) do
                     if info.name == Config.BossSelected then
                         targetInfo = info
                         break
                     end
                 end
-                
                 if targetInfo then
                     local found = FindBoss(targetInfo.name)
                     if #found > 0 then
-                        -- Chọn boss gần nhất
                         local nearest = found[1]
                         local minDist = (hrp.Position - nearest.hrp.Position).Magnitude
                         for _, b in ipairs(found) do
@@ -1450,7 +1230,6 @@ local function AutoBossLoop()
                     end
                 end
             else
-                -- Không chọn boss cụ thể → tìm boss gần nhất trong range
                 local allBosses = FindAllBossesInRange(Config.BossFarmRange)
                 if #allBosses > 0 then
                     targetBoss = allBosses[1]
@@ -1458,21 +1237,15 @@ local function AutoBossLoop()
                 end
             end
 
-            -- ✅ Không tìm thấy boss
             if not targetBoss then
                 BossState.NoBossTime = BossState.NoBossTime + 0.2
-
-                -- Nếu bật AutoSpawnBoss và có boss được chọn
                 if Config.AutoSpawnBoss and targetInfo then
                     if BossState.NoBossTime > 2 then
-                        -- Thử spawn mỗi 3 giây
                         if tick() - BossState.LastSearchTime > 3 then
                             BossState.LastSearchTime = tick()
                             TrySpawnBoss(targetInfo.name)
                         end
                     end
-
-                    -- Bay tới vị trí spawn boss để chờ
                     if targetInfo.spawnPos then
                         local distToSpawn = (hrp.Position - targetInfo.spawnPos).Magnitude
                         if distToSpawn > 20 then
@@ -1480,7 +1253,6 @@ local function AutoBossLoop()
                                 targetInfo.spawnPos + Vector3.new(0, Config.FarmDistance, 0)
                             ))
                         else
-                            -- Đứng chờ tại spawn point
                             SetMoveTarget(CFrame.new(hrp.Position))
                         end
                     end
@@ -1488,29 +1260,17 @@ local function AutoBossLoop()
                 return
             end
 
-            -- ✅ Có boss → reset timer
             BossState.NoBossTime = 0
 
-            -- ✅ Bay tới boss
             local bossPos = targetBoss.hrp.Position
             local bossHum = targetBoss.hum
             local dist = (hrp.Position - bossPos).Magnitude
 
-            if dist > Config.BossDistance then
-                local targetCF = CFrame.new(
-                    bossPos + Vector3.new(0, Config.BossDistance, 0),
-                    bossPos
-                )
-                SetMoveTarget(targetCF)
-            else
-                -- ✅ Đứng yên tại boss và đánh
-                SetMoveTarget(CFrame.new(
-                    bossPos + Vector3.new(0, Config.BossDistance, 0),
-                    bossPos
-                ))
-            end
+            SetMoveTarget(CFrame.new(
+                bossPos + Vector3.new(0, Config.BossDistance, 0),
+                bossPos
+            ))
 
-            -- ✅ Cập nhật kill tracking
             if bossHum.Health <= 0 then
                 if BossState.LastKillName ~= targetBoss.boss.Name 
                     or (tick() - BossState.LastKillTime) > 5 
@@ -1518,7 +1278,6 @@ local function AutoBossLoop()
                     BossState.LastKillTime = tick()
                     BossState.LastKillName = targetBoss.boss.Name
                     BossState.KillCount = BossState.KillCount + 1
-
                     if targetInfo then
                         Fluent:Notify({
                             Title    = "🐲 Boss Killed",
@@ -1561,12 +1320,10 @@ local function SeaTravelLoop()
             local char = GetCharacter()
             if not char then return end
             local hrp = char.HumanoidRootPart
-            
-            -- ✅ Nếu AutoBoss đang bật, đi tới boss
+
             if Config.AutoBoss and Config.BossSelected then
-                local sea = GetCurrentSea()
-                local bossList = GetBossListBySea(sea)
-                for _, info in ipairs(bossList) do
+                local allList = GetAllBossList()
+                for _, info in ipairs(allList) do
                     if info.name == Config.BossSelected then
                         local dist = (hrp.Position - info.spawnPos).Magnitude
                         if dist < 200 then
@@ -1579,7 +1336,7 @@ local function SeaTravelLoop()
                 end
                 return
             end
-            
+
             local entry = GetQuestData()
             if not entry or not entry.npc then return end
             local targetPos = entry.npc.Position
@@ -1594,17 +1351,81 @@ local function SeaTravelLoop()
 end
 
 -------------------------------------------------
--- FLOATING BUTTON CONTROLLER
+-- ✅ MỚI: FLOATING BUTTON - BẬT/TẮT MENU DATKITS
+-- Nút này chỉ để ẨN/HIỆN menu Fluent UI
 -------------------------------------------------
 local FloatingUI = {
     ScreenGui = nil,
     MainButton = nil,
     StatusLabel = nil,
+    IconLabel = nil,
     IsDragging = false,
     DragStart = nil,
     StartPos = nil,
-    Enabled = false,
+    MenuOpen = true,   -- Trạng thái menu (mở/đóng)
 }
+
+-- ✅ Hàm ẩn/hiện Fluent Window
+local function SetMenuVisible(visible)
+    FloatingUI.MenuOpen = visible
+
+    -- Cách 1: Dùng API chính thức của Fluent (nếu có)
+    pcall(function()
+        if visible then
+            Window:SelectTab(1)
+        end
+    end)
+
+    -- Cách 2: Tìm và ẩn/hiện ScreenGui của Fluent trực tiếp
+    local ok = pcall(function()
+        local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+        if not playerGui then return end
+
+        -- Tìm ScreenGui của Fluent
+        for _, gui in ipairs(playerGui:GetChildren()) do
+            if gui:IsA("ScreenGui") and (gui.Name == "Fluent" 
+                or gui.Name:lower():find("fluent")) then
+                gui.Enabled = visible
+            end
+        end
+
+        -- Fallback: Tìm MainFrame trong CoreGui
+        local coreGui = game:GetService("CoreGui")
+        for _, gui in ipairs(coreGui:GetChildren()) do
+            if gui:IsA("ScreenGui") and (gui.Name == "Fluent" 
+                or gui.Name:lower():find("fluent")) then
+                gui.Enabled = visible
+            end
+        end
+    end)
+
+    -- ✅ Nếu Fluent dùng MainFrame khác, thử toggle trực tiếp
+    pcall(function()
+        if Window and Window.MainFrame then
+            if Window.MainFrame.Instance then
+                Window.MainFrame.Instance.Visible = visible
+            elseif Window.MainFrame.SetVisible then
+                Window.MainFrame:SetVisible(visible)
+            end
+        end
+    end)
+
+    -- Update button visual
+    if FloatingUI.UpdateVisual then
+        FloatingUI.UpdateVisual()
+    end
+end
+
+local function ToggleMenu()
+    local newState = not FloatingUI.MenuOpen
+    SetMenuVisible(newState)
+
+    Fluent:Notify({
+        Title    = "Datkits",
+        Content  = newState and "✅ Menu đã MỞ" or "❌ Menu đã ĐÓNG",
+        Duration = 2,
+    })
+end
 
 local function CreateFloatingButton()
     if FloatingUI.ScreenGui then
@@ -1617,7 +1438,7 @@ local function CreateFloatingButton()
     sg.ResetOnSpawn = false
     sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     sg.IgnoreGuiInset = true
-    sg.DisplayOrder = 9999
+    sg.DisplayOrder = 999999  -- Luôn trên cùng
 
     local ok = pcall(function()
         sg.Parent = LocalPlayer:WaitForChild("PlayerGui", 5)
@@ -1628,10 +1449,11 @@ local function CreateFloatingButton()
         end)
     end
 
+    -- Main button (tròn)
     local btn = Instance.new("TextButton")
     btn.Name = "MainButton"
     btn.Size = UDim2.fromOffset(Config.ButtonSize, Config.ButtonSize)
-    btn.Position = UDim2.new(0, 20, 0.5, -Config.ButtonSize / 2)
+    btn.Position = UDim2.new(0, Config.ButtonPosX, Config.ButtonPosY, -Config.ButtonSize / 2)
     btn.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
     btn.BackgroundTransparency = 1 - Config.ButtonOpacity
     btn.BorderSizePixel = 0
@@ -1645,7 +1467,7 @@ local function CreateFloatingButton()
     corner.Parent = btn
 
     local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(255, 60, 60)
+    stroke.Color = Color3.fromRGB(60, 255, 120)  -- xanh = menu mở
     stroke.Thickness = 2
     stroke.Transparency = 0.2
     stroke.Parent = btn
@@ -1654,8 +1476,8 @@ local function CreateFloatingButton()
     icon.Name = "Icon"
     icon.Size = UDim2.new(1, 0, 1, 0)
     icon.BackgroundTransparency = 1
-    icon.Text = "D"
-    icon.TextColor3 = Color3.fromRGB(255, 60, 60)
+    icon.Text = "≡"  -- dấu 3 gạch (menu icon)
+    icon.TextColor3 = Color3.fromRGB(60, 255, 120)
     icon.TextScaled = true
     icon.Font = Enum.Font.GothamBlack
     icon.ZIndex = 11
@@ -1665,7 +1487,7 @@ local function CreateFloatingButton()
     dot.Name = "StatusDot"
     dot.Size = UDim2.fromOffset(12, 12)
     dot.Position = UDim2.new(1, -14, 0, 2)
-    dot.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+    dot.BackgroundColor3 = Color3.fromRGB(60, 255, 120)
     dot.BorderSizePixel = 0
     dot.ZIndex = 12
     dot.Parent = btn
@@ -1676,12 +1498,12 @@ local function CreateFloatingButton()
 
     local label = Instance.new("TextLabel")
     label.Name = "StatusLabel"
-    label.Size = UDim2.fromOffset(180, 32)
+    label.Size = UDim2.fromOffset(160, 32)
     label.Position = UDim2.new(1, 10, 0.5, -16)
     label.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
     label.BackgroundTransparency = 0.1
     label.BorderSizePixel = 0
-    label.Text = "Datkits: OFF"
+    label.Text = "Menu: Đang mở"
     label.TextColor3 = Color3.fromRGB(255, 255, 255)
     label.TextSize = 13
     label.Font = Enum.Font.GothamBold
@@ -1698,97 +1520,33 @@ local function CreateFloatingButton()
     FloatingUI.MainButton = btn
     FloatingUI.StatusLabel = label
     FloatingUI.StatusDot = dot
+    FloatingUI.IconLabel = icon
 
+    -- ✅ Update visual theo trạng thái menu
     local function UpdateButtonVisual()
-        local anyActive = Config.AutoQuest or Config.AutoFarm or Config.AutoChest
-            or Config.AutoSea3Farm or Config.AutoSeaTravel or Config.AutoBoss
-
-        if anyActive then
+        if FloatingUI.MenuOpen then
+            -- Menu mở → xanh
             stroke.Color = Color3.fromRGB(60, 255, 120)
             icon.TextColor3 = Color3.fromRGB(60, 255, 120)
+            icon.Text = "≡"
             dot.BackgroundColor3 = Color3.fromRGB(60, 255, 120)
-
-            local activeList = {}
-            if Config.AutoQuest then table.insert(activeList, "Quest") end
-            if Config.AutoFarm then table.insert(activeList, "Farm") end
-            if Config.AutoChest then table.insert(activeList, "Chest") end
-            if Config.AutoSea3Farm then table.insert(activeList, "Sea3") end
-            if Config.AutoBoss then table.insert(activeList, "Boss") end
-            if Config.AutoSeaTravel then table.insert(activeList, "Sail") end
-
-            label.Text = "✅ " .. table.concat(activeList, ", ")
+            label.Text = "✅ Menu: Đang MỞ"
             label.TextColor3 = Color3.fromRGB(60, 255, 120)
         else
+            -- Menu đóng → đỏ
             stroke.Color = Color3.fromRGB(255, 60, 60)
             icon.TextColor3 = Color3.fromRGB(255, 60, 60)
-            dot.BackgroundColor3 = Color3.fromRGB(120, 120, 120)
-
-            label.Text = "❌ Datkits: OFF"
-            label.TextColor3 = Color3.fromRGB(255, 255, 255)
+            icon.Text = "✕"
+            dot.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+            label.Text = "❌ Menu: Đang ĐÓNG"
+            label.TextColor3 = Color3.fromRGB(255, 150, 150)
         end
     end
 
     FloatingUI.UpdateVisual = UpdateButtonVisual
+    UpdateButtonVisual()
 
-    local function ToggleAll()
-        local anyActive = Config.AutoQuest or Config.AutoFarm or Config.AutoChest
-            or Config.AutoSea3Farm or Config.AutoSeaTravel or Config.AutoBoss
-
-        if anyActive then
-            Config.AutoQuest = false
-            Config.AutoFarm = false
-            Config.AutoChest = false
-            Config.AutoSea3Farm = false
-            Config.AutoSeaTravel = false
-            Config.AutoBoss = false
-
-            ResetCharacterState()
-            StopSail()
-
-            pcall(function()
-                if Options and Options.AutoQuestToggle then Options.AutoQuestToggle:SetValue(false) end
-                if Options and Options.AutoFarmToggle then Options.AutoFarmToggle:SetValue(false) end
-                if Options and Options.AutoChestToggle then Options.AutoChestToggle:SetValue(false) end
-                if Options and Options.AutoSea3FarmToggle then Options.AutoSea3FarmToggle:SetValue(false) end
-                if Options and Options.AutoSeaTravelToggle then Options.AutoSeaTravelToggle:SetValue(false) end
-                if Options and Options.AutoBossToggle then Options.AutoBossToggle:SetValue(false) end
-            end)
-
-            Fluent:Notify({
-                Title    = "Datkits",
-                Content  = "❌ Đã TẮT tất cả chức năng",
-                Duration = 3,
-            })
-        else
-            Config.AutoQuest = true
-            Config.AutoFarm = true
-            Config.AutoChest = true
-
-            if GetCurrentSea() == 3 then
-                Config.AutoSea3Farm = true
-            end
-
-            pcall(function()
-                if Options and Options.AutoQuestToggle then Options.AutoQuestToggle:SetValue(true) end
-                if Options and Options.AutoFarmToggle then Options.AutoFarmToggle:SetValue(true) end
-                if Options and Options.AutoChestToggle then Options.AutoChestToggle:SetValue(true) end
-                if Options and Options.AutoSea3FarmToggle and GetCurrentSea() == 3 then
-                    Options.AutoSea3FarmToggle:SetValue(true)
-                end
-            end)
-
-            Fluent:Notify({
-                Title    = "Datkits",
-                Content  = "✅ Đã BẬT tất cả chức năng",
-                Duration = 3,
-            })
-        end
-
-        UpdateButtonVisual()
-    end
-
-    FloatingUI.ToggleAll = ToggleAll
-
+    -- ✅ Drag handler
     local function OnInputBegan(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1
             or input.UserInputType == Enum.UserInputType.Touch
@@ -1823,7 +1581,8 @@ local function CreateFloatingButton()
                 if FloatingUI.DragStart then
                     local delta = input.Position - FloatingUI.DragStart
                     if delta.Magnitude < 5 then
-                        FloatingUI.ToggleAll()
+                        -- ✅ Click → Toggle menu
+                        ToggleMenu()
                     end
                 end
             end
@@ -1837,10 +1596,10 @@ local function CreateFloatingButton()
     btn.MouseEnter:Connect(function()
         label.Visible = true
         pcall(function()
-            game:GetService("TweenService"):Create(
+            TweenService:Create(
                 btn,
                 TweenInfo.new(0.15),
-                { Size = UDim2.fromOffset(Config.ButtonSize + 5, Config.ButtonSize + 5) }
+                { Size = UDim2.fromOffset(Config.ButtonSize + 6, Config.ButtonSize + 6) }
             ):Play()
         end)
     end)
@@ -1848,7 +1607,7 @@ local function CreateFloatingButton()
     btn.MouseLeave:Connect(function()
         label.Visible = false
         pcall(function()
-            game:GetService("TweenService"):Create(
+            TweenService:Create(
                 btn,
                 TweenInfo.new(0.15),
                 { Size = UDim2.fromOffset(Config.ButtonSize, Config.ButtonSize) }
@@ -1856,8 +1615,7 @@ local function CreateFloatingButton()
         end)
     end)
 
-    UpdateButtonVisual()
-    print("[Datkits] ✅ Floating Button đã được tạo!")
+    print("[Datkits] ✅ Floating Button (Menu Toggle) đã được tạo!")
 end
 
 local function DestroyFloatingButton()
@@ -1867,6 +1625,7 @@ local function DestroyFloatingButton()
         FloatingUI.MainButton = nil
         FloatingUI.StatusLabel = nil
         FloatingUI.StatusDot = nil
+        FloatingUI.IconLabel = nil
     end
 end
 
@@ -1881,7 +1640,7 @@ local function StartAllLoops()
     task.spawn(AutoChestLoop)
     task.spawn(SeaTravelLoop)
     task.spawn(AutoSea3FarmLoop)
-    task.spawn(AutoBossLoop)  -- ✅ MỚI
+    task.spawn(AutoBossLoop)
 end
 
 -------------------------------------------------
@@ -1923,7 +1682,6 @@ Tabs.Main:AddToggle("AutoQuestToggle", {
     Callback = function(v)
         Config.AutoQuest = v
         if not v then ResetCharacterState() end
-        if FloatingUI.UpdateVisual then FloatingUI.UpdateVisual() end
     end,
 })
 
@@ -1945,7 +1703,6 @@ Tabs.Main:AddToggle("AutoFarmToggle", {
     Callback = function(v)
         Config.AutoFarm = v
         if not v then ResetCharacterState() end
-        if FloatingUI.UpdateVisual then FloatingUI.UpdateVisual() end
     end,
 })
 
@@ -1957,7 +1714,6 @@ Tabs.Main:AddToggle("AutoChestToggle", {
     Callback = function(v)
         Config.AutoChest = v
         if not v then ResetCharacterState() end
-        if FloatingUI.UpdateVisual then FloatingUI.UpdateVisual() end
     end,
 })
 
@@ -1994,7 +1750,6 @@ Tabs.Sea3:AddToggle("AutoSea3FarmToggle", {
         else
             ResetCharacterState()
         end
-        if FloatingUI.UpdateVisual then FloatingUI.UpdateVisual() end
     end,
 })
 
@@ -2027,12 +1782,10 @@ Tabs.Sea3:AddDropdown("Sea3AreaSelect", {
             Sea3State.CurrentIndex = idx
             Sea3State.StuckCounter = 0
             Sea3State.LastTargetPos = nil
-
             if Config.AutoSea3Farm then
                 local targetPos = Sea3Enemies[idx].pos + Vector3.new(0, Config.FarmDistance, 0)
                 SetMoveTarget(CFrame.new(targetPos))
             end
-
             Fluent:Notify({
                 Title    = "Sea 3",
                 Content  = "Chuyển tới: " .. Sea3Enemies[idx].name,
@@ -2050,13 +1803,11 @@ Tabs.Sea3:AddButton({
         if Sea3State.CurrentIndex > #Sea3Enemies then
             Sea3State.CurrentIndex = 1
         end
-
         local areaData = Sea3Enemies[Sea3State.CurrentIndex]
         if areaData and Config.AutoSea3Farm then
             local targetPos = areaData.pos + Vector3.new(0, Config.FarmDistance, 0)
             SetMoveTarget(CFrame.new(targetPos))
         end
-
         Fluent:Notify({
             Title    = "Sea 3",
             Content  = "Chuyển tới: " .. (areaData and areaData.name or "?"),
@@ -2072,7 +1823,6 @@ Tabs.Sea3:AddButton({
         Sea3State.CurrentIndex = 1
         Sea3State.StuckCounter = 0
         Sea3State.LastTargetPos = nil
-
         Fluent:Notify({
             Title    = "Sea 3",
             Content  = "Đã reset về khu vực 1",
@@ -2082,18 +1832,18 @@ Tabs.Sea3:AddButton({
 })
 
 -------------------------------------------------
--- ✅ UI - TAB AUTO BOSS (MỚI)
+-- ✅ UI - TAB AUTO BOSS
 -------------------------------------------------
 Tabs.Boss:AddSection("🐲 Auto Boss - Cả 3 Sea")
 
 Tabs.Boss:AddParagraph({
     Title = "Hướng dẫn Auto Boss",
-    Content = "Chọn boss từ dropdown → Bật Auto Boss → Nhân vật tự bay tới và đánh boss. Nếu boss chưa spawn, bật Auto Spawn (nếu hỗ trợ).",
+    Content = "Bước 1: Chọn Sea → Bước 2: Chọn boss → Bước 3: Bật Auto Boss. Nhân vật sẽ tự bay tới và đánh boss.",
 })
 
 Tabs.Boss:AddToggle("AutoBossToggle", {
-    Title       = "Auto Boss (Tự động đánh boss)",
-    Description = "Tự động tìm và đánh boss trong khu vực hiện tại",
+    Title       = "Auto Đánh Boss",
+    Description = "Tự động tìm và đánh boss đã chọn",
     Default     = false,
     Callback    = function(v)
         Config.AutoBoss = v
@@ -2101,13 +1851,12 @@ Tabs.Boss:AddToggle("AutoBossToggle", {
             ResetCharacterState()
             BossState.NoBossTime = 0
         end
-        if FloatingUI.UpdateVisual then FloatingUI.UpdateVisual() end
     end,
 })
 
 Tabs.Boss:AddToggle("AutoSpawnBossToggle", {
     Title       = "Auto Spawn Boss",
-    Description = "Tự động thử spawn boss nếu chưa có (chỉ boss có spawn button)",
+    Description = "Tự động thử spawn boss nếu chưa có",
     Default     = false,
     Callback    = function(v) Config.AutoSpawnBoss = v end,
 })
@@ -2132,15 +1881,14 @@ Tabs.Boss:AddSlider("BossDistance", {
     Callback    = function(v) Config.BossDistance = v end,
 })
 
-Tabs.Boss:AddSection("📍 Chọn Boss theo Sea")
+Tabs.Boss:AddSection("📍 Chọn Boss")
 
 Tabs.Boss:AddDropdown("BossSeaSelect", {
-    Title   = "Chọn Sea",
+    Title   = "1️⃣ Chọn Sea",
     Values  = { "Sea 1", "Sea 2", "Sea 3" },
     Multi   = false,
     Default = 1,
     Callback = function(selected)
-        -- Cập nhật dropdown boss theo sea
         local seaNum = tonumber(selected:match("(%d+)"))
         if seaNum then
             local bossList = GetBossListBySea(seaNum)
@@ -2148,17 +1896,15 @@ Tabs.Boss:AddDropdown("BossSeaSelect", {
             for _, info in ipairs(bossList) do
                 table.insert(names, info.displayName)
             end
-            
-            -- Update dropdown boss
+            -- Update dropdown boss theo sea đã chọn
             if Options and Options.BossSelect then
                 pcall(function()
                     Options.BossSelect:SetValues(names)
                 end)
             end
-
             Fluent:Notify({
                 Title    = "Auto Boss",
-                Content  = "Đã chuyển sang " .. selected .. " (" .. #names .. " boss)",
+                Content  = "Đã chọn " .. selected .. " (" .. #names .. " boss)",
                 Duration = 3,
             })
         end
@@ -2166,7 +1912,7 @@ Tabs.Boss:AddDropdown("BossSeaSelect", {
 })
 
 Tabs.Boss:AddDropdown("BossSelect", {
-    Title   = "Chọn Boss",
+    Title   = "2️⃣ Chọn Boss",
     Values  = (function()
         local t = {}
         for _, info in ipairs(BossData[1]) do
@@ -2177,39 +1923,37 @@ Tabs.Boss:AddDropdown("BossSelect", {
     Multi   = false,
     Default = 1,
     Callback = function(selected)
-        -- Tìm boss info theo displayName
-        for sea, list in pairs(BossData) do
-            for _, info in ipairs(list) do
-                if info.displayName == selected then
-                    Config.BossSelected = info.name
-
-                    -- Nếu AutoBoss đang bật → bay tới boss ngay
-                    if Config.AutoBoss then
-                        local found = FindBoss(info.name)
-                        if #found > 0 then
-                            local b = found[1]
-                            SetMoveTarget(CFrame.new(
-                                b.hrp.Position + Vector3.new(0, Config.BossDistance, 0),
-                                b.hrp.Position
-                            ))
-                        elseif info.spawnPos then
-                            SetMoveTarget(CFrame.new(
-                                info.spawnPos + Vector3.new(0, Config.FarmDistance, 0)
-                            ))
-                        end
+        -- Tìm boss theo displayName
+        local allList = GetAllBossList()
+        for _, info in ipairs(allList) do
+            if info.displayName == selected then
+                Config.BossSelected = info.name
+                if Config.AutoBoss then
+                    local found = FindBoss(info.name)
+                    if #found > 0 then
+                        local b = found[1]
+                        SetMoveTarget(CFrame.new(
+                            b.hrp.Position + Vector3.new(0, Config.BossDistance, 0),
+                            b.hrp.Position
+                        ))
+                    elseif info.spawnPos then
+                        SetMoveTarget(CFrame.new(
+                            info.spawnPos + Vector3.new(0, Config.FarmDistance, 0)
+                        ))
                     end
-
-                    Fluent:Notify({
-                        Title    = "🐲 Boss Selected",
-                        Content  = selected .. " (Sea " .. sea .. ")",
-                        Duration = 3,
-                    })
-                    return
                 end
+                Fluent:Notify({
+                    Title    = "🐲 Boss Selected",
+                    Content  = selected,
+                    Duration = 3,
+                })
+                return
             end
         end
     end,
 })
+
+Tabs.Boss:AddSection("🎯 Hành động nhanh")
 
 Tabs.Boss:AddButton({
     Title       = "📍 Bay tới boss đã chọn",
@@ -2223,7 +1967,6 @@ Tabs.Boss:AddButton({
             })
             return
         end
-
         local found = FindBoss(Config.BossSelected)
         if #found > 0 then
             local b = found[1]
@@ -2233,14 +1976,12 @@ Tabs.Boss:AddButton({
             ))
             Fluent:Notify({
                 Title    = "Auto Boss",
-                Content  = "Bay tới boss!",
+                Content  = "Đang bay tới boss!",
                 Duration = 3,
             })
         else
-            -- Boss chưa spawn → tới vị trí spawn
-            local sea = GetCurrentSea()
-            local bossList = GetBossListBySea(sea)
-            for _, info in ipairs(bossList) do
+            local allList = GetAllBossList()
+            for _, info in ipairs(allList) do
                 if info.name == Config.BossSelected then
                     SetMoveTarget(CFrame.new(
                         info.spawnPos + Vector3.new(0, Config.FarmDistance, 0)
@@ -2270,20 +2011,20 @@ Tabs.Boss:AddButton({
     end,
 })
 
-Tabs.Boss:AddSection("📋 Danh sách Boss hiện tại")
+Tabs.Boss:AddSection("📋 Danh sách Boss")
 
 Tabs.Boss:AddParagraph({
-    Title = "Boss Sea 1",
-    Content = "Saber Expert (lv 200), The Gorilla King (lv 30), Bobby (lv 30)",
+    Title = "Boss Sea 1 (3 boss)",
+    Content = "Saber Expert, The Gorilla King, Bobby",
 })
 
 Tabs.Boss:AddParagraph({
-    Title = "Boss Sea 2",
-    Content = "Cyborg (lv 950), Diamond (lv 750), Jeremy (lv 850), Fajita (lv 925), Smoke Admiral (lv 1100)",
+    Title = "Boss Sea 2 (5 boss)",
+    Content = "Cyborg, Diamond, Jeremy, Fajita, Smoke Admiral",
 })
 
 Tabs.Boss:AddParagraph({
-    Title = "Boss Sea 3",
+    Title = "Boss Sea 3 (9 boss)",
     Content = "Stone, Hydra Leader, Island Empress, Kilo Admiral, Captain Elephant, Beautiful Pirate, Cake Queen, Longma, Soul Reaper",
 })
 
@@ -2299,7 +2040,6 @@ Tabs.Sail:AddToggle("AutoSeaTravelToggle", {
     Callback    = function(v)
         Config.AutoSeaTravel = v
         if not v then StopSail() end
-        if FloatingUI.UpdateVisual then FloatingUI.UpdateVisual() end
     end,
 })
 
@@ -2410,22 +2150,18 @@ Tabs.Player:AddToggle("NoclipToggle", {
     Default     = true,
     Callback    = function(v)
         Config.NoclipEnabled = v
-        if v then
-            EnableNoclip()
-        else
-            DisableNoclip()
-        end
+        if v then EnableNoclip() else DisableNoclip() end
     end,
 })
 
 -------------------------------------------------
 -- UI - TAB SETTINGS
 -------------------------------------------------
-Tabs.Settings:AddSection("🎛️ Floating Button")
+Tabs.Settings:AddSection("🎛️ Nút Menu Floating")
 
 Tabs.Settings:AddToggle("FloatingButtonToggle", {
-    Title       = "Hiện nút nổi trên màn hình",
-    Description = "Nút nhanh để bật/tắt tất cả chức năng",
+    Title       = "Hiện nút bật/tắt Menu",
+    Description = "Nút nổi để ẩn/hiện Menu Datkits Premium",
     Default     = true,
     Callback    = function(v)
         Config.FloatingButton = v
@@ -2440,9 +2176,9 @@ Tabs.Settings:AddToggle("FloatingButtonToggle", {
 Tabs.Settings:AddSlider("ButtonSizeSlider", {
     Title       = "Kích thước nút",
     Description = "Kích thước nút nổi (pixel)",
-    Default     = 45,
+    Default     = 50,
     Min         = 30,
-    Max         = 80,
+    Max         = 100,
     Rounding    = 0,
     Callback    = function(v)
         Config.ButtonSize = v
@@ -2482,6 +2218,14 @@ Tabs.Settings:AddButton({
     end,
 })
 
+Tabs.Settings:AddButton({
+    Title       = "⌨️ Toggle Menu (RightCtrl)",
+    Description = "Bấm nút này hoặc RightCtrl để ẩn/hiện menu",
+    Callback    = function()
+        ToggleMenu()
+    end,
+})
+
 -------------------------------------------------
 -- UI - SETTINGS + SAVE
 -------------------------------------------------
@@ -2510,7 +2254,7 @@ end
 
 Fluent:Notify({
     Title    = "Datkits Premium",
-    Content  = "v4.5 Auto Boss cả 3 Sea đã sẵn sàng!",
+    Content  = "v4.6 Menu Toggle + Auto Boss đã sẵn sàng!",
     Duration = 6,
 })
 
@@ -2535,4 +2279,4 @@ if Config.NoclipEnabled then
     EnableNoclip()
 end
 
-print("[Datkits] ✅ v4.5 Auto Boss loaded successfully!")
+print("[Datkits] ✅ v4.6 Menu Toggle + Auto Boss loaded successfully!")
