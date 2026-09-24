@@ -1,8 +1,8 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v4.3           ║
+    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v4.4           ║
     ║   Fluent UI • Zero-Stutter Fly • Sea 1+2+3               ║
-    ║   Auto Quest + Auto Farm + Auto Chest (FULL SEA 3)       ║
+    ║   Auto Quest + Auto Farm + Auto Chest + Floating Button  ║
     ╚══════════════════════════════════════════════════════════╝
 --]]
 
@@ -20,6 +20,7 @@ repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
 local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService        = game:GetService("RunService")
+local UserInputService  = game:GetService("UserInputService")
 local LocalPlayer       = Players.LocalPlayer
 
 -------------------------------------------------
@@ -71,9 +72,12 @@ local Config = {
     NoclipEnabled = true,
     ChestRange    = 300,
     QuestGracePeriod = 5,
-    -- ✅ MỚI: Sea 3 specific
     AutoSea3Farm  = false,
     Sea3FarmRange = 500,
+    -- ✅ MỚI: Cấu hình nút nổi
+    FloatingButton = true,
+    ButtonSize     = 45,
+    ButtonOpacity  = 0.9,
 }
 
 -------------------------------------------------
@@ -81,7 +85,7 @@ local Config = {
 -------------------------------------------------
 local Window = Fluent:CreateWindow({
     Title       = "Datkits Premium | Blox Fruits",
-    SubTitle    = "v4.3 • Sea 1+2+3 Auto Farm",
+    SubTitle    = "v4.4 • Sea 1+2+3 Auto Farm",
     TabWidth    = 160,
     Size        = UDim2.fromOffset(600, 480),
     Acrylic     = true,
@@ -564,9 +568,6 @@ end
 -- ✅ QUEST DATA - SEA 1 + SEA 2 + SEA 3
 -------------------------------------------------
 local QuestData = {
-    -------------------------------------------------
-    -- SEA 1 (Level 1 - 699)
-    -------------------------------------------------
     [1] = {
         { maxLv = 9,   quest = "BanditQuest",   lv = 1, mob = "Bandit",            npc = CFrame.new(1059.37, 16.51, 1549.26), spawn = CFrame.new(1145, 17, 1634) },
         { maxLv = 14,  quest = "JungleQuest",   lv = 1, mob = "Monkey",            npc = CFrame.new(-1598.08, 36.85, 153.38), spawn = CFrame.new(-1610, 37, 145) },
@@ -585,10 +586,6 @@ local QuestData = {
         { maxLv = 624, quest = "SkyQuest2",     lv = 2, mob = "Shandian",          npc = CFrame.new(-7861.34, 5545.49, -380.29),spawn= CFrame.new(-7850, 5600, -220) },
         { maxLv = 699, quest = "FountainQuest", lv = 1, mob = "Galley Pirate",     npc = CFrame.new(5259.82, 38.5, 4050.03),  spawn = CFrame.new(5580, 38, 3990) },
     },
-
-    -------------------------------------------------
-    -- SEA 2 (Level 700 - 1499)
-    -------------------------------------------------
     [2] = {
         { maxLv = 725, quest = "Area1Quest",    lv = 1, mob = "Raider",            npc = CFrame.new(-429.54, 71.77, 1836.18), spawn = CFrame.new(-728, 52, 2345) },
         { maxLv = 775, quest = "Area1Quest",    lv = 2, mob = "Mercenary",         npc = CFrame.new(-429.54, 71.77, 1836.18), spawn = CFrame.new(-1004, 80, 1424) },
@@ -606,36 +603,19 @@ local QuestData = {
         { maxLv = 1425,quest = "CursedShipQuest",lv = 2, mob = "Demonic Soul",     npc = CFrame.new(923.85, 125.29, 32857.45),spawn = CFrame.new(1060, 128, 32900) },
         { maxLv = 1499,quest = "IceCastleQuest", lv = 1, mob = "Ice Legion",       npc = CFrame.new(5576.23, 300.16, -6300.44),spawn = CFrame.new(5620, 300, -6280) },
     },
-
-    -------------------------------------------------
-    -- SEA 3 (Level 1500+) ✅ MỚI
-    -------------------------------------------------
     [3] = {
-        -- Port Town (1500 - 1624)
         { maxLv = 1549, quest = "PirateQuest",   lv = 1, mob = "Pirate",            npc = CFrame.new(-285.71, 6.16, 5353.14),  spawn = CFrame.new(-200, 6, 5340) },
         { maxLv = 1624, quest = "PirateQuest",   lv = 2, mob = "Brute",             npc = CFrame.new(-285.71, 6.16, 5353.14),  spawn = CFrame.new(-200, 6, 5340) },
-
-        -- Hydra Island (1625 - 1724)
         { maxLv = 1674, quest = "HydraQuest",    lv = 1, mob = "Mercenary",         npc = CFrame.new(5705.43, 15.36, -630.42), spawn = CFrame.new(5670, 15, -650) },
         { maxLv = 1724, quest = "HydraQuest",    lv = 2, mob = "Raider",            npc = CFrame.new(5705.43, 15.36, -630.42), spawn = CFrame.new(5670, 15, -650) },
-
-        -- Great Tree (1725 - 1824)
         { maxLv = 1774, quest = "GreatTreeQuest",lv = 1, mob = "Forest Pirate",     npc = CFrame.new(2150.34, 27.66, -6650.59),spawn = CFrame.new(2150, 28, -6680) },
         { maxLv = 1824, quest = "GreatTreeQuest",lv = 2, mob = "Mythological Pirate",npc = CFrame.new(2150.34, 27.66, -6650.59),spawn = CFrame.new(2150, 28, -6680) },
-
-        -- Castle on the Sea (1825 - 1924)
         { maxLv = 1874, quest = "CastleQuest",   lv = 1, mob = "Pirate",            npc = CFrame.new(-5500.14, 313.66, -3010.76),spawn = CFrame.new(-5530, 313, -3020) },
         { maxLv = 1924, quest = "CastleQuest",   lv = 2, mob = "Musketeer",         npc = CFrame.new(-5500.14, 313.66, -3010.76),spawn = CFrame.new(-5530, 313, -3020) },
-
-        -- Floating Turtle (1925 - 2024)
         { maxLv = 1974, quest = "FloatingTurtleQuest", lv = 1, mob = "Fishman",     npc = CFrame.new(-11000.5, 331.5, -8600.5), spawn = CFrame.new(-11030, 331, -8600) },
         { maxLv = 2024, quest = "FloatingTurtleQuest", lv = 2, mob = "Fishman Captain", npc = CFrame.new(-11000.5, 331.5, -8600.5), spawn = CFrame.new(-11030, 331, -8600) },
-
-        -- Haunted Castle (2025 - 2124)
         { maxLv = 2074, quest = "HauntedQuest",  lv = 1, mob = "Reborn Skeleton",   npc = CFrame.new(-9515.5, 142.5, 5520.5),  spawn = CFrame.new(-9540, 142, 5530) },
         { maxLv = 2124, quest = "HauntedQuest",  lv = 2, mob = "Living Zombie",     npc = CFrame.new(-9515.5, 142.5, 5520.5),  spawn = CFrame.new(-9540, 142, 5530) },
-
-        -- Sea of Treats (2125+)
         { maxLv = 2224, quest = "CandyQuest",    lv = 1, mob = "Candy Pirate",      npc = CFrame.new(-1160.5, 14.5, -10750.5), spawn = CFrame.new(-1180, 14, -10750) },
         { maxLv = 2324, quest = "CandyQuest",    lv = 2, mob = "Cookie Crafter",    npc = CFrame.new(-1160.5, 14.5, -10750.5), spawn = CFrame.new(-1180, 14, -10750) },
         { maxLv = 2424, quest = "CandyQuest",    lv = 3, mob = "Cake Guard",        npc = CFrame.new(-1160.5, 14.5, -10750.5), spawn = CFrame.new(-1180, 14, -10750) },
@@ -643,7 +623,6 @@ local QuestData = {
     },
 }
 
--- ✅ Danh sách enemy Sea 3 để auto farm không cần quest
 local Sea3Enemies = {
     { name = "Pirate",              pos = Vector3.new(-200, 6, 5340)     },
     { name = "Brute",               pos = Vector3.new(-200, 6, 5340)     },
@@ -854,7 +833,7 @@ local function AutoChestLoop()
 end
 
 -------------------------------------------------
--- ✅ AUTO QUEST v4.3 - HỖ TRỢ SEA 1 + 2 + 3
+-- ✅ AUTO QUEST v4.4
 -------------------------------------------------
 local QuestState = {
     Phase = "idle",
@@ -896,13 +875,11 @@ local function AutoQuestLoop()
             local qInfo = GetQuestInfo()
             local now = tick()
 
-            -- Đổi quest → reset
             if qInfo.QuestName and qInfo.QuestName ~= QuestState.LastQuest then
                 QuestState.QuestAccepted = false
                 QuestState.QuestCompleted = false
             end
 
-            -- Cập nhật quest state
             if qInfo.HasQuest and not qInfo.IsComplete then
                 if not QuestState.QuestAccepted then
                     QuestState.QuestAccepted = true
@@ -915,7 +892,6 @@ local function AutoQuestLoop()
                 QuestState.QuestCompleted = true
             end
 
-            -- Quyết định farm hay không
             local shouldFarm = false
             if qInfo.HasQuest and not qInfo.IsComplete then
                 shouldFarm = true
@@ -923,14 +899,10 @@ local function AutoQuestLoop()
                 shouldFarm = true
             end
 
-            -- Vừa kill → giữ farm
             if not shouldFarm and (now - QuestState.LastKillTime) < 3 then
                 shouldFarm = true
             end
 
-            ---------------------------------------------------
-            -- PHASE 1: ĐI ĐÁNH QUÁI
-            ---------------------------------------------------
             if shouldFarm then
                 QuestState.Phase = "toMob"
 
@@ -970,9 +942,6 @@ local function AutoQuestLoop()
                 return
             end
 
-            ---------------------------------------------------
-            -- PHASE 2: ĐI TỚI NPC
-            ---------------------------------------------------
             QuestState.Phase = "toNPC"
             QuestState.LastEnemyCount = 0
 
@@ -1040,8 +1009,7 @@ local function AutoFarmLoop()
 end
 
 -------------------------------------------------
--- ✅ MỚI: SEA 3 AUTO FARM LOOP
--- Bay qua các khu vực Sea 3 để đánh quái tự động
+-- ✅ SEA 3 AUTO FARM LOOP
 -------------------------------------------------
 local Sea3State = {
     CurrentIndex = 1,
@@ -1065,7 +1033,6 @@ local function AutoSea3FarmLoop()
             local hrp = char.HumanoidRootPart
             if not hrp then return end
 
-            -- ✅ Ưu tiên 1: Tìm quái trong bán kính Sea3FarmRange
             local hits = GetClosestEnemies(Config.Sea3FarmRange)
             if #hits > 0 then
                 local target = hits[1]
@@ -1076,22 +1043,18 @@ local function AutoSea3FarmLoop()
                 )
                 SetMoveTarget(targetCF)
 
-                -- Reset stuck counter khi tìm thấy quái
                 Sea3State.StuckCounter = 0
                 Sea3State.LastTargetPos = pos
                 return
             end
 
-            -- ✅ Ưu tiên 2: Không có quái gần → bay tới khu vực tiếp theo
             local currentPos = hrp.Position
 
-            -- Nếu đã tới vị trí target cũ mà vẫn không có quái → chuyển khu vực
             if Sea3State.LastTargetPos then
                 local distToLast = (currentPos - Sea3State.LastTargetPos).Magnitude
                 if distToLast < 30 then
                     Sea3State.StuckCounter = Sea3State.StuckCounter + 1
                     if Sea3State.StuckCounter >= 3 then
-                        -- Chuyển sang khu vực tiếp theo
                         Sea3State.CurrentIndex = Sea3State.CurrentIndex + 1
                         if Sea3State.CurrentIndex > #Sea3Enemies then
                             Sea3State.CurrentIndex = 1
@@ -1101,7 +1064,6 @@ local function AutoSea3FarmLoop()
                 end
             end
 
-            -- Bay tới khu vực hiện tại
             local areaData = Sea3Enemies[Sea3State.CurrentIndex]
             if areaData then
                 local targetPos = areaData.pos + Vector3.new(0, Config.FarmDistance, 0)
@@ -1155,6 +1117,329 @@ local function SeaTravelLoop()
 end
 
 -------------------------------------------------
+-- ✅ MỚI: FLOATING BUTTON CONTROLLER
+-- Nút nổi trên màn hình để bật/tắt nhanh
+-------------------------------------------------
+local FloatingUI = {
+    ScreenGui = nil,
+    MainButton = nil,
+    StatusLabel = nil,
+    IsDragging = false,
+    DragStart = nil,
+    StartPos = nil,
+    Enabled = false,
+}
+
+local function CreateFloatingButton()
+    -- Cleanup nếu đã tồn tại
+    if FloatingUI.ScreenGui then
+        pcall(function() FloatingUI.ScreenGui:Destroy() end)
+        FloatingUI.ScreenGui = nil
+    end
+
+    -- Tạo ScreenGui
+    local sg = Instance.new("ScreenGui")
+    sg.Name = "DatkitsFloatingUI"
+    sg.ResetOnSpawn = false
+    sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    sg.IgnoreGuiInset = true
+    sg.DisplayOrder = 9999
+
+    -- Parent vào PlayerGui (với fallback cho CoreGui nếu cần)
+    local ok = pcall(function()
+        sg.Parent = LocalPlayer:WaitForChild("PlayerGui", 5)
+    end)
+    if not ok or not sg.Parent then
+        pcall(function()
+            sg.Parent = game:GetService("CoreGui")
+        end)
+    end
+
+    -- ✅ Main Button (nút tròn)
+    local btn = Instance.new("TextButton")
+    btn.Name = "MainButton"
+    btn.Size = UDim2.fromOffset(Config.ButtonSize, Config.ButtonSize)
+    btn.Position = UDim2.new(0, 20, 0.5, -Config.ButtonSize / 2)
+    btn.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+    btn.BackgroundTransparency = 1 - Config.ButtonOpacity
+    btn.BorderSizePixel = 0
+    btn.Text = ""
+    btn.AutoButtonColor = false
+    btn.ZIndex = 10
+    btn.Parent = sg
+
+    -- Bo tròn
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(1, 0)
+    corner.Parent = btn
+
+    -- Viền
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(255, 60, 60)
+    stroke.Thickness = 2
+    stroke.Transparency = 0.2
+    stroke.Parent = btn
+
+    -- ✅ Icon chữ "D"
+    local icon = Instance.new("TextLabel")
+    icon.Name = "Icon"
+    icon.Size = UDim2.new(1, 0, 1, 0)
+    icon.BackgroundTransparency = 1
+    icon.Text = "D"
+    icon.TextColor3 = Color3.fromRGB(255, 60, 60)
+    icon.TextScaled = true
+    icon.Font = Enum.Font.GothamBlack
+    icon.ZIndex = 11
+    icon.Parent = btn
+
+    -- ✅ Status Dot (chấm đỏ nhỏ hiển thị trạng thái)
+    local dot = Instance.new("Frame")
+    dot.Name = "StatusDot"
+    dot.Size = UDim2.fromOffset(12, 12)
+    dot.Position = UDim2.new(1, -14, 0, 2)
+    dot.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+    dot.BorderSizePixel = 0
+    dot.ZIndex = 12
+    dot.Parent = btn
+
+    local dotCorner = Instance.new("UICorner")
+    dotCorner.CornerRadius = UDim.new(1, 0)
+    dotCorner.Parent = dot
+
+    -- ✅ Status Label (hiển thị trạng thái khi hover)
+    local label = Instance.new("TextLabel")
+    label.Name = "StatusLabel"
+    label.Size = UDim2.fromOffset(160, 32)
+    label.Position = UDim2.new(1, 10, 0.5, -16)
+    label.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    label.BackgroundTransparency = 0.1
+    label.BorderSizePixel = 0
+    label.Text = "Datkits: OFF"
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.TextSize = 14
+    label.Font = Enum.Font.GothamBold
+    label.TextXAlignment = Enum.TextXAlignment.Center
+    label.Visible = false
+    label.ZIndex = 11
+    label.Parent = btn
+
+    local labelCorner = Instance.new("UICorner")
+    labelCorner.CornerRadius = UDim.new(0, 8)
+    labelCorner.Parent = label
+
+    FloatingUI.ScreenGui = sg
+    FloatingUI.MainButton = btn
+    FloatingUI.StatusLabel = label
+    FloatingUI.StatusDot = dot
+
+    -------------------------------------------------
+    -- HÀM CẬP NHẬT MÀU SẮC NÚT
+    -------------------------------------------------
+    local function UpdateButtonVisual()
+        local anyActive = Config.AutoQuest or Config.AutoFarm or Config.AutoChest
+            or Config.AutoSea3Farm or Config.AutoSeaTravel
+
+        if anyActive then
+            stroke.Color = Color3.fromRGB(60, 255, 120)
+            icon.TextColor3 = Color3.fromRGB(60, 255, 120)
+            dot.BackgroundColor3 = Color3.fromRGB(60, 255, 120)
+
+            local activeList = {}
+            if Config.AutoQuest then table.insert(activeList, "Quest") end
+            if Config.AutoFarm then table.insert(activeList, "Farm") end
+            if Config.AutoChest then table.insert(activeList, "Chest") end
+            if Config.AutoSea3Farm then table.insert(activeList, "Sea3") end
+            if Config.AutoSeaTravel then table.insert(activeList, "Sail") end
+
+            label.Text = "✅ ON: " .. table.concat(activeList, ", ")
+            label.TextColor3 = Color3.fromRGB(60, 255, 120)
+        else
+            stroke.Color = Color3.fromRGB(255, 60, 60)
+            icon.TextColor3 = Color3.fromRGB(255, 60, 60)
+            dot.BackgroundColor3 = Color3.fromRGB(120, 120, 120)
+
+            label.Text = "❌ Datkits: OFF"
+            label.TextColor3 = Color3.fromRGB(255, 255, 255)
+        end
+    end
+
+    FloatingUI.UpdateVisual = UpdateButtonVisual
+
+    -------------------------------------------------
+    -- HÀM BẬT/TẮT TẤT CẢ
+    -------------------------------------------------
+    local function ToggleAll()
+        local anyActive = Config.AutoQuest or Config.AutoFarm or Config.AutoChest
+            or Config.AutoSea3Farm or Config.AutoSeaTravel
+
+        if anyActive then
+            -- TẮT TẤT CẢ
+            Config.AutoQuest = false
+            Config.AutoFarm = false
+            Config.AutoChest = false
+            Config.AutoSea3Farm = false
+            Config.AutoSeaTravel = false
+
+            -- Reset character
+            ResetCharacterState()
+            StopSail()
+
+            -- Update Fluent UI toggles
+            pcall(function()
+                if Options and Options.AutoQuestToggle then
+                    Options.AutoQuestToggle:SetValue(false)
+                end
+                if Options and Options.AutoFarmToggle then
+                    Options.AutoFarmToggle:SetValue(false)
+                end
+                if Options and Options.AutoChestToggle then
+                    Options.AutoChestToggle:SetValue(false)
+                end
+                if Options and Options.AutoSea3FarmToggle then
+                    Options.AutoSea3FarmToggle:SetValue(false)
+                end
+                if Options and Options.AutoSeaTravelToggle then
+                    Options.AutoSeaTravelToggle:SetValue(false)
+                end
+            end)
+
+            Fluent:Notify({
+                Title    = "Datkits",
+                Content  = "❌ Đã TẮT tất cả chức năng",
+                Duration = 3,
+            })
+        else
+            -- BẬT TẤT CẢ (trừ Sea 3 vì chỉ dùng khi ở Sea 3)
+            Config.AutoQuest = true
+            Config.AutoFarm = true
+            Config.AutoChest = true
+
+            -- Nếu đang ở Sea 3 thì bật luôn Sea 3
+            if GetCurrentSea() == 3 then
+                Config.AutoSea3Farm = true
+            end
+
+            -- Update Fluent UI toggles
+            pcall(function()
+                if Options and Options.AutoQuestToggle then
+                    Options.AutoQuestToggle:SetValue(true)
+                end
+                if Options and Options.AutoFarmToggle then
+                    Options.AutoFarmToggle:SetValue(true)
+                end
+                if Options and Options.AutoChestToggle then
+                    Options.AutoChestToggle:SetValue(true)
+                end
+                if Options and Options.AutoSea3FarmToggle and GetCurrentSea() == 3 then
+                    Options.AutoSea3FarmToggle:SetValue(true)
+                end
+            end)
+
+            Fluent:Notify({
+                Title    = "Datkits",
+                Content  = "✅ Đã BẬT tất cả chức năng",
+                Duration = 3,
+            })
+        end
+
+        UpdateButtonVisual()
+    end
+
+    FloatingUI.ToggleAll = ToggleAll
+
+    -------------------------------------------------
+    -- DRAG HANDLER
+    -------------------------------------------------
+    local function OnInputBegan(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch
+        then
+            FloatingUI.IsDragging = true
+            FloatingUI.DragStart = input.Position
+            FloatingUI.StartPos = btn.Position
+        end
+    end
+
+    local function OnInputChanged(input)
+        if not FloatingUI.IsDragging then return end
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch
+        then
+            local delta = input.Position - FloatingUI.DragStart
+            btn.Position = UDim2.new(
+                FloatingUI.StartPos.X.Scale,
+                FloatingUI.StartPos.X.Offset + delta.X,
+                FloatingUI.StartPos.Y.Scale,
+                FloatingUI.StartPos.Y.Offset + delta.Y
+            )
+        end
+    end
+
+    local function OnInputEnded(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch
+        then
+            if FloatingUI.IsDragging then
+                FloatingUI.IsDragging = false
+
+                -- Kiểm tra xem có phải là click (không phải drag)
+                if FloatingUI.DragStart then
+                    local delta = input.Position - FloatingUI.DragStart
+                    if delta.Magnitude < 5 then
+                        -- Là click → toggle
+                        FloatingUI.ToggleAll()
+                    end
+                end
+            end
+        end
+    end
+
+    btn.InputBegan:Connect(OnInputBegan)
+    UserInputService.InputChanged:Connect(OnInputChanged)
+    UserInputService.InputEnded:Connect(OnInputEnded)
+
+    -------------------------------------------------
+    -- HOVER EFFECT
+    -------------------------------------------------
+    btn.MouseEnter:Connect(function()
+        label.Visible = true
+        pcall(function()
+            game:GetService("TweenService"):Create(
+                btn,
+                TweenInfo.new(0.15),
+                { Size = UDim2.fromOffset(Config.ButtonSize + 5, Config.ButtonSize + 5) }
+            ):Play()
+        end)
+    end)
+
+    btn.MouseLeave:Connect(function()
+        label.Visible = false
+        pcall(function()
+            game:GetService("TweenService"):Create(
+                btn,
+                TweenInfo.new(0.15),
+                { Size = UDim2.fromOffset(Config.ButtonSize, Config.ButtonSize) }
+            ):Play()
+        end)
+    end)
+
+    -- Khởi tạo màu
+    UpdateButtonVisual()
+
+    print("[Datkits] ✅ Floating Button đã được tạo!")
+end
+
+local function DestroyFloatingButton()
+    if FloatingUI.ScreenGui then
+        pcall(function() FloatingUI.ScreenGui:Destroy() end)
+        FloatingUI.ScreenGui = nil
+        FloatingUI.MainButton = nil
+        FloatingUI.StatusLabel = nil
+        FloatingUI.StatusDot = nil
+    end
+end
+
+-------------------------------------------------
 -- KHỞI ĐỘNG LOOPS
 -------------------------------------------------
 local function StartAllLoops()
@@ -1164,7 +1449,7 @@ local function StartAllLoops()
     task.spawn(AutoFarmLoop)
     task.spawn(AutoChestLoop)
     task.spawn(SeaTravelLoop)
-    task.spawn(AutoSea3FarmLoop)  -- ✅ MỚI
+    task.spawn(AutoSea3FarmLoop)
 end
 
 -------------------------------------------------
@@ -1206,6 +1491,7 @@ Tabs.Main:AddToggle("AutoQuestToggle", {
     Callback = function(v)
         Config.AutoQuest = v
         if not v then ResetCharacterState() end
+        if FloatingUI.UpdateVisual then FloatingUI.UpdateVisual() end
     end,
 })
 
@@ -1227,6 +1513,7 @@ Tabs.Main:AddToggle("AutoFarmToggle", {
     Callback = function(v)
         Config.AutoFarm = v
         if not v then ResetCharacterState() end
+        if FloatingUI.UpdateVisual then FloatingUI.UpdateVisual() end
     end,
 })
 
@@ -1238,6 +1525,7 @@ Tabs.Main:AddToggle("AutoChestToggle", {
     Callback = function(v)
         Config.AutoChest = v
         if not v then ResetCharacterState() end
+        if FloatingUI.UpdateVisual then FloatingUI.UpdateVisual() end
     end,
 })
 
@@ -1252,7 +1540,7 @@ Tabs.Main:AddSlider("ChestRange", {
 })
 
 -------------------------------------------------
--- ✅ UI - TAB SEA 3 (MỚI)
+-- UI - TAB SEA 3
 -------------------------------------------------
 Tabs.Sea3:AddSection("🌊 Sea 3 Auto Farm")
 
@@ -1268,13 +1556,13 @@ Tabs.Sea3:AddToggle("AutoSea3FarmToggle", {
     Callback    = function(v)
         Config.AutoSea3Farm = v
         if v then
-            -- Reset state khi bật
             Sea3State.CurrentIndex = 1
             Sea3State.StuckCounter = 0
             Sea3State.LastTargetPos = nil
         else
             ResetCharacterState()
         end
+        if FloatingUI.UpdateVisual then FloatingUI.UpdateVisual() end
     end,
 })
 
@@ -1302,14 +1590,12 @@ Tabs.Sea3:AddDropdown("Sea3AreaSelect", {
     Multi   = false,
     Default = 1,
     Callback = function(selected)
-        -- Parse index từ chuỗi "1. Pirate"
         local idx = tonumber(selected:match("^(%d+)"))
         if idx and Sea3Enemies[idx] then
             Sea3State.CurrentIndex = idx
             Sea3State.StuckCounter = 0
             Sea3State.LastTargetPos = nil
 
-            -- Nếu đang bật Auto Sea 3, di chuyển ngay tới đó
             if Config.AutoSea3Farm then
                 local targetPos = Sea3Enemies[idx].pos + Vector3.new(0, Config.FarmDistance, 0)
                 SetMoveTarget(CFrame.new(targetPos))
@@ -1375,6 +1661,7 @@ Tabs.Sail:AddToggle("AutoSeaTravelToggle", {
     Callback    = function(v)
         Config.AutoSeaTravel = v
         if not v then StopSail() end
+        if FloatingUI.UpdateVisual then FloatingUI.UpdateVisual() end
     end,
 })
 
@@ -1494,6 +1781,70 @@ Tabs.Player:AddToggle("NoclipToggle", {
 })
 
 -------------------------------------------------
+-- ✅ MỚI: UI - TAB SETTINGS (thêm cấu hình nút nổi)
+-------------------------------------------------
+Tabs.Settings:AddSection("🎛️ Floating Button")
+
+Tabs.Settings:AddToggle("FloatingButtonToggle", {
+    Title       = "Hiện nút nổi trên màn hình",
+    Description = "Nút nhanh để bật/tắt tất cả chức năng. Click để toggle, kéo để di chuyển",
+    Default     = true,
+    Callback    = function(v)
+        Config.FloatingButton = v
+        if v then
+            CreateFloatingButton()
+        else
+            DestroyFloatingButton()
+        end
+    end,
+})
+
+Tabs.Settings:AddSlider("ButtonSizeSlider", {
+    Title       = "Kích thước nút",
+    Description = "Kích thước nút nổi (pixel)",
+    Default     = 45,
+    Min         = 30,
+    Max         = 80,
+    Rounding    = 0,
+    Callback    = function(v)
+        Config.ButtonSize = v
+        if FloatingUI.MainButton then
+            FloatingUI.MainButton.Size = UDim2.fromOffset(v, v)
+        end
+    end,
+})
+
+Tabs.Settings:AddSlider("ButtonOpacitySlider", {
+    Title       = "Độ mờ nút",
+    Description = "0 = trong suốt, 1 = đậm",
+    Default     = 90,
+    Min         = 30,
+    Max         = 100,
+    Rounding    = 0,
+    Callback    = function(v)
+        Config.ButtonOpacity = v / 100
+        if FloatingUI.MainButton then
+            FloatingUI.MainButton.BackgroundTransparency = 1 - (v / 100)
+        end
+    end,
+})
+
+Tabs.Settings:AddButton({
+    Title       = "🔄 Reset vị trí nút",
+    Description = "Đưa nút về vị trí mặc định",
+    Callback    = function()
+        if FloatingUI.MainButton then
+            FloatingUI.MainButton.Position = UDim2.new(0, 20, 0.5, -Config.ButtonSize / 2)
+            Fluent:Notify({
+                Title    = "Datkits",
+                Content  = "Đã reset vị trí nút",
+                Duration = 3,
+            })
+        end
+    end,
+})
+
+-------------------------------------------------
 -- UI - SETTINGS + SAVE
 -------------------------------------------------
 pcall(function()
@@ -1512,9 +1863,16 @@ Window:SelectTab(1)
 -------------------------------------------------
 StartAllLoops()
 
+-------------------------------------------------
+-- ✅ KHỞI ĐỘNG FLOATING BUTTON
+-------------------------------------------------
+if Config.FloatingButton then
+    CreateFloatingButton()
+end
+
 Fluent:Notify({
     Title    = "Datkits Premium",
-    Content  = "v4.3 Sea 1+2+3 Auto Farm sẵn sàng!",
+    Content  = "v4.4 Floating Button đã sẵn sàng!",
     Duration = 6,
 })
 
@@ -1539,4 +1897,4 @@ if Config.NoclipEnabled then
     EnableNoclip()
 end
 
-print("[Datkits] ✅ v4.3 Sea 1+2+3 Auto Farm loaded successfully!")
+print("[Datkits] ✅ v4.4 Floating Button loaded successfully!")
