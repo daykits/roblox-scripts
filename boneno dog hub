@@ -11446,11 +11446,21 @@ Fluent:Notify({
     Duration = 6,
 })
 
-Window:Notify({
-    Title = "Thanks Alot!",
-    Content = "Enjoy The Private Only Script",
-    Image = "rbxassetid://127632820302449",
-    Duration = 5,
-})
+pcall(function()
+    Fluent:Notify({
+        Title    = "Menu Loaded!",
+        Content  = "Nhấn LeftControl (PC) hoặc nút cyan (Mobile) để bật/tắt menu.",
+        Duration = 6,
+    })
+end)
+
+pcall(function()
+    Window:Notify({
+        Title = "Thanks Alot!",
+        Content = "Enjoy The Private Only Script",
+        Image = "rbxassetid://127632820302449",
+        Duration = 5,
+    })
+end)
 
 print("[IdkQqw Script] ✅ Loaded successfully!")
