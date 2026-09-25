@@ -11374,12 +11374,24 @@ CreateFloatingButton()
 -- ============================================================
 
 pcall(function()
-    SaveManager:SetLibrary(Fluent)
-    InterfaceManager:SetLibrary(Fluent)
-    SaveManager:SetFolder("IdkQqwProject")
-    InterfaceManager:SetFolder("IdkQqwProject")
-    InterfaceManager:BuildInterfaceSection(Tabs.Settings)
-    SaveManager:BuildConfigSection(Tabs.Settings)
+    if SaveManager and SaveManager.SetLibrary then
+        SaveManager:SetLibrary(Fluent)
+        SaveManager:SetFolder("IdkQqwProject")
+    end
+end)
+
+pcall(function()
+    if InterfaceManager and InterfaceManager.SetLibrary then
+        InterfaceManager:SetLibrary(Fluent)
+        InterfaceManager:SetFolder("IdkQqwProject")
+        InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+    end
+end)
+
+pcall(function()
+    if SaveManager and SaveManager.BuildConfigSection then
+        SaveManager:BuildConfigSection(Tabs.Settings)
+    end
 end)
 
 -- ============================================================
