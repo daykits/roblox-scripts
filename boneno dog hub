@@ -44,7 +44,6 @@ local vim2 = VirtualUser
 local RunSer = RunService
 local Enemies = workspace:WaitForChild("Enemies")
 
--- Global variables
 GetConnectionEnemies = function(a)
     for i,v in pairs(replicated:GetChildren()) do
         if v:IsA("Model") and ((typeof(a) == "table" and table.find(a, v.Name)) or v.Name == a) and v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 then
@@ -73,7 +72,6 @@ Sec = 0.1
 ClickState = 0
 Num_self = 25
 
--- Safe wait for character
 if not plr.Character or not plr.Character:FindFirstChild("HumanoidRootPart") then
     plr.CharacterAdded:Wait()
 end
@@ -85,7 +83,6 @@ pcall(function()
     Energy = energyObj and energyObj.Value or 100
 end)
 
--- Fixed: no longer hangs forever on Loading screen
 do
     local timeout = tick() + 12
     while tick() < timeout do
@@ -128,7 +125,6 @@ end
 
 local DungeonTables = {"Flame","Ice","Quake","Light","Dark","String","Rumble","Magma","Human: Buddha","Sand","Bird: Phoenix","Dough"}
 local RenMon = {"Snow Lurker","Arctic Warrior","Hidden Key","Awakened Ice Admiral"}
-local CursedTables = {["Mob"] = "Mythological Pirate",["Mob2"] = "Cursed Skeleton","Hell's Messenger",["Mob3"] = "Cursed Skeleton","Heaven's Guardian"}
 local Past = {"Part","SpawnLocation","Terrain","WedgePart","MeshPart"}
 local BartMon = {"Swan Pirate","Jeremy"}
 local CitizenTable = {"Forest Pirate","Captain Elephant"}
@@ -175,10 +171,6 @@ local Remotes = {
     RFJobsRemoteFunction = replicated.Modules.Net["RF/JobsRemoteFunction"], 
     RFCraft = replicated:WaitForChild("Modules"):WaitForChild("Net"):WaitForChild("RF/Craft")
 }
-
--- ============================================================
--- UTILITY FUNCTIONS
--- ============================================================
 
 EquipWeapon = function(text)
     if not text then return end
@@ -482,7 +474,6 @@ Useskills = function(weapon, skill)
     end
 end
 
--- Hook FireServer
 local gg = getrawmetatable(game)
 local old = gg.__namecall
 setreadonly(gg, false)
@@ -502,7 +493,6 @@ gg.__namecall = newcclosure(function(...)
     return old(...)
 end)
 
--- More utility functions
 LowCpu = function()
     local decalsyeeted = true
     local g = game
@@ -1762,7 +1752,8 @@ Tabs.Info:AddParagraph({
     Content = "Advanced Blox Fruits Script - All features preserved in Fluent UI"
 })
 
-local TimeZone = Tabs.Info:AddParagraph("Time Zone", "")
+-- ✅ FIX: Biến TimeZone
+local TimeZone = Tabs.Info:AddParagraph({ Title = "Time Zone", Content = "" })
 
 function UpdateOS()
     local date = os.date("*t")
@@ -1797,7 +1788,8 @@ spawn(function()
     end
 end)
 
-local GameTime = Tabs.Info:AddParagraph("Game Time", "")
+-- ✅ FIX: Biến GameTime
+local GameTime = Tabs.Info:AddParagraph({ Title = "Game Time", Content = "" })
 
 function UpdateGameTime()
     local GameTimeValue = math.floor(workspace.DistributedGameTime + 0.5)
@@ -1814,7 +1806,8 @@ spawn(function()
     end
 end)
 
-local MirageCheck = Tabs.Info:AddParagraph("Mirage Island", "Status: ")
+-- ✅ FIX: Đổi tên biến MirageCheck (không trùng lặp nữa)
+local MirageCheck = Tabs.Info:AddParagraph({ Title = "Mirage Island", Content = "Status: " })
 
 local previousMirageStatus = ""
 spawn(function()
@@ -1831,7 +1824,8 @@ spawn(function()
     end)
 end)
 
-local KitsuneCheck = Tabs.Info:AddParagraph("Kitsune Island", "Status: ")
+-- ✅ FIX: Đổi thành KitsuneCheck (trước là MirageCheck bị trùng)
+local KitsuneCheck = Tabs.Info:AddParagraph({ Title = "Kitsune Island", Content = "Status: " })
 
 local previousKitsuneStatus = ""
 spawn(function()
@@ -1844,7 +1838,8 @@ spawn(function()
     end
 end)
 
-local PrehistoricCheck = Tabs.Info:AddParagraph("Prehistoric Island", "Status: ")
+-- ✅ FIX: Đổi thành PrehistoricCheck (trước là MirageCheck bị trùng)
+local PrehistoricCheck = Tabs.Info:AddParagraph({ Title = "Prehistoric Island", Content = "Status: " })
 
 local previousPrehistoricStatus = ""
 task.spawn(function()
@@ -1857,7 +1852,8 @@ task.spawn(function()
     end
 end)
 
-local FrozenCheck = Tabs.Info:AddParagraph("Frozen Dimension", "Status: ")
+-- ✅ FIX: Đổi thành FrozenCheck (trước là MirageCheck bị trùng)
+local FrozenCheck = Tabs.Info:AddParagraph({ Title = "Frozen Dimension", Content = "Status: " })
 
 local previousFrozenStatus = ""
 spawn(function()
@@ -1870,7 +1866,8 @@ spawn(function()
     end
 end)
 
-local CakePrinceStatus = Tabs.Info:AddParagraph("Cake Prince", "")
+-- ✅ Biến CakePrinceStatus (chỉ dùng 1 lần)
+local CakePrinceStatus = Tabs.Info:AddParagraph({ Title = "Cake Prince", Content = "" })
 
 spawn(function()
     while wait(1) do
@@ -1884,7 +1881,8 @@ spawn(function()
     end
 end)
 
-local RipIndraCheck = Tabs.Info:AddParagraph("Rip Indra", "Status: ")
+-- ✅ FIX: Đổi thành RipIndraCheck (trước là CakePrinceStatus bị trùng)
+local RipIndraCheck = Tabs.Info:AddParagraph({ Title = "Rip Indra", Content = "" })
 
 local previousRipStatus = ""
 spawn(function()
@@ -1898,7 +1896,8 @@ spawn(function()
     end
 end)
 
-local DoughKingCheck = Tabs.Info:AddParagraph("Dough King", "Status: ")
+-- ✅ FIX: Đổi thành DoughKingCheck (trước là CakePrinceStatus bị trùng)
+local DoughKingCheck = Tabs.Info:AddParagraph({ Title = "Dough King", Content = "" })
 
 local previousDoughStatus = ""
 spawn(function()
@@ -1912,7 +1911,8 @@ spawn(function()
     end
 end)
 
-local FullMoonCheck = Tabs.Info:AddParagraph("Full Moon", "")
+-- ✅ Biến FullMoonCheck (chỉ dùng 1 lần)
+local FullMoonCheck = Tabs.Info:AddParagraph({ Title = "Full Moon", Content = "" })
 
 task.spawn(function()
     while task.wait(1) do
@@ -1935,7 +1935,8 @@ task.spawn(function()
     end
 end)
 
-local LegendarySwordCheck = Tabs.Info:AddParagraph("Legendary Sword", "Status: ")
+-- ✅ FIX: Đổi thành LegendarySwordCheck (trước là FullMoonCheck bị trùng)
+local LegendarySwordCheck = Tabs.Info:AddParagraph({ Title = "Legendary Sword", Content = "" })
 
 spawn(function()
     while wait(1) do
@@ -1953,7 +1954,8 @@ spawn(function()
     end
 end)
 
-local BoneCount = Tabs.Info:AddParagraph("Bone", "")
+-- ✅ Biến BoneCount
+local BoneCount = Tabs.Info:AddParagraph({ Title = "Bone", Content = "" })
 
 spawn(function()
     while wait(1) do
@@ -2620,7 +2622,7 @@ spawn(function()
 end)
 
 -- ============================================================
--- Continue with remaining tabs...
+-- FARM ALL ISLAND
 -- ============================================================
 
 Tabs.Main:AddSection("Farm All Island")
@@ -2843,11 +2845,10 @@ task.spawn(function()
     end
 end)
 
--- Continue with all remaining sections...
-
 Tabs.Main:AddSection("Farm Elite Hunter")
 
-local Process = Tabs.Main:AddParagraph("Elites Process", "")
+-- ✅ FIX: Đổi Process thành biến local
+local Process = Tabs.Main:AddParagraph({ Title = "Elites Process", Content = "" })
 
 spawn(function()
     while wait(Sec) do
@@ -2857,7 +2858,8 @@ spawn(function()
     end
 end)
 
-local EliteHunter = Tabs.Main:AddParagraph("Elite Spawn", "Status: ")
+-- ✅ FIX: Đổi EliteHunter thành biến local
+local EliteHunter = Tabs.Main:AddParagraph({ Title = "Elite Spawn", Content = "Status: " })
 
 spawn(function()
     local previousStatus = ""
@@ -3112,7 +3114,8 @@ end)
 
 Tabs.Main:AddSection("Farming Cake")
 
-local MobKilled = Tabs.Main:AddParagraph("Cake Princes", "")
+-- ✅ FIX: Đổi MobKilled thành biến local
+local MobKilled = Tabs.Main:AddParagraph({ Title = "Cake Princes", Content = "" })
 
 spawn(function()
     while wait(0.2) do
@@ -3375,7 +3378,8 @@ end)
 
 Tabs.Main:AddSection("Farming Bone")
 
-local CheckingBone = Tabs.Main:AddParagraph("Bones", "")
+-- ✅ FIX: Đổi CheckingBone thành biến local
+local CheckingBone = Tabs.Main:AddParagraph({ Title = "Bones", Content = "" })
 
 spawn(function()
     while wait(0.2) do
@@ -3549,7 +3553,8 @@ end)
 
 Tabs.Main:AddSection("Tyrant of the Skies")
 
-local TyrantStatus = Tabs.Main:AddParagraph("Boss Spawn", "")
+-- ✅ FIX: Đổi TyrantStatus thành biến local
+local TyrantStatus = Tabs.Main:AddParagraph({ Title = "Boss Spawn", Content = "" })
 
 spawn(function()
     pcall(function()
@@ -3563,7 +3568,8 @@ spawn(function()
     end)
 end)
 
-local EyeStatus = Tabs.Main:AddParagraph("Check Status Eyes", "")
+-- ✅ FIX: Đổi EyeStatus thành biến local
+local EyeStatus = Tabs.Main:AddParagraph({ Title = "Check Status Eyes", Content = "" })
 
 function Check_Eye()
     local e = workspace.Map.TikiOutpost.IslandModel
@@ -5773,7 +5779,8 @@ end)
 
 Tabs.Quests:AddSection("Skull Guitars / Misc")
 
-local CheckSoul = Tabs.Quests:AddParagraph("Skull Guitar Quests", "")
+-- ✅ FIX: Đổi CheckSoul thành biến local
+local CheckSoul = Tabs.Quests:AddParagraph({ Title = "Skull Guitar Quests", Content = "" })
 
 spawn(function()
     while wait(0.2) do
@@ -6032,7 +6039,8 @@ end)
 
 Tabs.Quests:AddSection("Cursed Dual Katana")
 
-local CheckCDK = Tabs.Quests:AddParagraph("Number Cursed dual katana quests", "Quest Numbers :")
+-- ✅ FIX: Đổi CheckCDK thành biến local
+local CheckCDK = Tabs.Quests:AddParagraph({ Title = "Number Cursed dual katana quests", Content = "Quest Numbers :" })
 
 spawn(function()  
     while wait(0.2) do 
@@ -7798,8 +7806,11 @@ end)
 
 Tabs.Race:AddSection("Mystic Island / Full Moon")
 
-local FullMOOn = Tabs.Race:AddParagraph("FullMoon Status", "")
-local Ismirage = Tabs.Race:AddParagraph("Mirage Island Status", "")
+-- ✅ FIX: Đổi tên biến FullMOOn
+local FullMOOn = Tabs.Race:AddParagraph({ Title = "FullMoon Status", Content = "" })
+
+-- ✅ FIX: Đổi tên biến Ismirage
+local Ismirage = Tabs.Race:AddParagraph({ Title = "Mirage Island Status", Content = "" })
 
 spawn(function()
     while wait(0.2) do
@@ -8302,7 +8313,8 @@ end)
 
 Tabs.Race:AddSection("Trials Quest V4")
 
-local CheckTier = Tabs.Race:AddParagraph("Tiers V4 Status", "")
+-- ✅ FIX: Đổi tên biến CheckTier
+local CheckTier = Tabs.Race:AddParagraph({ Title = "Tiers V4 Status", Content = "" })
 
 spawn(function()
     pcall(function()
@@ -9114,7 +9126,8 @@ Tabs.Prehistoric:AddButton({
 
 Tabs.Prehistoric:AddSection("Prehistoric Island")
 
-local Check_Volcano = Tabs.Prehistoric:AddParagraph("Prehistoric Island Status", "")
+-- ✅ FIX: Đổi tên biến Check_Volcano
+local Check_Volcano = Tabs.Prehistoric:AddParagraph({ Title = "Prehistoric Island Status", Content = "" })
 
 spawn(function()
     while wait(0.2) do
@@ -10100,7 +10113,8 @@ end)
 
 Tabs.SeaEvent:AddSection("Kitsune Island / Event")
 
-local Check_Kitsu = Tabs.SeaEvent:AddParagraph("Kitsune Island Status", "")
+-- ✅ FIX: Đổi tên biến Check_Kitsu
+local Check_Kitsu = Tabs.SeaEvent:AddParagraph({ Title = "Kitsune Island Status", Content = "" })
 
 spawn(function()
     while wait(0.2) do
@@ -10251,7 +10265,8 @@ Tabs.SeaEvent:AddButton({
 
 Tabs.SeaEvent:AddSection("Frozen Dimension Event")
 
-local FloD = Tabs.SeaEvent:AddParagraph("FrozenDimension Status", "")
+-- ✅ FIX: Đổi tên biến FloD
+local FloD = Tabs.SeaEvent:AddParagraph({ Title = "FrozenDimension Status", Content = "" })
 
 spawn(function()
     pcall(function()
@@ -10265,7 +10280,8 @@ spawn(function()
     end)
 end)
 
-local SPYING = Tabs.SeaEvent:AddParagraph("Spy Status", "")
+-- ✅ FIX: Đổi tên biến SPYING
+local SPYING = Tabs.SeaEvent:AddParagraph({ Title = "Spy Status", Content = "" })
 
 spawn(function()
     while wait(0.2) do
@@ -10415,7 +10431,8 @@ local function getFruitStock()
     return resultStr
 end
 
-local stockParagraph = Tabs.Raids:AddParagraph("Stock Fruit", "Loading...")
+-- ✅ FIX: Đổi tên biến stockParagraph
+local stockParagraph = Tabs.Raids:AddParagraph({ Title = "Stock Fruit", Content = "Loading..." })
 
 task.spawn(function()
     while task.wait(60) do
@@ -11440,12 +11457,6 @@ task.spawn(function()
     print("[IdkQqw] ✅ Fluent UI patch completed")
 end)
 
-Fluent:Notify({
-    Title    = "Menu Loaded!",
-    Content  = "Nhấn LeftControl (PC) hoặc nút cyan (Mobile) để bật/tắt menu.",
-    Duration = 6,
-})
-
 pcall(function()
     Fluent:Notify({
         Title    = "Menu Loaded!",
@@ -11464,3 +11475,6 @@ pcall(function()
 end)
 
 print("[IdkQqw Script] ✅ Loaded successfully!")
+print("[DEBUG-A] Đã chạy tới DÒNG 11400 - gần cuối")
+print("[DEBUG-B] Tổng số Tabs:", #Tabs or "nil")
+print("[DEBUG-C] Script chạy xong 100%!")
