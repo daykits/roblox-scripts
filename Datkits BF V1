@@ -1,8 +1,8 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v5.3           ║
+    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v5.4           ║
     ║   FastAttack ALWAYS ON • Zero-Stutter Fly • Sea 1+2+3    ║
-    ║   Quest + Farm + Chest + Boss + Hop Boss (SMOOTH v5.3)  ║
+    ║   Quest + Farm + Chest + Boss + Hop Boss (SMOOTH v5.4)  ║
     ╚══════════════════════════════════════════════════════════╝
 --]]
 
@@ -65,12 +65,11 @@ local Config = {
     AutoFarm      = false,
     AutoChest     = false,
 
-    -- ✅ FAST ATTACK v5.3 - LUÔN BẬT
-    FastAttack       = true,     -- Bật/tắt qua UI (mặc định BẬT)
-    AttackDelay      = 0.05,     -- Tốc độ đánh (giây)
-    HitboxRange      = 50,       -- Tầm đánh chung
-    AlwaysAttackRange = 80,      -- ✅ Tầm đánh cho FastAttack vĩnh viễn
-    AutoEquipWeapon  = true,     -- Tự động equip melee
+    FastAttack       = true,
+    AttackDelay      = 0.05,
+    HitboxRange      = 50,
+    AlwaysAttackRange = 80,
+    AutoEquipWeapon  = true,
 
     FarmDistance  = 6,
     WalkSpeed     = 16,
@@ -105,6 +104,14 @@ local Config = {
     MoveArriveDist     = 1.5,
     MovePriorityLock   = 0.3,
     MoveRotDeadZone    = 15,
+
+    -- ✅ v5.4: FastAttack tuning mới
+    FastAttackUseRemote   = true,
+    FastAttackUseRegHit   = true,
+    FastAttackUseToolAct  = true,
+    FastAttackAutoEquip   = true,
+    FastAttackMultiHit    = true,
+    FastAttackIgnoreBoat  = true,
 }
 
 -------------------------------------------------
@@ -112,7 +119,7 @@ local Config = {
 -------------------------------------------------
 local Window = Fluent:CreateWindow({
     Title       = "Datkits Premium | Blox Fruits",
-    SubTitle    = "v5.3 • FastAttack ALWAYS ON",
+    SubTitle    = "v5.4 • FastAttack Tuning",
     TabWidth    = 150,
     Size        = UDim2.fromOffset(620, 500),
     Acrylic     = true,
@@ -557,14 +564,13 @@ local function GetNearestIsland()
 end
 
 -------------------------------------------------
--- WEAPON SYSTEM - v5.3 NÂNG CẤP
+-- WEAPON SYSTEM
 -------------------------------------------------
 local MELEE_KEYWORDS = {
     "combat", "step", "karate", "dragon", "electric",
     "god", "claw", "superhuman", "death", "shark", "saber", "sword",
 }
 
--- ✅ Danh sách ưu tiên melee từ mạnh đến yếu
 local MELEE_PRIORITY = {
     "godhuman",
     "sanguine art",
@@ -590,7 +596,6 @@ local function GetBestMelee()
     end
     if #allTools == 0 then return nil end
 
-    -- Ưu tiên theo MELEE_PRIORITY
     for _, priorityName in ipairs(MELEE_PRIORITY) do
         for _, tool in ipairs(allTools) do
             if tool.Name:lower():find(priorityName, 1, true) then
@@ -599,12 +604,10 @@ local function GetBestMelee()
         end
     end
 
-    -- Melee có ToolTip == "Melee"
     for _, tool in ipairs(allTools) do
         if tool.ToolTip == "Melee" then return tool end
     end
 
-    -- Bất kỳ tool nào có keyword melee
     for _, tool in ipairs(allTools) do
         local n = tool.Name:lower()
         for _, kw in ipairs(MELEE_KEYWORDS) do
@@ -612,7 +615,6 @@ local function GetBestMelee()
         end
     end
 
-    -- Fallback: tool đầu tiên
     return allTools[1]
 end
 
@@ -623,10 +625,8 @@ local function EquipWeapon()
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hum then return end
 
-    -- Nếu đã có tool thì check xem có phải melee không
     local currentTool = char:FindFirstChildOfClass("Tool")
     if currentTool then
-        -- Nếu tool hiện tại là melee → giữ nguyên
         if currentTool.ToolTip == "Melee" then return end
         local n = currentTool.Name:lower()
         for _, kw in ipairs(MELEE_KEYWORDS) do
@@ -637,7 +637,6 @@ local function EquipWeapon()
     local bestMelee = GetBestMelee()
     if not bestMelee then return end
 
-    -- Nếu melee tốt hơn đang ở backpack → equip
     pcall(function() hum:EquipTool(bestMelee) end)
 end
 
@@ -808,7 +807,7 @@ local function GetAllBossList()
 end
 
 -------------------------------------------------
--- FIND BOSS (v5.3 - fix prefix/suffix)
+-- FIND BOSS
 -------------------------------------------------
 local function FindBoss(bossName)
     local found = {}
@@ -929,7 +928,7 @@ local function GetClosestEnemies(maxRange, nameFilter)
 end
 
 -------------------------------------------------
--- ✅ FAST ATTACK v5.3 - LUÔN HOẠT ĐỘNG
+-- FAST ATTACK v5.4
 -------------------------------------------------
 local function GetNet()
     local modules = ReplicatedStorage:FindFirstChild("Modules")
@@ -939,41 +938,33 @@ local function GetNet()
     return net:FindFirstChild("RE/RegisterAttack"), net:FindFirstChild("RE/RegisterHit")
 end
 
--- ✅ Hàm này chạy mỗi 0.05s, LUÔN tìm mục tiêu để đánh
--- Không phụ thuộc vào bất kỳ config nào
 local function DoFastAttackAlways()
     local char = GetCharacter()
     if not char then return end
 
-    -- 1. Tự động equip melee nếu chưa có
+    -- ✅ FIX: Không block loop khi equip
     local tool = char:FindFirstChildOfClass("Tool")
-    if not tool then
-        if Config.AutoEquipWeapon then
-            EquipWeapon()
-            for _ = 1, 3 do
-                task.wait()
-                tool = char:FindFirstChildOfClass("Tool")
-                if tool then break end
-            end
-        end
-        if not tool then return end
+    if not tool and Config.FastAttackAutoEquip then
+        task.spawn(function()
+            pcall(EquipWeapon)
+        end)
     end
 
-    -- 2. Activate tool
-    pcall(function() tool:Activate() end)
-
-    -- 3. Fire RegisterAttack
+    -- ✅ Fire RegisterAttack
     local regAttack, regHit = GetNet()
     if regAttack then
         pcall(function() regAttack:FireServer(0.1) end)
     end
 
-    -- 4. Tìm mục tiêu để đánh
-    --    Ưu tiên: Boss (nếu AutoBoss bật) > Quái/Boss gần nhất trong tầm
+    -- ✅ Activate tool (nếu có config)
+    if tool and Config.FastAttackUseToolAct then
+        pcall(function() tool:Activate() end)
+    end
+
+    -- ✅ Tìm mục tiêu
     local hits = {}
     local useRange = math.max(Config.AlwaysAttackRange, Config.HitboxRange)
 
-    -- Nếu AutoBoss bật + có boss → ưu tiên boss
     if Config.AutoBoss then
         local bosses
         if Config.BossSelected then
@@ -986,16 +977,13 @@ local function DoFastAttackAlways()
         end
     end
 
-    -- Nếu chưa có hit nào → tìm enemy gần nhất (bao gồm boss) trong tầm
     if #hits == 0 then
-        -- Tìm trong Enemies folder (bao gồm cả boss nếu boss nằm trong Enemies)
         local enemies = GetClosestEnemies(useRange)
         for _, e in ipairs(enemies) do
             table.insert(hits, { enemy = e.enemy, hrp = e.hrp, dist = e.dist })
         end
     end
 
-    -- Nếu vẫn không có → thử tìm boss trực tiếp trong workspace (nếu AutoBoss bật)
     if #hits == 0 and Config.AutoBoss then
         local bosses = FindAllBossesInRange(useRange)
         for _, b in ipairs(bosses) do
@@ -1003,24 +991,32 @@ local function DoFastAttackAlways()
         end
     end
 
-    -- 5. Fire LeftClickRemote với hướng đến mục tiêu
+    -- ✅ Fire LeftClickRemote (nếu có config + có tool)
     local hrp = char.HumanoidRootPart
-    local lcRemote = tool:FindFirstChild("LeftClickRemote")
-        or tool:FindFirstChild("Remote")
-        or tool:FindFirstChildWhichIsA("RemoteEvent")
+    if tool and Config.FastAttackUseRemote then
+        local lcRemote = tool:FindFirstChild("LeftClickRemote")
+            or tool:FindFirstChild("Remote")
+            or tool:FindFirstChildWhichIsA("RemoteEvent")
 
-    if lcRemote then
-        local dir = (#hits > 0)
-            and (hits[1].hrp.Position - hrp.Position).Unit
-            or Vector3.new(0, -1, 0)
-        pcall(function() lcRemote:FireServer(dir, 1) end)
+        if lcRemote then
+            local dir = (#hits > 0)
+                and (hits[1].hrp.Position - hrp.Position).Unit
+                or Vector3.new(0, -1, 0)
+            pcall(function() lcRemote:FireServer(dir, 1) end)
+        end
     end
 
-    -- 6. Fire RegisterHit cho TẤT CẢ mục tiêu trong tầm
-    if regHit and #hits > 0 then
-        for _, data in ipairs(hits) do
+    -- ✅ Fire RegisterHit (multi-hit hoặc single target)
+    if regHit and #hits > 0 and Config.FastAttackUseRegHit then
+        if Config.FastAttackMultiHit then
+            for _, data in ipairs(hits) do
+                pcall(function()
+                    regHit:FireServer(data.hrp, { data.enemy })
+                end)
+            end
+        else
             pcall(function()
-                regHit:FireServer(data.hrp, { data.enemy })
+                regHit:FireServer(hits[1].hrp, { hits[1].enemy })
             end)
         end
     end
@@ -1644,21 +1640,16 @@ local function InitAfterHop()
 end
 
 -------------------------------------------------
--- ✅ LOOPS v5.3 - FAST ATTACK CHẠY ĐỘC LẬP
+-- LOOPS
 -------------------------------------------------
-
--- ✅ FastAttackLoop mới: CHẠY MỌI LÚC, không phụ thuộc AutoFarm/AutoBoss
 local function FastAttackLoop()
     while task.wait(Config.AttackDelay) do
-        -- Chỉ cần Config.FastAttack = true là chạy
         if not Config.FastAttack then continue end
-        -- Nếu đang ngồi thuyền thì không đánh (tránh glitch)
-        if GetBoat() then continue end
+        if Config.FastAttackIgnoreBoat and GetBoat() then continue end
         pcall(DoFastAttackAlways)
     end
 end
 
--- ✅ EquipLoop: tự động equip melee mọi lúc
 local function EquipLoop()
     while task.wait(0.5) do
         if Config.AutoEquipWeapon then
@@ -1946,7 +1937,7 @@ local function DestroyFloatingButton()
 end
 
 -------------------------------------------------
--- KHỞI ĐỘNG LOOPS
+-- START LOOPS
 -------------------------------------------------
 local function StartAllLoops()
     task.spawn(FastAttackLoop)
@@ -1975,7 +1966,10 @@ Tabs.Main:AddToggle("FastAttackToggle", {
 Tabs.Main:AddToggle("AutoEquipToggle", {
     Title = "Tự động equip Melee mạnh nhất",
     Default = true,
-    Callback = function(v) Config.AutoEquipWeapon = v end,
+    Callback = function(v)
+        Config.AutoEquipWeapon = v
+        Config.FastAttackAutoEquip = v
+    end,
 })
 
 Tabs.Main:AddSlider("AlwaysAttackRange", {
@@ -2508,118 +2502,114 @@ Tabs.Settings:AddButton({
     Callback = function() ToggleMenu() end,
 })
 
-Tabs.Settings:AddSection("🎯 Tinh chỉnh di chuyển (v5.0)")
+-------------------------------------------------
+-- ✅ v5.4 UI - TINH CHỈNH FAST ATTACK
+-------------------------------------------------
+Tabs.Settings:AddSection("⚡ Tinh chỉnh Fast Attack (v5.4)")
 
-Tabs.Settings:AddSlider("MoveSmoothSpeedSlider", {
-    Title       = "Độ mượt (Speed)",
-    Description = "Cao hơn = nhanh hơn, thấp hơn = mượt hơn (2-15)",
-    Default     = 5, Min = 2, Max = 15, Rounding = 0,
-    Callback    = function(v) Config.MoveSmoothSpeed = v end,
+Tabs.Settings:AddToggle("FastAttackUseRemoteToggle", {
+    Title       = "Fire LeftClickRemote",
+    Description = "Gửi remote LeftClick khi đánh (hầu hết tool cần)",
+    Default     = true,
+    Callback    = function(v) Config.FastAttackUseRemote = v end,
 })
 
-Tabs.Settings:AddSlider("MoveResponsiveSlider", {
-    Title       = "Độ phản hồi (Responsiveness)",
-    Description = "AlignPosition responsiveness (10-80)",
-    Default     = 25, Min = 10, Max = 80, Rounding = 0,
+Tabs.Settings:AddToggle("FastAttackUseRegHitToggle", {
+    Title       = "Fire RegisterHit (Redz Style)",
+    Description = "Gửi RegisterHit trực tiếp (bỏ qua animation)",
+    Default     = true,
+    Callback    = function(v) Config.FastAttackUseRegHit = v end,
+})
+
+Tabs.Settings:AddToggle("FastAttackUseToolActToggle", {
+    Title       = "Gọi Tool:Activate()",
+    Description = "Bật animation tool khi đánh",
+    Default     = true,
+    Callback    = function(v) Config.FastAttackUseToolAct = v end,
+})
+
+Tabs.Settings:AddToggle("FastAttackAutoEquipToggle", {
+    Title       = "Tự equip Melee mạnh nhất",
+    Description = "Tool mạnh nhất được equip tự động",
+    Default     = true,
     Callback    = function(v)
-        Config.MoveResponsiveness = v
-        if Move.AlignPos then Move.AlignPos.Responsiveness = v end
+        Config.FastAttackAutoEquip = v
+        Config.AutoEquipWeapon = v
     end,
 })
 
-Tabs.Settings:AddSlider("MoveMaxForceSlider", {
-    Title       = "Lực di chuyển (MaxForce)",
-    Description = "Cao = nhanh + dễ overshoot, thấp = mượt + chậm (30000-200000)",
-    Default     = 60000, Min = 30000, Max = 200000, Rounding = 0,
-    Callback    = function(v)
-        Config.MoveMaxForce = v
-        if Move.AlignPos then Move.AlignPos.MaxForce = v end
-        if Move.AlignOri then Move.AlignOri.MaxTorque = v end
-    end,
+Tabs.Settings:AddToggle("FastAttackMultiHitToggle", {
+    Title       = "Đánh nhiều mục tiêu cùng lúc",
+    Description = "Fire RegisterHit cho tất cả enemy/boss trong tầm",
+    Default     = true,
+    Callback    = function(v) Config.FastAttackMultiHit = v end,
 })
 
-Tabs.Settings:AddSlider("MoveMaxVelocitySlider", {
-    Title       = "Vận tốc tối đa",
-    Description = "Giới hạn vận tốc di chuyển (100-500)",
-    Default     = 250, Min = 100, Max = 500, Rounding = 0,
-    Callback    = function(v)
-        Config.MoveMaxVelocity = v
-        if Move.AlignPos then Move.AlignPos.MaxVelocity = v end
-    end,
+Tabs.Settings:AddToggle("FastAttackIgnoreBoatToggle", {
+    Title       = "Bỏ qua khi ngồi thuyền",
+    Description = "Không đánh khi đang ngồi thuyền (tránh glitch)",
+    Default     = true,
+    Callback    = function(v) Config.FastAttackIgnoreBoat = v end,
 })
 
-Tabs.Settings:AddSlider("MovePriorityLockSlider", {
-    Title       = "Khóa ưu tiên (giây)",
-    Description = "Thời gian khóa target sau mỗi lần set (0.1-1s)",
-    Default     = 0.3, Min = 0.1, Max = 1, Rounding = 2,
-    Callback    = function(v) Config.MovePriorityLock = v end,
+Tabs.Settings:AddSlider("FastAttackRangeSlider", {
+    Title       = "Tầm đánh FastAttack",
+    Description = "Bán kính tìm mục tiêu để đánh (30 - 500)",
+    Default     = 80, Min = 30, Max = 500, Rounding = 0,
+    Callback    = function(v) Config.AlwaysAttackRange = v end,
 })
 
-Tabs.Settings:AddSlider("MoveArriveDistSlider", {
-    Title       = "Khoảng cách snap",
-    Description = "Tới gần hơn X studs sẽ snap thẳng (0.5-5)",
-    Default     = 1.5, Min = 0.5, Max = 5, Rounding = 1,
-    Callback    = function(v) Config.MoveArriveDist = v end,
+Tabs.Settings:AddSlider("FastAttackDelaySlider", {
+    Title       = "Tốc độ đánh (giây)",
+    Description = "Càng nhỏ càng nhanh (0.02 - 0.5)",
+    Default     = 0.05, Min = 0.02, Max = 0.5, Rounding = 2,
+    Callback    = function(v) Config.AttackDelay = v end,
 })
 
 Tabs.Settings:AddButton({
-    Title       = "🔄 Reset về mặc định v5.0",
-    Description = "Reset cấu hình di chuyển về mặc định tối ưu",
+    Title       = "🔄 Reset Fast Attack mặc định",
+    Description = "Khôi phục cấu hình FastAttack về mặc định",
     Callback    = function()
-        Config.MoveSmoothSpeed = 5
-        Config.MoveResponsiveness = 25
-        Config.MoveMaxForce = 60000
-        Config.MoveMaxVelocity = 250
-        Config.MovePriorityLock = 0.3
-        Config.MoveArriveDist = 1.5
-        if Move.AlignPos then
-            Move.AlignPos.Responsiveness = 25
-            Move.AlignPos.MaxForce = 60000
-            Move.AlignPos.MaxVelocity = 250
-        end
-        if Move.AlignOri then
-            Move.AlignOri.MaxTorque = 60000
-        end
+        Config.FastAttackUseRemote = true
+        Config.FastAttackUseRegHit = true
+        Config.FastAttackUseToolAct = true
+        Config.FastAttackAutoEquip = true
+        Config.FastAttackMultiHit = true
+        Config.FastAttackIgnoreBoat = true
+        Config.AlwaysAttackRange = 80
+        Config.AttackDelay = 0.05
+        Config.AutoEquipWeapon = true
         Fluent:Notify({
-            Title = "Datkits", Content = "Đã reset cấu hình v5.0", Duration = 3,
+            Title = "Datkits", Content = "🔄 Đã reset Fast Attack", Duration = 3,
         })
     end,
 })
 
 Tabs.Settings:AddButton({
-    Title       = "⚡ Preset: Siêu mượt",
-    Description = "Ưu tiên mượt (dùng khi bay xa)",
+    Title       = "🚀 Preset: Fast Attack Siêu nhanh",
+    Description = "0.02s delay, tầm 200, multi-hit bật",
     Callback    = function()
-        Config.MoveSmoothSpeed = 3
-        Config.MoveResponsiveness = 15
-        Config.MoveMaxForce = 40000
-        Config.MoveMaxVelocity = 200
-        if Move.AlignPos then
-            Move.AlignPos.Responsiveness = 15
-            Move.AlignPos.MaxForce = 40000
-            Move.AlignPos.MaxVelocity = 200
-        end
+        Config.AttackDelay = 0.02
+        Config.AlwaysAttackRange = 200
+        Config.FastAttackMultiHit = true
+        Config.FastAttackUseRegHit = true
         Fluent:Notify({
-            Title = "Datkits", Content = "⚡ Đã bật preset Siêu mượt", Duration = 3,
+            Title = "Datkits", Content = "🚀 Fast Attack Siêu nhanh", Duration = 3,
         })
     end,
 })
 
 Tabs.Settings:AddButton({
-    Title       = "🚀 Preset: Siêu nhanh",
-    Description = "Ưu tiên nhanh (dùng khi farm)",
+    Title       = "🎯 Preset: Fast Attack An toàn",
+    Description = "0.1s delay, tầm 50, không multi-hit (chống detect)",
     Callback    = function()
-        Config.MoveSmoothSpeed = 8
-        Config.MoveResponsiveness = 40
-        Config.MoveMaxForce = 90000
-        Config.MoveMaxVelocity = 350
-        if Move.AlignPos then
-            Move.AlignPos.Responsiveness = 40
-            Move.AlignPos.MaxForce = 90000
-            Move.AlignPos.MaxVelocity = 350
-        end
+        Config.AttackDelay = 0.1
+        Config.AlwaysAttackRange = 50
+        Config.FastAttackMultiHit = false
+        Config.FastAttackUseRegHit = true
+        Config.FastAttackUseRemote = true
         Fluent:Notify({
-            Title = "Datkits", Content = "🚀 Đã bật preset Siêu nhanh", Duration = 3,
+            Title = "Datkits", Content = "🎯 Fast Attack An toàn", Duration = 3,
         })
     end,
 })
@@ -2639,20 +2629,14 @@ end)
 Window:SelectTab(1)
 
 -------------------------------------------------
--- KHỞI ĐỘNG LOOPS
+-- START
 -------------------------------------------------
 StartAllLoops()
 
--------------------------------------------------
--- KHỞI ĐỘNG FLOATING BUTTON
--------------------------------------------------
 if Config.FloatingButton then
     CreateFloatingButton()
 end
 
--------------------------------------------------
--- INIT AFTER HOP
--------------------------------------------------
 task.spawn(function()
     task.wait(3)
     if Config.AutoHopBoss then
@@ -2662,7 +2646,7 @@ end)
 
 Fluent:Notify({
     Title    = "Datkits Premium",
-    Content  = "v5.3 FastAttack ALWAYS ON đã sẵn sàng!",
+    Content  = "v5.4 FastAttack Tuning đã sẵn sàng!",
     Duration = 6,
 })
 
@@ -2682,7 +2666,6 @@ LocalPlayer.CharacterAdded:Connect(function(newChar)
     local hum = newChar:FindFirstChildOfClass("Humanoid")
     if hum then hum.WalkSpeed = Config.WalkSpeed end
 
-    -- Tự equip ngay sau khi respawn
     task.wait(0.5)
     if Config.AutoEquipWeapon then
         pcall(EquipWeapon)
@@ -2693,10 +2676,9 @@ if Config.NoclipEnabled then
     EnableNoclip()
 end
 
--- Tự equip ngay lần đầu
 task.wait(2)
 if Config.AutoEquipWeapon then
     pcall(EquipWeapon)
 end
 
-print("[Datkits] ✅ v5.3 - FastAttack ALWAYS ON loaded successfully!")
+print("[Datkits] ✅ v5.4 - FastAttack Tuning loaded successfully!")
