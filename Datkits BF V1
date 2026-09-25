@@ -1,8 +1,8 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v4.9           ║
+    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v5.0           ║
     ║   Fluent UI • Zero-Stutter Fly • Sea 1+2+3               ║
-    ║   Quest + Farm + Chest + Boss + Hop Boss (SMOOTH)       ║
+    ║   Quest + Farm + Chest + Boss + Hop Boss (SMOOTH v5)    ║
     ╚══════════════════════════════════════════════════════════╝
 --]]
 
@@ -94,11 +94,14 @@ local Config = {
     HopAutoSpawnFirst = true,
     HopCooldown       = 12,
     MenuVisible    = true,
-    -- ✅ MỚI: Movement tuning
-    MoveResponsiveness = 30,
-    MoveMaxForce       = 80000,
-    MoveSmoothFactor   = 6,
-    MoveDamping        = 8,
+    -- ✅ v5.0: Movement tuning mới
+    MoveResponsiveness = 25,     -- AlignPosition responsiveness
+    MoveMaxForce       = 60000,  -- Force trung bình
+    MoveMaxVelocity    = 250,    -- Vận tốc tối đa
+    MoveSmoothSpeed    = 5,      -- Hệ số smooth (frame-rate independent)
+    MoveArriveDist     = 1.5,    -- Khoảng cách coi là "đã tới"
+    MovePriorityLock   = 0.3,    -- Lock target sau mỗi lần set (giây)
+    MoveRotDeadZone    = 15,     -- Góc tối thiểu để rotate (độ)
 }
 
 -------------------------------------------------
@@ -106,7 +109,7 @@ local Config = {
 -------------------------------------------------
 local Window = Fluent:CreateWindow({
     Title       = "Datkits Premium | Blox Fruits",
-    SubTitle    = "v4.9 • Smooth Movement",
+    SubTitle    = "v5.0 • Ultra Smooth Movement",
     TabWidth    = 150,
     Size        = UDim2.fromOffset(620, 500),
     Acrylic     = true,
@@ -220,20 +223,32 @@ local function DisableNoclip()
 end
 
 -------------------------------------------------
--- ✅ MOVEMENT CONTROLLER v4.9 - SMOOTH
--- FIX: Giảm Responsiveness, damping khi gần target,
---      target priority, alpha thấp, không overshoot
+-- ✅ v5.0 MOVEMENT CONTROLLER - ULTRA SMOOTH
+-- 5 KEY FIXES:
+--   1. Frame-rate independent smoothing (exp)
+--   2. Priority lock 0.3s chống overwrite
+--   3. Arrive detection (snap khi < 1.5 studs)
+--   4. Rotation dead-zone (không rotate lặt vặt)
+--   5. Velocity clamp + MaxVelocity
 -------------------------------------------------
 local Move = {
-    Active = false, TargetCF = nil, SmoothPos = nil, BoundHRP = nil,
-    AlignPos = nil, AlignOri = nil, Attach = nil, Heartbeat = nil,
-    -- ✅ MỚI: Priority system chống overwrite
-    Priority = 0,       -- 0 = thấp, 10 = cao
+    Active = false,
+    TargetCF = nil,
+    SmoothPos = nil,
+    BoundHRP = nil,
+    AlignPos = nil,
+    AlignOri = nil,
+    Attach = nil,
+    Heartbeat = nil,
+    -- Priority lock
+    Priority = 0,
+    LockUntil = 0,          -- ✅ Lock cứng
     LastSetTime = 0,
-    LastTargetPos = nil,
-    -- ✅ MỚI: Velocity tracking để smooth hơn
-    Velocity = Vector3.zero,
-    LastHRPPos = nil,
+    -- ✅ Arrive detection
+    Arrived = false,
+    LastArriveCheck = 0,
+    -- ✅ Rotation cache
+    LastRotCF = nil,
 }
 
 local function CleanupMoveInstances()
@@ -251,28 +266,32 @@ local function EnsureMoveInstances(hrp)
     local att = Instance.new("Attachment")
     att.Name = "FarmAtt"; att.Parent = hrp
 
-    -- ✅ FIX: Giảm MaxForce + Responsiveness để mượt
+    -- ✅ AlignPosition với cấu hình tối ưu
     local ap = Instance.new("AlignPosition")
-    ap.Name = "FarmAP"; ap.Attachment0 = att
+    ap.Name = "FarmAP"
+    ap.Attachment0 = att
     ap.Mode = Enum.PositionAlignmentMode.OneAttachment
     ap.Position = hrp.Position
-    ap.MaxForce = Config.MoveMaxForce           -- 80000 (giảm từ 125000)
-    ap.Responsiveness = Config.MoveResponsiveness -- 30 (giảm từ 80)
+    ap.MaxForce = Config.MoveMaxForce
+    ap.Responsiveness = Config.MoveResponsiveness
     ap.ApplyAtCenterOfMass = false
-    ap.MaxVelocity = nil  -- Không giới hạn
+    ap.MaxVelocity = Config.MoveMaxVelocity   -- ✅ Giới hạn vận tốc
     ap.Parent = hrp
 
-    -- ✅ FIX: AlignOrientation mượt hơn
+    -- ✅ AlignOrientation với dead-zone
     local ao = Instance.new("AlignOrientation")
-    ao.Name = "FarmAO"; ao.Attachment0 = att
+    ao.Name = "FarmAO"
+    ao.Attachment0 = att
     ao.Mode = Enum.OrientationAlignmentMode.OneAttachment
-    ao.CFrame = hrp.CFrame; ao.MaxTorque = 80000
-    ao.Responsiveness = 40   -- 40 thay vì 80
+    ao.CFrame = hrp.CFrame
+    ao.MaxTorque = Config.MoveMaxForce
+    ao.Responsiveness = 30
     ao.Parent = hrp
 
-    Move.BoundHRP = hrp; Move.AlignPos = ap; Move.AlignOri = ao; Move.Attach = att
-    Move.LastHRPPos = hrp.Position
-    Move.Velocity = Vector3.zero
+    Move.BoundHRP = hrp
+    Move.AlignPos = ap
+    Move.AlignOri = ao
+    Move.Attach = att
     return true
 end
 
@@ -289,13 +308,14 @@ local function StartFly()
     pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Climbing, false) end)
     pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false) end)
     pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false) end)
-    pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Swimming, false) end)   -- ✅ MỚI
-    pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, false) end)    -- ✅ MỚI
+    pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Swimming, false) end)
+    pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, false) end)
 
     if not Move.Active then
         Move.SmoothPos = hrp.Position
         Move.Active = true
-        Move.Velocity = Vector3.zero
+        Move.Arrived = false
+        Move.LastRotCF = nil
     end
     for _, part in ipairs(char:GetDescendants()) do
         if part:IsA("BasePart") then part.CanCollide = false end
@@ -305,9 +325,14 @@ end
 
 local function StopFly()
     if not Move.Active then return end
-    Move.Active = false; Move.TargetCF = nil; Move.SmoothPos = nil
+    Move.Active = false
+    Move.TargetCF = nil
+    Move.SmoothPos = nil
     Move.Priority = 0
-    Move.Velocity = Vector3.zero
+    Move.LockUntil = 0
+    Move.Arrived = false
+    Move.LastRotCF = nil
+
     local char = GetCharacter()
     if not char then return end
     local hum = char:FindFirstChildOfClass("Humanoid")
@@ -317,24 +342,39 @@ local function StopFly()
     end
 end
 
--- ✅ FIX: SetMoveTarget với PRIORITY - chống overwrite
--- Priority: 1 = thấp (quest/sea3), 5 = cao (farm), 10 = rất cao (boss)
+-- ✅ v5.0: SetMoveTarget với PRIORITY LOCK cứng
+-- Priority: 0-10 (cao hơn = ưu tiên hơn)
 local function SetMoveTarget(targetCFrame, priority)
     if not targetCFrame then return end
     priority = priority or 5
 
-    -- ✅ Nếu priority thấp hơn priority hiện tại VÀ vừa set gần đây → bỏ qua
     local now = tick()
-    if Move.Active and priority < Move.Priority and (now - Move.LastSetTime) < 0.15 then
+
+    -- ✅ FIX 1: Nếu đang trong LockUntil VÀ priority thấp hơn Priority → BỎ QUA
+    if Move.Active and now < Move.LockUntil and priority < Move.Priority then
+        return
+    end
+
+    -- ✅ FIX 2: Nếu cùng priority và vừa set gần đây (< 0.1s) → BỎ QUA
+    if Move.Active and priority == Move.Priority and (now - Move.LastSetTime) < 0.1 then
         return
     end
 
     if not StartFly() then return end
 
+    -- ✅ FIX 3: Nếu target mới quá gần target cũ (< 2 studs) → BỎ QUA (không cập nhật)
+    if Move.TargetCF then
+        local dist = (Move.TargetCF.Position - targetCFrame.Position).Magnitude
+        if dist < 2 and priority <= Move.Priority then
+            return
+        end
+    end
+
     Move.TargetCF = targetCFrame
     Move.Priority = priority
     Move.LastSetTime = now
-    Move.LastTargetPos = targetCFrame.Position
+    Move.LockUntil = now + Config.MovePriorityLock  -- ✅ Lock 0.3s
+    Move.Arrived = false
 end
 
 local function BindHeartbeat()
@@ -353,7 +393,7 @@ local function BindHeartbeat()
             if not EnsureMoveInstances(hrp) then return end
         end
 
-        -- Force noclip
+        -- Force noclip mỗi frame
         for _, part in ipairs(char:GetDescendants()) do
             if part:IsA("BasePart") and part.CanCollide then
                 part.CanCollide = false
@@ -364,30 +404,52 @@ local function BindHeartbeat()
         local currentPos = hrp.Position
         local distance = (currentPos - targetPos).Magnitude
 
-        -- ✅ FIX 1: Smooth alpha thấp hơn (dt * 6 thay vì 18)
-        local alpha = math.clamp(dt * Config.MoveSmoothFactor, 0, 0.4)
+        -- ✅ FIX 4: ARRIVE DETECTION - Snap khi gần target
+        if distance < Config.MoveArriveDist then
+            if not Move.Arrived then
+                Move.SmoothPos = targetPos
+                Move.AlignPos.Position = targetPos
+                Move.Arrived = true
+            end
+            -- Đã tới → chỉ giữ vị trí, không smooth nữa
+            Move.AlignPos.Position = targetPos
+            return
+        else
+            Move.Arrived = false
+        end
 
-        -- ✅ FIX 2: Nếu đã ở gần target (< 2 studs) → giảm tốc mượt
-        if distance < 3 then
-            alpha = alpha * 0.5
+        -- ✅ FIX 5: FRAME-RATE INDEPENDENT SMOOTH
+        -- Dùng công thức exponential: 1 - e^(-k * dt)
+        -- Kết quả giống nhau ở mọi FPS (30, 60, 144)
+        local k = Config.MoveSmoothSpeed  -- Hệ số smooth
+        local alpha = 1 - math.exp(-k * dt)
+
+        -- Clamp alpha để tránh nhảy quá lớn khi lag
+        alpha = math.clamp(alpha, 0, 0.5)
+
+        -- ✅ FIX 6: Nếu ở gần target (< 5 studs) → giảm alpha (damping)
+        if distance < 5 then
+            alpha = alpha * 0.6
         end
 
         Move.SmoothPos = Move.SmoothPos:Lerp(targetPos, alpha)
-
-        -- ✅ FIX 3: Clamp SmoothPos không vượt quá target quá xa
-        if distance > 0.1 then
-            local dir = (targetPos - Move.SmoothPos)
-            if dir.Magnitude > 50 then
-                Move.SmoothPos = targetPos - dir.Unit * 50
-            end
-        end
-
         Move.AlignPos.Position = Move.SmoothPos
 
-        -- ✅ FIX 4: Orientation chỉ update khi cần
-        local lookDir = (targetPos - currentPos)
+        -- ✅ FIX 7: Rotation với DEAD ZONE (chỉ rotate khi lệch > 15°)
+        local lookDir = targetPos - currentPos
         if lookDir.Magnitude > 1 then
-            Move.AlignOri.CFrame = CFrame.new(currentPos, currentPos + lookDir.Unit)
+            local currentLook = hrp.CFrame.LookVector
+            local targetLook = lookDir.Unit
+            local dotProduct = currentLook:Dot(targetLook)
+
+            -- Nếu góc lệch > 15° (cos15 ≈ 0.966)
+            if dotProduct < 0.966 then
+                local targetCFrame = CFrame.new(currentPos, currentPos + targetLook)
+                -- Smooth rotation
+                local rotAlpha = 1 - math.exp(-8 * dt)
+                Move.AlignOri.CFrame = Move.AlignOri.CFrame:Lerp(targetCFrame, rotAlpha)
+                Move.LastRotCF = targetCFrame
+            end
         end
     end)
 end
@@ -942,17 +1004,14 @@ local function AutoChestLoop()
             local target = validChests[1].chest
             local targetDist = validChests[1].dist
 
-            if targetDist > 8 then
-                SetMoveTarget(target.CFrame, 3)  -- Priority thấp
-            else
-                SetMoveTarget(target.CFrame, 3)
-                if firetouchinterest then
-                    pcall(function()
-                        firetouchinterest(hrp, target, 0)
-                        task.wait(0.03)
-                        firetouchinterest(hrp, target, 1)
-                    end)
-                end
+            SetMoveTarget(target.CFrame, 3)
+
+            if targetDist <= 7 and firetouchinterest then
+                pcall(function()
+                    firetouchinterest(hrp, target, 0)
+                    task.wait(0.03)
+                    firetouchinterest(hrp, target, 1)
+                end)
             end
         end)
     end
@@ -1246,7 +1305,7 @@ local function AutoBossLoop()
                         if distToSpawn > 20 then
                             SetMoveTarget(CFrame.new(
                                 targetInfo.spawnPos + Vector3.new(0, Config.FarmDistance, 0)
-                            ), 10)  -- Priority cao nhất
+                            ), 10)
                         else
                             SetMoveTarget(CFrame.new(hrp.Position), 10)
                         end
@@ -1263,7 +1322,7 @@ local function AutoBossLoop()
             SetMoveTarget(CFrame.new(
                 bossPos + Vector3.new(0, Config.BossDistance, 0),
                 bossPos
-            ), 10)  -- Priority cao nhất
+            ), 10)
 
             if bossHum.Health <= 0 then
                 if BossState.LastKillName ~= targetBoss.boss.Name 
@@ -2311,35 +2370,30 @@ Tabs.Settings:AddButton({
     Callback = function() ToggleMenu() end,
 })
 
--- ✅ MỚI: Movement tuning
-Tabs.Settings:AddSection("🎯 Tinh chỉnh di chuyển")
+-- ✅ v5.0: Movement tuning nâng cao
+Tabs.Settings:AddSection("🎯 Tinh chỉnh di chuyển (v5.0)")
 
-Tabs.Settings:AddSlider("MoveSmoothSlider", {
-    Title       = "Độ mượt di chuyển",
-    Description = "Cao hơn = mượt hơn nhưng chậm hơn (2-20)",
-    Default     = 6, Min = 2, Max = 20, Rounding = 0,
-    Callback    = function(v) Config.MoveSmoothFactor = v end,
+Tabs.Settings:AddSlider("MoveSmoothSpeedSlider", {
+    Title       = "Độ mượt (Speed)",
+    Description = "Cao hơn = nhanh hơn, thấp hơn = mượt hơn (2-15)",
+    Default     = 5, Min = 2, Max = 15, Rounding = 0,
+    Callback    = function(v) Config.MoveSmoothSpeed = v end,
 })
 
 Tabs.Settings:AddSlider("MoveResponsiveSlider", {
-    Title       = "Độ phản hồi",
-    Description = "Cao hơn = nhanh hơn nhưng dễ giật (10-80)",
-    Default     = 30, Min = 10, Max = 80, Rounding = 0,
+    Title       = "Độ phản hồi (Responsiveness)",
+    Description = "AlignPosition responsiveness (10-80)",
+    Default     = 25, Min = 10, Max = 80, Rounding = 0,
     Callback    = function(v)
         Config.MoveResponsiveness = v
-        if Move.AlignPos then
-            Move.AlignPos.Responsiveness = v
-        end
-        if Move.AlignOri then
-            Move.AlignOri.Responsiveness = v + 10
-        end
+        if Move.AlignPos then Move.AlignPos.Responsiveness = v end
     end,
 })
 
 Tabs.Settings:AddSlider("MoveMaxForceSlider", {
-    Title       = "Lực di chuyển",
-    Description = "Cao hơn = nhanh hơn nhưng dễ overshoot (30000-200000)",
-    Default     = 80000, Min = 30000, Max = 200000, Rounding = 0,
+    Title       = "Lực di chuyển (MaxForce)",
+    Description = "Cao = nhanh + dễ overshoot, thấp = mượt + chậm (30000-200000)",
+    Default     = 60000, Min = 30000, Max = 200000, Rounding = 0,
     Callback    = function(v)
         Config.MoveMaxForce = v
         if Move.AlignPos then Move.AlignPos.MaxForce = v end
@@ -2347,23 +2401,88 @@ Tabs.Settings:AddSlider("MoveMaxForceSlider", {
     end,
 })
 
+Tabs.Settings:AddSlider("MoveMaxVelocitySlider", {
+    Title       = "Vận tốc tối đa",
+    Description = "Giới hạn vận tốc di chuyển (100-500)",
+    Default     = 250, Min = 100, Max = 500, Rounding = 0,
+    Callback    = function(v)
+        Config.MoveMaxVelocity = v
+        if Move.AlignPos then Move.AlignPos.MaxVelocity = v end
+    end,
+})
+
+Tabs.Settings:AddSlider("MovePriorityLockSlider", {
+    Title       = "Khóa ưu tiên (giây)",
+    Description = "Thời gian khóa target sau mỗi lần set (0.1-1s)",
+    Default     = 0.3, Min = 0.1, Max = 1, Rounding = 2,
+    Callback    = function(v) Config.MovePriorityLock = v end,
+})
+
+Tabs.Settings:AddSlider("MoveArriveDistSlider", {
+    Title       = "Khoảng cách snap",
+    Description = "Tới gần hơn X studs sẽ snap thẳng (0.5-5)",
+    Default     = 1.5, Min = 0.5, Max = 5, Rounding = 1,
+    Callback    = function(v) Config.MoveArriveDist = v end,
+})
+
 Tabs.Settings:AddButton({
-    Title       = "🔄 Reset về mặc định",
-    Description = "Reset cấu hình di chuyển về mặc định",
+    Title       = "🔄 Reset về mặc định v5.0",
+    Description = "Reset cấu hình di chuyển về mặc định tối ưu",
     Callback    = function()
-        Config.MoveSmoothFactor = 6
-        Config.MoveResponsiveness = 30
-        Config.MoveMaxForce = 80000
+        Config.MoveSmoothSpeed = 5
+        Config.MoveResponsiveness = 25
+        Config.MoveMaxForce = 60000
+        Config.MoveMaxVelocity = 250
+        Config.MovePriorityLock = 0.3
+        Config.MoveArriveDist = 1.5
         if Move.AlignPos then
-            Move.AlignPos.Responsiveness = 30
-            Move.AlignPos.MaxForce = 80000
+            Move.AlignPos.Responsiveness = 25
+            Move.AlignPos.MaxForce = 60000
+            Move.AlignPos.MaxVelocity = 250
         end
         if Move.AlignOri then
-            Move.AlignOri.Responsiveness = 40
-            Move.AlignOri.MaxTorque = 80000
+            Move.AlignOri.MaxTorque = 60000
         end
         Fluent:Notify({
-            Title = "Datkits", Content = "Đã reset cấu hình di chuyển", Duration = 3,
+            Title = "Datkits", Content = "Đã reset cấu hình v5.0", Duration = 3,
+        })
+    end,
+})
+
+Tabs.Settings:AddButton({
+    Title       = "⚡ Preset: Siêu mượt",
+    Description = "Ưu tiên mượt (dùng khi bay xa)",
+    Callback    = function()
+        Config.MoveSmoothSpeed = 3
+        Config.MoveResponsiveness = 15
+        Config.MoveMaxForce = 40000
+        Config.MoveMaxVelocity = 200
+        if Move.AlignPos then
+            Move.AlignPos.Responsiveness = 15
+            Move.AlignPos.MaxForce = 40000
+            Move.AlignPos.MaxVelocity = 200
+        end
+        Fluent:Notify({
+            Title = "Datkits", Content = "⚡ Đã bật preset Siêu mượt", Duration = 3,
+        })
+    end,
+})
+
+Tabs.Settings:AddButton({
+    Title       = "🚀 Preset: Siêu nhanh",
+    Description = "Ưu tiên nhanh (dùng khi farm)",
+    Callback    = function()
+        Config.MoveSmoothSpeed = 8
+        Config.MoveResponsiveness = 40
+        Config.MoveMaxForce = 90000
+        Config.MoveMaxVelocity = 350
+        if Move.AlignPos then
+            Move.AlignPos.Responsiveness = 40
+            Move.AlignPos.MaxForce = 90000
+            Move.AlignPos.MaxVelocity = 350
+        end
+        Fluent:Notify({
+            Title = "Datkits", Content = "🚀 Đã bật preset Siêu nhanh", Duration = 3,
         })
     end,
 })
@@ -2406,7 +2525,7 @@ end)
 
 Fluent:Notify({
     Title    = "Datkits Premium",
-    Content  = "v4.9 Smooth Movement đã sẵn sàng!",
+    Content  = "v5.0 Ultra Smooth Movement đã sẵn sàng!",
     Duration = 6,
 })
 
@@ -2431,4 +2550,4 @@ if Config.NoclipEnabled then
     EnableNoclip()
 end
 
-print("[Datkits] ✅ v4.9 Smooth Movement loaded successfully!")
+print("[Datkits] ✅ v5.0 Ultra Smooth Movement loaded successfully!")
