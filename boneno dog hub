@@ -1655,18 +1655,47 @@ end
 local Fluent, SaveManager, InterfaceManager
 
 local function LoadFluent()
-    local ok, err = pcall(function()
-        Fluent = loadstring(game:HttpGet(
-            "https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"
-        ))()
-        SaveManager = loadstring(game:HttpGet(
-            "https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"
-        ))()
-        InterfaceManager = loadstring(game:HttpGet(
-            "https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"
-        ))()
-    end)
-    return ok, err
+    local FluentURLs = {
+        "https://raw.githubusercontent.com/dawid-scripts/Fluent/master/main.lua",
+        "https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua",
+        "https://raw.githubusercontent.com/dawid-scripts/Fluent/main/main.lua",
+    }
+    local SaveURLs = {
+        "https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua",
+        "https://raw.githubusercontent.com/dawid-scripts/Fluent/main/Addons/SaveManager.lua",
+    }
+    local InterfaceURLs = {
+        "https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua",
+        "https://raw.githubusercontent.com/dawid-scripts/Fluent/main/Addons/InterfaceManager.lua",
+    }
+    
+    local ok, err = false, nil
+    for _, url in ipairs(FluentURLs) do
+        ok, err = pcall(function()
+            Fluent = loadstring(game:HttpGet(url))()
+        end)
+        if ok and Fluent then break end
+    end
+    
+    if not ok or not Fluent then
+        return false, err or "All Fluent URLs failed"
+    end
+    
+    for _, url in ipairs(SaveURLs) do
+        pcall(function()
+            SaveManager = loadstring(game:HttpGet(url))()
+        end)
+        if SaveManager then break end
+    end
+    
+    for _, url in ipairs(InterfaceURLs) do
+        pcall(function()
+            InterfaceManager = loadstring(game:HttpGet(url))()
+        end)
+        if InterfaceManager then break end
+    end
+    
+    return true, nil
 end
 
 local okLoad, loadErr = LoadFluent()
