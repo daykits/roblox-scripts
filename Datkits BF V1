@@ -1,8 +1,8 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v5.0           ║
+    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v5.1           ║
     ║   Fluent UI • Zero-Stutter Fly • Sea 1+2+3               ║
-    ║   Quest + Farm + Chest + Boss + Hop Boss (SMOOTH v5)    ║
+    ║   Quest + Farm + Chest + Boss + Hop Boss (SMOOTH v5.1)  ║
     ╚══════════════════════════════════════════════════════════╝
 --]]
 
@@ -95,13 +95,13 @@ local Config = {
     HopCooldown       = 12,
     MenuVisible    = true,
     -- ✅ v5.0: Movement tuning mới
-    MoveResponsiveness = 25,     -- AlignPosition responsiveness
-    MoveMaxForce       = 60000,  -- Force trung bình
-    MoveMaxVelocity    = 250,    -- Vận tốc tối đa
-    MoveSmoothSpeed    = 5,      -- Hệ số smooth (frame-rate independent)
-    MoveArriveDist     = 1.5,    -- Khoảng cách coi là "đã tới"
-    MovePriorityLock   = 0.3,    -- Lock target sau mỗi lần set (giây)
-    MoveRotDeadZone    = 15,     -- Góc tối thiểu để rotate (độ)
+    MoveResponsiveness = 25,
+    MoveMaxForce       = 60000,
+    MoveMaxVelocity    = 250,
+    MoveSmoothSpeed    = 5,
+    MoveArriveDist     = 1.5,
+    MovePriorityLock   = 0.3,
+    MoveRotDeadZone    = 15,
 }
 
 -------------------------------------------------
@@ -109,7 +109,7 @@ local Config = {
 -------------------------------------------------
 local Window = Fluent:CreateWindow({
     Title       = "Datkits Premium | Blox Fruits",
-    SubTitle    = "v5.0 • Ultra Smooth Movement",
+    SubTitle    = "v5.1 • Ultra Smooth Movement",
     TabWidth    = 150,
     Size        = UDim2.fromOffset(620, 500),
     Acrylic     = true,
@@ -224,12 +224,6 @@ end
 
 -------------------------------------------------
 -- ✅ v5.0 MOVEMENT CONTROLLER - ULTRA SMOOTH
--- 5 KEY FIXES:
---   1. Frame-rate independent smoothing (exp)
---   2. Priority lock 0.3s chống overwrite
---   3. Arrive detection (snap khi < 1.5 studs)
---   4. Rotation dead-zone (không rotate lặt vặt)
---   5. Velocity clamp + MaxVelocity
 -------------------------------------------------
 local Move = {
     Active = false,
@@ -240,14 +234,11 @@ local Move = {
     AlignOri = nil,
     Attach = nil,
     Heartbeat = nil,
-    -- Priority lock
     Priority = 0,
-    LockUntil = 0,          -- ✅ Lock cứng
+    LockUntil = 0,
     LastSetTime = 0,
-    -- ✅ Arrive detection
     Arrived = false,
     LastArriveCheck = 0,
-    -- ✅ Rotation cache
     LastRotCF = nil,
 }
 
@@ -266,7 +257,6 @@ local function EnsureMoveInstances(hrp)
     local att = Instance.new("Attachment")
     att.Name = "FarmAtt"; att.Parent = hrp
 
-    -- ✅ AlignPosition với cấu hình tối ưu
     local ap = Instance.new("AlignPosition")
     ap.Name = "FarmAP"
     ap.Attachment0 = att
@@ -275,10 +265,9 @@ local function EnsureMoveInstances(hrp)
     ap.MaxForce = Config.MoveMaxForce
     ap.Responsiveness = Config.MoveResponsiveness
     ap.ApplyAtCenterOfMass = false
-    ap.MaxVelocity = Config.MoveMaxVelocity   -- ✅ Giới hạn vận tốc
+    ap.MaxVelocity = Config.MoveMaxVelocity
     ap.Parent = hrp
 
-    -- ✅ AlignOrientation với dead-zone
     local ao = Instance.new("AlignOrientation")
     ao.Name = "FarmAO"
     ao.Attachment0 = att
@@ -342,27 +331,22 @@ local function StopFly()
     end
 end
 
--- ✅ v5.0: SetMoveTarget với PRIORITY LOCK cứng
--- Priority: 0-10 (cao hơn = ưu tiên hơn)
 local function SetMoveTarget(targetCFrame, priority)
     if not targetCFrame then return end
     priority = priority or 5
 
     local now = tick()
 
-    -- ✅ FIX 1: Nếu đang trong LockUntil VÀ priority thấp hơn Priority → BỎ QUA
     if Move.Active and now < Move.LockUntil and priority < Move.Priority then
         return
     end
 
-    -- ✅ FIX 2: Nếu cùng priority và vừa set gần đây (< 0.1s) → BỎ QUA
     if Move.Active and priority == Move.Priority and (now - Move.LastSetTime) < 0.1 then
         return
     end
 
     if not StartFly() then return end
 
-    -- ✅ FIX 3: Nếu target mới quá gần target cũ (< 2 studs) → BỎ QUA (không cập nhật)
     if Move.TargetCF then
         local dist = (Move.TargetCF.Position - targetCFrame.Position).Magnitude
         if dist < 2 and priority <= Move.Priority then
@@ -373,7 +357,7 @@ local function SetMoveTarget(targetCFrame, priority)
     Move.TargetCF = targetCFrame
     Move.Priority = priority
     Move.LastSetTime = now
-    Move.LockUntil = now + Config.MovePriorityLock  -- ✅ Lock 0.3s
+    Move.LockUntil = now + Config.MovePriorityLock
     Move.Arrived = false
 end
 
@@ -393,7 +377,6 @@ local function BindHeartbeat()
             if not EnsureMoveInstances(hrp) then return end
         end
 
-        -- Force noclip mỗi frame
         for _, part in ipairs(char:GetDescendants()) do
             if part:IsA("BasePart") and part.CanCollide then
                 part.CanCollide = false
@@ -404,30 +387,22 @@ local function BindHeartbeat()
         local currentPos = hrp.Position
         local distance = (currentPos - targetPos).Magnitude
 
-        -- ✅ FIX 4: ARRIVE DETECTION - Snap khi gần target
         if distance < Config.MoveArriveDist then
             if not Move.Arrived then
                 Move.SmoothPos = targetPos
                 Move.AlignPos.Position = targetPos
                 Move.Arrived = true
             end
-            -- Đã tới → chỉ giữ vị trí, không smooth nữa
             Move.AlignPos.Position = targetPos
             return
         else
             Move.Arrived = false
         end
 
-        -- ✅ FIX 5: FRAME-RATE INDEPENDENT SMOOTH
-        -- Dùng công thức exponential: 1 - e^(-k * dt)
-        -- Kết quả giống nhau ở mọi FPS (30, 60, 144)
-        local k = Config.MoveSmoothSpeed  -- Hệ số smooth
+        local k = Config.MoveSmoothSpeed
         local alpha = 1 - math.exp(-k * dt)
-
-        -- Clamp alpha để tránh nhảy quá lớn khi lag
         alpha = math.clamp(alpha, 0, 0.5)
 
-        -- ✅ FIX 6: Nếu ở gần target (< 5 studs) → giảm alpha (damping)
         if distance < 5 then
             alpha = alpha * 0.6
         end
@@ -435,17 +410,14 @@ local function BindHeartbeat()
         Move.SmoothPos = Move.SmoothPos:Lerp(targetPos, alpha)
         Move.AlignPos.Position = Move.SmoothPos
 
-        -- ✅ FIX 7: Rotation với DEAD ZONE (chỉ rotate khi lệch > 15°)
         local lookDir = targetPos - currentPos
         if lookDir.Magnitude > 1 then
             local currentLook = hrp.CFrame.LookVector
             local targetLook = lookDir.Unit
             local dotProduct = currentLook:Dot(targetLook)
 
-            -- Nếu góc lệch > 15° (cos15 ≈ 0.966)
             if dotProduct < 0.966 then
                 local targetCFrame = CFrame.new(currentPos, currentPos + targetLook)
-                -- Smooth rotation
                 local rotAlpha = 1 - math.exp(-8 * dt)
                 Move.AlignOri.CFrame = Move.AlignOri.CFrame:Lerp(targetCFrame, rotAlpha)
                 Move.LastRotCF = targetCFrame
@@ -783,50 +755,73 @@ local function GetAllBossList()
     return list
 end
 
+-------------------------------------------------
+-- ✅ [FIX 1] FindBoss - nhận diện boss có prefix [Lv. XXX]
+-------------------------------------------------
 local function FindBoss(bossName)
     local found = {}
-    for _, obj in ipairs(workspace:GetChildren()) do
-        if obj.Name == bossName then
-            local hum = obj:FindFirstChildOfClass("Humanoid")
-            local hrp = obj:FindFirstChild("HumanoidRootPart")
-            if hum and hrp and hum.Health > 0 then
-                table.insert(found, { boss = obj, hum = hum, hrp = hrp })
-            end
+    local seen = {}
+
+    local function tryAdd(obj)
+        if not obj or seen[obj] then return end
+        local hum = obj:FindFirstChildOfClass("Humanoid")
+        local hrp = obj:FindFirstChild("HumanoidRootPart")
+        if hum and hrp and hum.Health > 0 then
+            seen[obj] = true
+            table.insert(found, { boss = obj, hum = hum, hrp = hrp })
         end
     end
-    local foldersToSearch = { "Bosses", "Enemies", "Characters", "NPCs", "Mobs" }
+
+    local function isNameMatch(objName)
+        if objName == bossName then return true end
+        local cleaned = objName:gsub("%[Lv%.%s*%d+%]%s*", "")
+        if cleaned == bossName then return true end
+        if cleaned:find(bossName, 1, true) then return true end
+        return false
+    end
+
+    for _, obj in ipairs(workspace:GetChildren()) do
+        if isNameMatch(obj.Name) then tryAdd(obj) end
+    end
+
+    local foldersToSearch = { "Enemies", "Bosses", "Characters", "NPCs", "Mobs", "SpawnedBosses" }
     for _, folderName in ipairs(foldersToSearch) do
         local folder = workspace:FindFirstChild(folderName)
         if folder then
             for _, obj in ipairs(folder:GetChildren()) do
-                if obj.Name == bossName or obj.Name:find(bossName, 1, true) then
-                    local hum = obj:FindFirstChildOfClass("Humanoid")
-                    local hrp = obj:FindFirstChild("HumanoidRootPart")
-                    if hum and hrp and hum.Health > 0 then
-                        table.insert(found, { boss = obj, hum = hum, hrp = hrp })
+                if isNameMatch(obj.Name) then tryAdd(obj) end
+                if obj:IsA("Folder") or obj:IsA("Model") then
+                    for _, sub in ipairs(obj:GetChildren()) do
+                        if isNameMatch(sub.Name) then tryAdd(sub) end
                     end
                 end
             end
         end
     end
+
     return found
 end
 
-local function FindAllBossesInRange(maxRange)
+-------------------------------------------------
+-- ✅ [FIX 2] FindAllBossesInRange - thêm filter boss đã chọn
+-------------------------------------------------
+local function FindAllBossesInRange(maxRange, filterBossName)
     local result = {}
     local hrp = GetHRP()
     if not hrp then return result end
     local sea = GetCurrentSea()
     local bossList = GetBossListBySea(sea)
     for _, bossInfo in ipairs(bossList) do
-        local bosses = FindBoss(bossInfo.name)
-        for _, b in ipairs(bosses) do
-            local dist = (hrp.Position - b.hrp.Position).Magnitude
-            if dist <= maxRange then
-                table.insert(result, {
-                    boss = b.boss, hum = b.hum, hrp = b.hrp,
-                    dist = dist, info = bossInfo,
-                })
+        if not filterBossName or bossInfo.name == filterBossName then
+            local bosses = FindBoss(bossInfo.name)
+            for _, b in ipairs(bosses) do
+                local dist = (hrp.Position - b.hrp.Position).Magnitude
+                if dist <= maxRange then
+                    table.insert(result, {
+                        boss = b.boss, hum = b.hum, hrp = b.hrp,
+                        dist = dist, info = bossInfo,
+                    })
+                end
             end
         end
     end
@@ -880,6 +875,9 @@ local function GetNet()
     return net:FindFirstChild("RE/RegisterAttack"), net:FindFirstChild("RE/RegisterHit")
 end
 
+-------------------------------------------------
+-- ✅ [FIX 3] DoFastAttack - ưu tiên boss đã chọn + delay equip
+-------------------------------------------------
 local function DoFastAttack()
     local char = GetCharacter()
     if not char then return end
@@ -887,7 +885,11 @@ local function DoFastAttack()
     local tool = char:FindFirstChildOfClass("Tool")
     if not tool then
         EquipWeapon()
-        tool = char:FindFirstChildOfClass("Tool")
+        for _ = 1, 3 do
+            task.wait()
+            tool = char:FindFirstChildOfClass("Tool")
+            if tool then break end
+        end
         if not tool then return end
     end
 
@@ -900,7 +902,13 @@ local function DoFastAttack()
 
     local hits
     if Config.AutoBoss then
-        local bosses = FindAllBossesInRange(Config.HitboxRange)
+        local bosses
+        if Config.BossSelected then
+            bosses = FindAllBossesInRange(Config.HitboxRange, Config.BossSelected)
+        else
+            bosses = FindAllBossesInRange(Config.HitboxRange)
+        end
+
         if #bosses > 0 then
             hits = {}
             for _, b in ipairs(bosses) do
@@ -908,9 +916,11 @@ local function DoFastAttack()
             end
         end
     end
-    if not hits then
+
+    if not hits and not Config.AutoBoss then
         hits = GetClosestEnemies(Config.HitboxRange)
     end
+    if not hits then hits = {} end
 
     local hrp = char.HumanoidRootPart
     local lcRemote = tool:FindFirstChild("LeftClickRemote")
@@ -1247,6 +1257,9 @@ local function TrySpawnBoss(bossName)
     return spawned
 end
 
+-------------------------------------------------
+-- ✅ [FIX 4] AutoBossLoop - giữ vị trí khi đã đủ gần boss
+-------------------------------------------------
 local function AutoBossLoop()
     while task.wait(0.2) do
         if not Config.AutoBoss then
@@ -1319,10 +1332,15 @@ local function AutoBossLoop()
             local bossPos = targetBoss.hrp.Position
             local bossHum = targetBoss.hum
 
-            SetMoveTarget(CFrame.new(
-                bossPos + Vector3.new(0, Config.BossDistance, 0),
-                bossPos
-            ), 10)
+            local myPos = hrp.Position
+            local dist = (myPos - bossPos).Magnitude
+
+            if dist > Config.BossDistance then
+                local dest = bossPos + Vector3.new(0, Config.BossDistance, 0)
+                SetMoveTarget(CFrame.new(dest, bossPos), 10)
+            else
+                SetMoveTarget(CFrame.new(myPos, bossPos), 10)
+            end
 
             if bossHum.Health <= 0 then
                 if BossState.LastKillName ~= targetBoss.boss.Name 
@@ -2370,7 +2388,6 @@ Tabs.Settings:AddButton({
     Callback = function() ToggleMenu() end,
 })
 
--- ✅ v5.0: Movement tuning nâng cao
 Tabs.Settings:AddSection("🎯 Tinh chỉnh di chuyển (v5.0)")
 
 Tabs.Settings:AddSlider("MoveSmoothSpeedSlider", {
@@ -2525,7 +2542,7 @@ end)
 
 Fluent:Notify({
     Title    = "Datkits Premium",
-    Content  = "v5.0 Ultra Smooth Movement đã sẵn sàng!",
+    Content  = "v5.1 Ultra Smooth + Boss Fix đã sẵn sàng!",
     Duration = 6,
 })
 
@@ -2550,4 +2567,4 @@ if Config.NoclipEnabled then
     EnableNoclip()
 end
 
-print("[Datkits] ✅ v5.0 Ultra Smooth Movement loaded successfully!")
+print("[Datkits] ✅ v5.1 - Boss Auto Attack Fixed loaded successfully!")
