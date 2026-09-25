@@ -1,8 +1,8 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v5.1           ║
+    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v5.2           ║
     ║   Fluent UI • Zero-Stutter Fly • Sea 1+2+3               ║
-    ║   Quest + Farm + Chest + Boss + Hop Boss (MELEE FIX)    ║
+    ║   Quest + Farm + Chest + Boss + Hop Boss (REDZ FIX)     ║
     ╚══════════════════════════════════════════════════════════╝
 --]]
 
@@ -64,17 +64,19 @@ local Config = {
     AutoQuest     = false,
     AutoFarm      = false,
     AutoChest     = false,
+    -- ✅ v5.2: Fast Attack Redz style
     FastAttack    = true,
+    AttackDelay   = 0.05,       -- Nhanh hơn nhiều (Redz style)
+    HitboxRange   = 55,         -- Bán kính hit lớn hơn (Redz style)
     FarmDistance  = 6,
-    -- ✅ v5.1: Attack delay tăng lên (melee cooldown)
-    AttackDelay   = 0.15,
-    HitboxRange   = 30,
-    -- ✅ v5.1: Melee specific
-    MeleeRange    = 15,        -- Tầm đánh melee tối đa
-    MeleeCooldown = 0.2,       -- Cooldown giữa các lần attack
-    UseRegHit     = true,      -- Dùng RE/RegisterHit
-    UseLCRemote   = true,      -- Dùng LeftClickRemote
-    UseActivate   = true,      -- Dùng tool:Activate()
+    -- Melee/Weapon
+    MeleeRange    = 15,
+    UseRegHit     = true,       -- ✅ BẮT BUỘC bật cho Redz
+    UseLCRemote   = true,       -- Fire LeftClickRemote
+    UseActivate   = false,      -- ❌ TẮT cho Redz (không spam activate)
+    UseRegAttack  = true,       -- ✅ Fire RE/RegisterAttack
+    FireAllEnemies = true,      -- ✅ Hit tất cả enemy trong tầm
+    -- General
     WalkSpeed     = 16,
     AutoSeaTravel = false,
     SailSpeed     = 350,
@@ -114,7 +116,7 @@ local Config = {
 -------------------------------------------------
 local Window = Fluent:CreateWindow({
     Title       = "Datkits Premium | Blox Fruits",
-    SubTitle    = "v5.1 • Ultra Smooth + Melee Fix",
+    SubTitle    = "v5.2 • Fast Attack Redz Style",
     TabWidth    = 150,
     Size        = UDim2.fromOffset(620, 500),
     Acrylic     = true,
@@ -228,7 +230,7 @@ local function DisableNoclip()
 end
 
 -------------------------------------------------
--- MOVEMENT CONTROLLER v5.1
+-- MOVEMENT CONTROLLER v5.2
 -------------------------------------------------
 local Move = {
     Active = false, TargetCF = nil, SmoothPos = nil, BoundHRP = nil,
@@ -547,36 +549,34 @@ local function GetNearestIsland()
 end
 
 -------------------------------------------------
--- ✅ v5.1: WEAPON + MELEE ATTACK SYSTEM
+-- ✅ v5.2: WEAPON SYSTEM
 -------------------------------------------------
 local MELEE_KEYWORDS = {
     "combat", "step", "karate", "dragon", "electric",
     "god", "claw", "superhuman", "death", "shark", "saber", "sword",
     "blackleg", "fishman", "trident", "halberd", "spike", "pole",
+    "dark", "dough", "rubber", "portal", "buddha", "venom", "control",
+    "spirit", "creation", "revive", "pain", "blizzard", "gravity",
+    "leopard", "kitsune", "gas", "shadow", "rumble", "light", "magma",
+    "ice", "quake", "bomb", "spring", "smoke", "flame", "falcon",
+    "chop", "spike", "sand", "ghost", "barrier", "diamond", "love",
+    "spider", "sound", "phoenix", "portal", "rumble", "paw", "gravity",
 }
 
--- ✅ Force equip melee weapon
-local function EquipMeleeWeapon()
+-- ✅ Force equip weapon (KHÔNG cần phải melee, Redz dùng mọi loại weapon)
+local function EquipWeapon()
     local char = GetCharacter()
     if not char then return nil end
 
-    -- Nếu đã có tool → check có phải melee không
+    -- Nếu đã có tool → dùng luôn
     local currentTool = char:FindFirstChildOfClass("Tool")
-    if currentTool then
-        if currentTool.ToolTip == "Melee" then
-            return currentTool
-        end
-        local n = currentTool.Name:lower()
-        for _, kw in ipairs(MELEE_KEYWORDS) do
-            if n:find(kw, 1, true) then return currentTool end
-        end
-    end
+    if currentTool then return currentTool end
 
-    -- Equip từ backpack
+    -- Equip từ backpack (ưu tiên melee trước)
     local backpack = LocalPlayer:FindFirstChild("Backpack")
-    if not backpack then return currentTool end
+    if not backpack then return nil end
     local hum = GetHumanoid()
-    if not hum then return currentTool end
+    if not hum then return nil end
 
     -- Ưu tiên ToolTip == "Melee"
     for _, tool in ipairs(backpack:GetChildren()) do
@@ -601,101 +601,199 @@ local function EquipMeleeWeapon()
         end
     end
 
-    return currentTool
-end
-
--- ✅ Lấy tất cả remote có thể fire attack
-local function GetAttackRemotes(tool)
-    if not tool then return {} end
-    local remotes = {}
-    
-    -- LeftClickRemote (chính)
-    local lc = tool:FindFirstChild("LeftClickRemote")
-    if lc then table.insert(remotes, { remote = lc, type = "leftclick" }) end
-    
-    -- Các remote khác có thể
-    for _, child in ipairs(tool:GetChildren()) do
-        if child:IsA("RemoteEvent") and child ~= lc then
-            table.insert(remotes, { remote = child, type = "remote" })
-        end
+    -- Fallback: bất kỳ tool nào
+    local any = backpack:FindFirstChildOfClass("Tool")
+    if any then
+        pcall(function() hum:EquipTool(any) end)
+        task.wait(0.05)
+        return any
     end
-    
-    return remotes
+
+    return nil
 end
 
--- ✅ Hàm đánh melee hoàn chỉnh
-local function MeleeAttack(enemyHRP, enemyModel)
+-- ✅ Giữ tên cũ cho tương thích
+local function EquipMeleeWeapon()
+    return EquipWeapon()
+end
+
+-------------------------------------------------
+-- ✅ v5.2: FAST ATTACK REDZ STYLE
+-- Cách hoạt động:
+--   1. KHÔNG gọi tool:Activate() (đây là điểm khác biệt)
+--   2. Fire RE/RegisterAttack để báo server
+--   3. Fire RE/RegisterHit với TẤT CẢ enemy trong hitbox
+--   4. Fire LeftClickRemote để tăng damage
+-------------------------------------------------
+local AttackState = {
+    LastFireTime = 0,
+    HitCount = 0,
+}
+
+-- Lấy Net modules (cache)
+local NetModules = nil
+local RegisterAttack = nil
+local RegisterHit = nil
+
+local function InitNet()
+    if RegisterAttack and RegisterHit then return true end
+    local modules = ReplicatedStorage:FindFirstChild("Modules")
+    if not modules then return false end
+    local net = modules:FindFirstChild("Net")
+    if not net then return false end
+    RegisterAttack = net:FindFirstChild("RE/RegisterAttack")
+    RegisterHit = net:FindFirstChild("RE/RegisterHit")
+    return RegisterAttack ~= nil
+end
+
+InitNet()
+
+-- ✅ HÀM CHÍNH: Fast Attack Redz
+local function RedzFastAttack()
     local char = GetCharacter()
     if not char then return end
 
-    -- ✅ Force equip melee
-    local tool = EquipMeleeWeapon()
-    if not tool then return end
+    -- ✅ Đảm bảo có weapon equip
+    local tool = char:FindFirstChildOfClass("Tool")
+    if not tool then
+        tool = EquipWeapon()
+        if not tool then return end
+    end
+
+    InitNet()
+    if not RegisterAttack or not RegisterHit then return end
 
     local hrp = char.HumanoidRootPart
     if not hrp then return end
 
-    -- ✅ Tính hướng tới enemy
-    local lookDir = Vector3.new(0, -1, 0)
-    if enemyHRP and enemyHRP.Parent then
-        local dir = enemyHRP.Position - hrp.Position
-        if dir.Magnitude > 0.1 then
-            lookDir = dir.Unit
-        end
-    end
+    -- ✅ Thu thập TẤT CẢ enemy trong hitbox range
+    local targets = {}
 
-    -- ✅ 1. Activate tool (quan trọng nhất)
-    if Config.UseActivate then
-        pcall(function() tool:Activate() end)
-    end
-
-    -- ✅ 2. Register Attack (báo server biết đang attack)
-    local modules = ReplicatedStorage:FindFirstChild("Modules")
-    if modules then
-        local net = modules:FindFirstChild("Net")
-        if net then
-            local regAttack = net:FindFirstChild("RE/RegisterAttack")
-            if regAttack then
-                pcall(function() regAttack:FireServer(0) end)
-            end
-        end
-    end
-
-    -- ✅ 3. Fire tất cả remotes trong tool
-    if Config.UseLCRemote then
-        local remotes = GetAttackRemotes(tool)
-        for _, r in ipairs(remotes) do
-            pcall(function()
-                r.remote:FireServer(lookDir, 1)
-            end)
-        end
-    end
-
-    -- ✅ 4. Register Hit (damage chính)
-    if Config.UseRegHit and enemyHRP and enemyModel then
-        local modules2 = ReplicatedStorage:FindFirstChild("Modules")
-        if modules2 then
-            local net2 = modules2:FindFirstChild("Net")
-            if net2 then
-                local regHit = net2:FindFirstChild("RE/RegisterHit")
-                if regHit then
-                    -- ✅ Format đúng: (enemyHRP, { enemyModel })
-                    pcall(function()
-                        regHit:FireServer(enemyHRP, { enemyModel })
-                    end)
+    -- Tìm enemy thường
+    local enemiesFolder = workspace:FindFirstChild("Enemies")
+    if enemiesFolder then
+        for _, enemy in ipairs(enemiesFolder:GetChildren()) do
+            local eHum = enemy:FindFirstChildOfClass("Humanoid")
+            local eHrp = enemy:FindFirstChild("HumanoidRootPart")
+            if eHum and eHrp and eHum.Health > 0 then
+                local dist = (hrp.Position - eHrp.Position).Magnitude
+                if dist <= Config.HitboxRange then
+                    table.insert(targets, { model = enemy, hrp = eHrp, hum = eHum, dist = dist })
                 end
             end
         end
     end
+
+    -- ✅ Nếu AutoBoss, ưu tiên thêm boss
+    if Config.AutoBoss then
+        local allList = GetAllBossList()
+        for _, info in ipairs(allList) do
+            local found = FindBoss(info.name)
+            for _, b in ipairs(found) do
+                local dist = (hrp.Position - b.hrp.Position).Magnitude
+                if dist <= Config.HitboxRange then
+                    -- Check trùng
+                    local dup = false
+                    for _, t in ipairs(targets) do
+                        if t.model == b.boss then dup = true; break end
+                    end
+                    if not dup then
+                        table.insert(targets, { 
+                            model = b.boss, hrp = b.hrp, hum = b.hum, 
+                            dist = dist, isBoss = true 
+                        })
+                    end
+                end
+            end
+        end
+    end
+
+    if #targets == 0 then return end
+
+    -- Sắp xếp theo khoảng cách
+    table.sort(targets, function(a, b) return a.dist < b.dist end)
+
+    -- ✅ 1. Fire RE/RegisterAttack (báo server biết đang attack)
+    if Config.UseRegAttack then
+        pcall(function() RegisterAttack:FireServer(0) end)
+    end
+
+    -- ✅ 2. Fire LeftClickRemote (như player click chuột)
+    if Config.UseLCRemote and tool then
+        local lcRemote = tool:FindFirstChild("LeftClickRemote")
+            or tool:FindFirstChild("Remote")
+            or tool:FindFirstChildWhichIsA("RemoteEvent")
+        
+        if lcRemote then
+            local firstTarget = targets[1]
+            local lookDir = (firstTarget.hrp.Position - hrp.Position).Unit
+            pcall(function() lcRemote:FireServer(lookDir, 1) end)
+        end
+    end
+
+    -- ✅ 3. Fire RE/RegisterHit cho TẤT CẢ enemy trong tầm
+    if Config.UseRegHit then
+        local hitList = Config.FireAllEnemies and targets or { targets[1] }
+        for _, t in ipairs(hitList) do
+            pcall(function()
+                RegisterHit:FireServer(t.hrp, { t.model })
+            end)
+        end
+        AttackState.HitCount = AttackState.HitCount + #hitList
+    end
+end
+
+-- ✅ Fallback: Nếu Redz không hoạt động, dùng cách cũ
+local function FallbackAttack()
+    local char = GetCharacter()
+    if not char then return end
+
+    local tool = char:FindFirstChildOfClass("Tool")
+    if not tool then
+        tool = EquipWeapon()
+        if not tool then return end
+    end
+
+    pcall(function() tool:Activate() end)
+
+    InitNet()
+    if RegisterAttack then
+        pcall(function() RegisterAttack:FireServer(0) end)
+    end
+
+    local hrp = char.HumanoidRootPart
+    local hits = GetClosestEnemies(Config.HitboxRange)
+
+    if tool and #hits > 0 then
+        local lcRemote = tool:FindFirstChild("LeftClickRemote")
+            or tool:FindFirstChildWhichIsA("RemoteEvent")
+        if lcRemote then
+            local lookDir = (hits[1].hrp.Position - hrp.Position).Unit
+            pcall(function() lcRemote:FireServer(lookDir, 1) end)
+        end
+    end
+
+    if RegisterHit and #hits > 0 then
+        for _, data in ipairs(hits) do
+            pcall(function()
+                RegisterHit:FireServer(data.hrp, { data.enemy })
+            end)
+        end
+    end
+end
+
+-- ✅ Hàm chính (dùng Redz)
+local function DoFastAttack()
+    if Config.UseRegHit and Config.UseRegAttack then
+        RedzFastAttack()
+    else
+        FallbackAttack()
+    end
 end
 
 -------------------------------------------------
--- HELPER: EQUIP WEAPON (giữ tương thích)
+-- HELPER: EQUIP LOOP (giữ tương thích)
 -------------------------------------------------
-local function EquipWeapon()
-    local tool = EquipMeleeWeapon()
-    if not tool then return end
-end
 
 -------------------------------------------------
 -- QUEST DETECTION
@@ -947,47 +1045,6 @@ local function GetClosestEnemies(maxRange, nameFilter)
     end
     table.sort(result, function(a, b) return a.dist < b.dist end)
     return result
-end
-
--------------------------------------------------
--- ✅ v5.1: FAST ATTACK LOOP (sử dụng MeleeAttack)
--------------------------------------------------
-local AttackState = {
-    LastAttackTime = 0,
-}
-
-local function DoFastAttack()
-    local char = GetCharacter()
-    if not char then return end
-
-    -- ✅ Tìm enemy gần nhất (melee range)
-    local meleeRange = math.min(Config.HitboxRange, Config.MeleeRange)
-    local hits = GetClosestEnemies(meleeRange)
-    
-    -- ✅ Nếu AutoBoss, ưu tiên boss
-    if Config.AutoBoss then
-        local bosses = FindAllBossesInRange(meleeRange)
-        if #bosses > 0 then
-            hits = {}
-            for _, b in ipairs(bosses) do
-                table.insert(hits, { enemy = b.boss, hrp = b.hrp, dist = b.dist })
-            end
-        end
-    end
-
-    -- ✅ Nếu không có enemy, vẫn activate để giữ combo (nếu cần)
-    if #hits == 0 then
-        -- Vẫn activate tool nếu đang bật attack (giữ trạng thái)
-        local tool = char:FindFirstChildOfClass("Tool")
-        if tool and Config.UseActivate then
-            pcall(function() tool:Activate() end)
-        end
-        return
-    end
-
-    -- ✅ Đánh enemy đầu tiên
-    local target = hits[1]
-    MeleeAttack(target.hrp, target.enemy)
 end
 
 -------------------------------------------------
@@ -1591,7 +1648,7 @@ local function InitAfterHop()
 end
 
 -------------------------------------------------
--- ✅ v5.1: FAST ATTACK + EQUIP + SEA TRAVEL LOOPS
+-- FAST ATTACK + EQUIP + SEA TRAVEL LOOPS
 -------------------------------------------------
 local function FastAttackLoop()
     while task.wait(Config.AttackDelay) do
@@ -1605,7 +1662,7 @@ end
 local function EquipLoop()
     while task.wait(0.5) do
         if Config.AutoQuest or Config.AutoFarm or Config.AutoSea3Farm or Config.AutoBoss then
-            pcall(EquipMeleeWeapon)
+            pcall(EquipWeapon)
         end
     end
 end
@@ -1914,28 +1971,31 @@ Tabs.Main:AddSlider("FarmDistance", {
 })
 
 Tabs.Main:AddSlider("HitboxRange", {
-    Title = "Tầm đánh (Hitbox)", Default = 30, Min = 15, Max = 100, Rounding = 0,
+    Title = "Tầm đánh (Hitbox)", 
+    Description = "Bán kính hit Redz (khuyên 40-70)",
+    Default = 55, Min = 15, Max = 150, Rounding = 0,
     Callback = function(v) Config.HitboxRange = v end,
-})
-
--- ✅ v5.1: Melee specific settings
-Tabs.Main:AddSlider("MeleeRange", {
-    Title = "Tầm melee (studs)",
-    Description = "Tầm đánh melee tối đa (khuyên 10-20)",
-    Default = 15, Min = 5, Max = 30, Rounding = 0,
-    Callback = function(v) Config.MeleeRange = v end,
 })
 
 Tabs.Main:AddSlider("AttackDelay", {
     Title = "Delay giữa các lần đánh (s)",
-    Description = "Melee cần 0.15-0.25s để không bị spam",
-    Default = 0.15, Min = 0.05, Max = 0.5, Rounding = 2,
+    Description = "Redz style: 0.03-0.1s",
+    Default = 0.05, Min = 0.01, Max = 0.5, Rounding = 2,
     Callback = function(v) Config.AttackDelay = v end,
 })
 
 Tabs.Main:AddToggle("FastAttackToggle", {
-    Title = "Fast Attack (Melee)", Default = true,
+    Title = "Fast Attack (Redz Style)", 
+    Description = "Fire RegisterHit trực tiếp - không auto click",
+    Default = true,
     Callback = function(v) Config.FastAttack = v end,
+})
+
+Tabs.Main:AddToggle("FireAllEnemiesToggle", {
+    Title = "Đánh tất cả enemy trong tầm",
+    Description = "Redz style: hit nhiều enemy cùng lúc",
+    Default = true,
+    Callback = function(v) Config.FireAllEnemies = v end,
 })
 
 Tabs.Main:AddSection("Auto Quest")
@@ -2476,7 +2536,7 @@ Tabs.Settings:AddSlider("MoveMaxVelocitySlider", {
 })
 
 Tabs.Settings:AddButton({
-    Title = "🔄 Reset về mặc định v5.1",
+    Title = "🔄 Reset về mặc định v5.2",
     Callback = function()
         Config.MoveSmoothSpeed = 5
         Config.MoveResponsiveness = 25
@@ -2493,7 +2553,7 @@ Tabs.Settings:AddButton({
             Move.AlignOri.MaxTorque = 60000
         end
         Fluent:Notify({
-            Title = "Datkits", Content = "Đã reset cấu hình v5.1", Duration = 3,
+            Title = "Datkits", Content = "Đã reset cấu hình v5.2", Duration = 3,
         })
     end,
 })
@@ -2536,47 +2596,71 @@ Tabs.Settings:AddButton({
     end,
 })
 
--- ✅ v5.1: Melee Attack Settings
-Tabs.Settings:AddSection("⚔️ Cấu hình Melee Attack")
+-- ✅ v5.2: Redz Fast Attack Settings
+Tabs.Settings:AddSection("⚔️ Cấu hình Fast Attack Redz")
+
+Tabs.Settings:AddToggle("UseRegAttackToggle", {
+    Title       = "Fire RE/RegisterAttack",
+    Description = "Báo server đang attack (BẮT BUỘC cho Redz)",
+    Default     = true,
+    Callback    = function(v) Config.UseRegAttack = v end,
+})
 
 Tabs.Settings:AddToggle("UseRegHitToggle", {
-    Title       = "Dùng RegisterHit (khuyên bật)",
-    Description = "Bật để damage chính xác hơn",
+    Title       = "Fire RE/RegisterHit",
+    Description = "Damage chính (BẮT BUỘC cho Redz)",
     Default     = true,
     Callback    = function(v) Config.UseRegHit = v end,
 })
 
 Tabs.Settings:AddToggle("UseLCRemoteToggle", {
-    Title       = "Dùng LeftClickRemote",
+    Title       = "Fire LeftClickRemote",
     Description = "Gửi LeftClick để tăng damage",
     Default     = true,
     Callback    = function(v) Config.UseLCRemote = v end,
 })
 
 Tabs.Settings:AddToggle("UseActivateToggle", {
-    Title       = "Dùng tool:Activate()",
-    Description = "Kích hoạt tool như player bình thường",
-    Default     = true,
+    Title       = "Dùng tool:Activate() (Auto Click)",
+    Description = "❌ KHÔNG khuyên bật cho Redz - sẽ bị cooldown",
+    Default     = false,
     Callback    = function(v) Config.UseActivate = v end,
 })
 
 Tabs.Settings:AddButton({
-    Title       = "🧪 Test Melee Attack ngay",
-    Description = "Đánh enemy gần nhất 1 lần (để test)",
+    Title       = "🧪 Test Redz Attack ngay",
+    Description = "Test Fast Attack Redz 1 lần",
     Callback    = function()
         local char = GetCharacter()
         if not char then
             Fluent:Notify({ Title = "Test", Content = "Không có character!", Duration = 3 })
             return
         end
-        local hits = GetClosestEnemies(Config.MeleeRange)
+        local hits = GetClosestEnemies(Config.HitboxRange)
         if #hits == 0 then
             Fluent:Notify({ Title = "Test", Content = "Không có enemy trong tầm!", Duration = 3 })
             return
         end
-        MeleeAttack(hits[1].hrp, hits[1].enemy)
+        DoFastAttack()
         Fluent:Notify({
-            Title = "Test", Content = "Đã đánh " .. hits[1].enemy.Name, Duration = 3,
+            Title = "Test", Content = "Đã test Redz Attack (" .. #hits .. " enemies)", Duration = 3,
+        })
+    end,
+})
+
+Tabs.Settings:AddButton({
+    Title       = "⚔️ Preset: Max Redz Speed",
+    Description = "Delay 0.03s, hitbox 70, hit all enemy",
+    Callback    = function()
+        Config.AttackDelay = 0.03
+        Config.HitboxRange = 70
+        Config.FireAllEnemies = true
+        Config.UseRegHit = true
+        Config.UseRegAttack = true
+        Config.UseLCRemote = true
+        Config.UseActivate = false
+        Fluent:Notify({
+            Title = "Datkits", Content = "⚔️ Đã bật preset Max Redz Speed", Duration = 3,
         })
     end,
 })
@@ -2619,7 +2703,7 @@ end)
 
 Fluent:Notify({
     Title    = "Datkits Premium",
-    Content  = "v5.1 Ultra Smooth + Melee Fix đã sẵn sàng!",
+    Content  = "v5.2 Fast Attack Redz Style đã sẵn sàng!",
     Duration = 6,
 })
 
@@ -2644,4 +2728,4 @@ if Config.NoclipEnabled then
     EnableNoclip()
 end
 
-print("[Datkits] ✅ v5.1 Ultra Smooth + Melee Fix loaded successfully!")
+print("[Datkits] ✅ v5.2 Fast Attack Redz Style loaded successfully!")
