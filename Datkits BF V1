@@ -1,8 +1,8 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v5.4           ║
-    ║   FastAttack ALWAYS ON • Zero-Stutter Fly • Sea 1+2+3    ║
-    ║   Quest + Farm + Chest + Boss + Hop Boss (SMOOTH v5.4)  ║
+    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v5.5           ║
+    ║   FastAttack RELENTLESS • Zero-Stutter Fly • Sea 1+2+3   ║
+    ║   Quest + Farm + Chest + Boss + Hop Boss (SMOOTH v5.5)  ║
     ╚══════════════════════════════════════════════════════════╝
 --]]
 
@@ -105,13 +105,17 @@ local Config = {
     MovePriorityLock   = 0.3,
     MoveRotDeadZone    = 15,
 
-    -- ✅ v5.4: FastAttack tuning mới
+    -- FastAttack tuning
     FastAttackUseRemote   = true,
     FastAttackUseRegHit   = true,
     FastAttackUseToolAct  = true,
     FastAttackAutoEquip   = true,
     FastAttackMultiHit    = true,
     FastAttackIgnoreBoat  = true,
+
+    -- ✅ v5.5: Chống rớt tool
+    FastAttackLockTool     = true,   -- Force equip lại mỗi 0.3s
+    FastAttackToolPriority = true,   -- Chỉ equip melee mạnh nhất
 }
 
 -------------------------------------------------
@@ -119,7 +123,7 @@ local Config = {
 -------------------------------------------------
 local Window = Fluent:CreateWindow({
     Title       = "Datkits Premium | Blox Fruits",
-    SubTitle    = "v5.4 • FastAttack Tuning",
+    SubTitle    = "v5.5 • Relentless FastAttack",
     TabWidth    = 150,
     Size        = UDim2.fromOffset(620, 500),
     Acrylic     = true,
@@ -564,7 +568,7 @@ local function GetNearestIsland()
 end
 
 -------------------------------------------------
--- WEAPON SYSTEM
+-- WEAPON SYSTEM v5.5
 -------------------------------------------------
 local MELEE_KEYWORDS = {
     "combat", "step", "karate", "dragon", "electric",
@@ -583,6 +587,16 @@ local MELEE_PRIORITY = {
     "dark step",
     "karate",
 }
+
+local function IsMeleeTool(tool)
+    if not tool then return false end
+    if tool.ToolTip == "Melee" then return true end
+    local n = tool.Name:lower()
+    for _, kw in ipairs(MELEE_KEYWORDS) do
+        if n:find(kw, 1, true) then return true end
+    end
+    return false
+end
 
 local function GetBestMelee()
     local backpack = LocalPlayer:FindFirstChild("Backpack")
@@ -618,6 +632,9 @@ local function GetBestMelee()
     return allTools[1]
 end
 
+-------------------------------------------------
+-- ✅ v5.5 EQUIP WEAPON - Xử lý PlatformStand
+-------------------------------------------------
 local function EquipWeapon()
     if not Config.AutoEquipWeapon then return end
     local char = GetCharacter()
@@ -625,19 +642,38 @@ local function EquipWeapon()
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hum then return end
 
+    -- Kiểm tra tool hiện tại
     local currentTool = char:FindFirstChildOfClass("Tool")
-    if currentTool then
-        if currentTool.ToolTip == "Melee" then return end
-        local n = currentTool.Name:lower()
-        for _, kw in ipairs(MELEE_KEYWORDS) do
-            if n:find(kw, 1, true) then return end
-        end
+    if currentTool and IsMeleeTool(currentTool) then
+        return  -- Đã có melee → OK
     end
 
     local bestMelee = GetBestMelee()
     if not bestMelee then return end
 
+    -- Lưu trạng thái PlatformStand
+    local wasPlatformStand = hum.PlatformStand
+
+    -- Nếu đang PlatformStand, tắt tạm để equip
+    if wasPlatformStand then
+        pcall(function() hum.PlatformStand = false end)
+        task.wait(0.05)
+    end
+
+    -- Nếu đang có tool khác → unequip trước
+    if currentTool then
+        pcall(function() hum:UnequipTools() end)
+        task.wait(0.03)
+    end
+
     pcall(function() hum:EquipTool(bestMelee) end)
+
+    task.wait(0.05)
+
+    -- Bật lại PlatformStand
+    if wasPlatformStand then
+        pcall(function() hum.PlatformStand = true end)
+    end
 end
 
 -------------------------------------------------
@@ -928,7 +964,7 @@ local function GetClosestEnemies(maxRange, nameFilter)
 end
 
 -------------------------------------------------
--- FAST ATTACK v5.4
+-- ✅ FAST ATTACK v5.5 - RELENTLESS
 -------------------------------------------------
 local function GetNet()
     local modules = ReplicatedStorage:FindFirstChild("Modules")
@@ -938,30 +974,60 @@ local function GetNet()
     return net:FindFirstChild("RE/RegisterAttack"), net:FindFirstChild("RE/RegisterHit")
 end
 
+-- ✅ v5.5: Force equip đồng bộ (block ngắn) khi tool rớt
+local function ForceReEquip()
+    local char = GetCharacter()
+    if not char then return nil end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return nil end
+
+    -- Tìm melee tốt nhất
+    local bestMelee = GetBestMelee()
+    if not bestMelee then return nil end
+
+    -- Lưu PlatformStand
+    local wasPlatformStand = hum.PlatformStand
+    if wasPlatformStand then
+        pcall(function() hum.PlatformStand = false end)
+    end
+
+    pcall(function() hum:UnequipTools() end)
+    pcall(function() hum:EquipTool(bestMelee) end)
+
+    if wasPlatformStand then
+        pcall(function() hum.PlatformStand = true end)
+    end
+
+    return char:FindFirstChildOfClass("Tool")
+end
+
+-- ✅ v5.5: DoFastAttackAlways - LUÔN đảm bảo tool trước khi đánh
 local function DoFastAttackAlways()
     local char = GetCharacter()
     if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
 
-    -- ✅ FIX: Không block loop khi equip
+    -- ✅ BƯỚC 1: Đảm bảo có tool melee
     local tool = char:FindFirstChildOfClass("Tool")
-    if not tool and Config.FastAttackAutoEquip then
-        task.spawn(function()
-            pcall(EquipWeapon)
-        end)
+    if not tool or not IsMeleeTool(tool) then
+        if Config.FastAttackAutoEquip then
+            tool = ForceReEquip()
+        end
     end
 
-    -- ✅ Fire RegisterAttack
+    -- ✅ BƯỚC 2: Fire RegisterAttack (luôn chạy, không cần tool)
     local regAttack, regHit = GetNet()
     if regAttack then
         pcall(function() regAttack:FireServer(0.1) end)
     end
 
-    -- ✅ Activate tool (nếu có config)
+    -- ✅ BƯỚC 3: Activate tool nếu có
     if tool and Config.FastAttackUseToolAct then
         pcall(function() tool:Activate() end)
     end
 
-    -- ✅ Tìm mục tiêu
+    -- ✅ BƯỚC 4: Tìm mục tiêu
     local hits = {}
     local useRange = math.max(Config.AlwaysAttackRange, Config.HitboxRange)
 
@@ -991,7 +1057,7 @@ local function DoFastAttackAlways()
         end
     end
 
-    -- ✅ Fire LeftClickRemote (nếu có config + có tool)
+    -- ✅ BƯỚC 5: Fire LeftClickRemote (kể cả tool nil)
     local hrp = char.HumanoidRootPart
     if tool and Config.FastAttackUseRemote then
         local lcRemote = tool:FindFirstChild("LeftClickRemote")
@@ -1006,7 +1072,7 @@ local function DoFastAttackAlways()
         end
     end
 
-    -- ✅ Fire RegisterHit (multi-hit hoặc single target)
+    -- ✅ BƯỚC 6: Fire RegisterHit (multi-hit hoặc single)
     if regHit and #hits > 0 and Config.FastAttackUseRegHit then
         if Config.FastAttackMultiHit then
             for _, data in ipairs(hits) do
@@ -1650,6 +1716,25 @@ local function FastAttackLoop()
     end
 end
 
+-- ✅ v5.5: Tool Lock Loop - đảm bảo tool luôn được equip
+local function ToolLockLoop()
+    while task.wait(0.3) do
+        if not Config.FastAttackLockTool then continue end
+        if not Config.FastAttack then continue end
+        if not Config.AutoEquipWeapon then continue end
+        pcall(function()
+            local char = GetCharacter()
+            if not char then return end
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if not hum then return end
+            local currentTool = char:FindFirstChildOfClass("Tool")
+            if not currentTool or not IsMeleeTool(currentTool) then
+                pcall(ForceReEquip)
+            end
+        end)
+    end
+end
+
 local function EquipLoop()
     while task.wait(0.5) do
         if Config.AutoEquipWeapon then
@@ -1941,6 +2026,7 @@ end
 -------------------------------------------------
 local function StartAllLoops()
     task.spawn(FastAttackLoop)
+    task.spawn(ToolLockLoop)
     task.spawn(EquipLoop)
     task.spawn(AutoQuestLoop)
     task.spawn(AutoFarmLoop)
@@ -1970,6 +2056,13 @@ Tabs.Main:AddToggle("AutoEquipToggle", {
         Config.AutoEquipWeapon = v
         Config.FastAttackAutoEquip = v
     end,
+})
+
+Tabs.Main:AddToggle("LockToolToggle", {
+    Title = "🔒 Khóa Tool (Chống rớt tool)",
+    Description = "Force equip melee mỗi 0.3s — fix lỗi ngừng đánh sau 1-2 con",
+    Default = true,
+    Callback = function(v) Config.FastAttackLockTool = v end,
 })
 
 Tabs.Main:AddSlider("AlwaysAttackRange", {
@@ -2503,9 +2596,9 @@ Tabs.Settings:AddButton({
 })
 
 -------------------------------------------------
--- ✅ v5.4 UI - TINH CHỈNH FAST ATTACK
+-- ✅ v5.5 UI - TINH CHỈNH FAST ATTACK
 -------------------------------------------------
-Tabs.Settings:AddSection("⚡ Tinh chỉnh Fast Attack (v5.4)")
+Tabs.Settings:AddSection("⚡ Tinh chỉnh Fast Attack (v5.5)")
 
 Tabs.Settings:AddToggle("FastAttackUseRemoteToggle", {
     Title       = "Fire LeftClickRemote",
@@ -2536,6 +2629,13 @@ Tabs.Settings:AddToggle("FastAttackAutoEquipToggle", {
         Config.FastAttackAutoEquip = v
         Config.AutoEquipWeapon = v
     end,
+})
+
+Tabs.Settings:AddToggle("FastAttackLockToolToggle", {
+    Title       = "🔒 Khóa Tool (Chống rớt tool)",
+    Description = "Force equip melee mỗi 0.3s — fix lỗi ngừng đánh sau 1-2 con",
+    Default     = true,
+    Callback    = function(v) Config.FastAttackLockTool = v end,
 })
 
 Tabs.Settings:AddToggle("FastAttackMultiHitToggle", {
@@ -2574,6 +2674,7 @@ Tabs.Settings:AddButton({
         Config.FastAttackUseRegHit = true
         Config.FastAttackUseToolAct = true
         Config.FastAttackAutoEquip = true
+        Config.FastAttackLockTool = true
         Config.FastAttackMultiHit = true
         Config.FastAttackIgnoreBoat = true
         Config.AlwaysAttackRange = 80
@@ -2593,6 +2694,7 @@ Tabs.Settings:AddButton({
         Config.AlwaysAttackRange = 200
         Config.FastAttackMultiHit = true
         Config.FastAttackUseRegHit = true
+        Config.FastAttackLockTool = true
         Fluent:Notify({
             Title = "Datkits", Content = "🚀 Fast Attack Siêu nhanh", Duration = 3,
         })
@@ -2608,6 +2710,7 @@ Tabs.Settings:AddButton({
         Config.FastAttackMultiHit = false
         Config.FastAttackUseRegHit = true
         Config.FastAttackUseRemote = true
+        Config.FastAttackLockTool = true
         Fluent:Notify({
             Title = "Datkits", Content = "🎯 Fast Attack An toàn", Duration = 3,
         })
@@ -2646,7 +2749,7 @@ end)
 
 Fluent:Notify({
     Title    = "Datkits Premium",
-    Content  = "v5.4 FastAttack Tuning đã sẵn sàng!",
+    Content  = "v5.5 Relentless FastAttack đã sẵn sàng!",
     Duration = 6,
 })
 
@@ -2681,4 +2784,4 @@ if Config.AutoEquipWeapon then
     pcall(EquipWeapon)
 end
 
-print("[Datkits] ✅ v5.4 - FastAttack Tuning loaded successfully!")
+print("[Datkits] ✅ v5.5 - Relentless FastAttack loaded successfully!")
