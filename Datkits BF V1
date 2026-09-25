@@ -1,8 +1,8 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v5.2           ║
+    ║   DATKITS PREMIUM | BLOX FRUITS AUTO FARM v5.3           ║
     ║   Fluent UI • Zero-Stutter Fly • Sea 1+2+3               ║
-    ║   Quest + Farm + Chest + Boss + Hop Boss (REDZ FIX)     ║
+    ║   Quest + Farm + Chest + Boss + Hop Boss (HOVER FIX)    ║
     ╚══════════════════════════════════════════════════════════╝
 --]]
 
@@ -64,18 +64,22 @@ local Config = {
     AutoQuest     = false,
     AutoFarm      = false,
     AutoChest     = false,
-    -- ✅ v5.2: Fast Attack Redz style
+    -- ✅ v5.3: Fast Attack Redz with hover optimization
     FastAttack    = true,
-    AttackDelay   = 0.05,       -- Nhanh hơn nhiều (Redz style)
-    HitboxRange   = 55,         -- Bán kính hit lớn hơn (Redz style)
-    FarmDistance  = 6,
-    -- Melee/Weapon
+    AttackDelay   = 0.05,
+    HitboxRange   = 55,          -- Bán kính ngang (X/Z)
+    -- ✅ v5.3: Hover distance mới (thấp hơn)
+    FarmDistance  = 3,           -- Giảm từ 6 xuống 3 studs
+    HorizontalDistance = 3,      -- Khoảng cách ngang tới quái
+    -- ✅ v5.3: Vertical check range (cho RegHit)
+    VerticalRange = 8,           -- Y-axis chấp nhận được
+    -- Melee
     MeleeRange    = 15,
-    UseRegHit     = true,       -- ✅ BẮT BUỘC bật cho Redz
-    UseLCRemote   = true,       -- Fire LeftClickRemote
-    UseActivate   = false,      -- ❌ TẮT cho Redz (không spam activate)
-    UseRegAttack  = true,       -- ✅ Fire RE/RegisterAttack
-    FireAllEnemies = true,      -- ✅ Hit tất cả enemy trong tầm
+    UseRegHit     = true,
+    UseLCRemote   = true,
+    UseActivate   = true,        -- ✅ BẬT LẠI - cần cho tool trigger
+    UseRegAttack  = true,
+    FireAllEnemies = true,
     -- General
     WalkSpeed     = 16,
     AutoSeaTravel = false,
@@ -92,7 +96,7 @@ local Config = {
     AutoBoss       = false,
     AutoSpawnBoss  = false,
     BossFarmRange  = 2000,
-    BossDistance   = 8,
+    BossDistance   = 5,          -- ✅ Giảm cho boss
     BossSelected   = nil,
     AutoHopBoss       = false,
     HopDelay          = 8,
@@ -102,7 +106,7 @@ local Config = {
     HopAutoSpawnFirst = true,
     HopCooldown       = 12,
     MenuVisible    = true,
-    -- Movement tuning
+    -- Movement
     MoveResponsiveness = 25,
     MoveMaxForce       = 60000,
     MoveMaxVelocity    = 250,
@@ -116,7 +120,7 @@ local Config = {
 -------------------------------------------------
 local Window = Fluent:CreateWindow({
     Title       = "Datkits Premium | Blox Fruits",
-    SubTitle    = "v5.2 • Fast Attack Redz Style",
+    SubTitle    = "v5.3 • Hover Attack Fix",
     TabWidth    = 150,
     Size        = UDim2.fromOffset(620, 500),
     Acrylic     = true,
@@ -230,7 +234,7 @@ local function DisableNoclip()
 end
 
 -------------------------------------------------
--- MOVEMENT CONTROLLER v5.2
+-- MOVEMENT CONTROLLER v5.3
 -------------------------------------------------
 local Move = {
     Active = false, TargetCF = nil, SmoothPos = nil, BoundHRP = nil,
@@ -549,7 +553,7 @@ local function GetNearestIsland()
 end
 
 -------------------------------------------------
--- ✅ v5.2: WEAPON SYSTEM
+-- ✅ v5.3: WEAPON SYSTEM
 -------------------------------------------------
 local MELEE_KEYWORDS = {
     "combat", "step", "karate", "dragon", "electric",
@@ -563,22 +567,18 @@ local MELEE_KEYWORDS = {
     "spider", "sound", "phoenix", "portal", "rumble", "paw", "gravity",
 }
 
--- ✅ Force equip weapon (KHÔNG cần phải melee, Redz dùng mọi loại weapon)
 local function EquipWeapon()
     local char = GetCharacter()
     if not char then return nil end
 
-    -- Nếu đã có tool → dùng luôn
     local currentTool = char:FindFirstChildOfClass("Tool")
     if currentTool then return currentTool end
 
-    -- Equip từ backpack (ưu tiên melee trước)
     local backpack = LocalPlayer:FindFirstChild("Backpack")
     if not backpack then return nil end
     local hum = GetHumanoid()
     if not hum then return nil end
 
-    -- Ưu tiên ToolTip == "Melee"
     for _, tool in ipairs(backpack:GetChildren()) do
         if tool:IsA("Tool") and tool.ToolTip == "Melee" then
             pcall(function() hum:EquipTool(tool) end)
@@ -587,7 +587,6 @@ local function EquipWeapon()
         end
     end
 
-    -- Tìm theo keyword
     for _, tool in ipairs(backpack:GetChildren()) do
         if tool:IsA("Tool") then
             local n = tool.Name:lower()
@@ -601,7 +600,6 @@ local function EquipWeapon()
         end
     end
 
-    -- Fallback: bất kỳ tool nào
     local any = backpack:FindFirstChildOfClass("Tool")
     if any then
         pcall(function() hum:EquipTool(any) end)
@@ -612,25 +610,22 @@ local function EquipWeapon()
     return nil
 end
 
--- ✅ Giữ tên cũ cho tương thích
 local function EquipMeleeWeapon()
     return EquipWeapon()
 end
 
 -------------------------------------------------
--- ✅ v5.2: FAST ATTACK REDZ STYLE
--- Cách hoạt động:
---   1. KHÔNG gọi tool:Activate() (đây là điểm khác biệt)
---   2. Fire RE/RegisterAttack để báo server
---   3. Fire RE/RegisterHit với TẤT CẢ enemy trong hitbox
---   4. Fire LeftClickRemote để tăng damage
+-- ✅ v5.3: FAST ATTACK REDZ - HOVER OPTIMIZED
+-- Key changes:
+--   1. Check HORIZONTAL distance (X/Z) chứ không phải 3D
+--   2. Force tool:Activate() để trigger combo
+--   3. Fire RegHit với fallback (2 lần nếu fail)
 -------------------------------------------------
 local AttackState = {
     LastFireTime = 0,
     HitCount = 0,
 }
 
--- Lấy Net modules (cache)
 local NetModules = nil
 local RegisterAttack = nil
 local RegisterHit = nil
@@ -648,12 +643,12 @@ end
 
 InitNet()
 
--- ✅ HÀM CHÍNH: Fast Attack Redz
+-- ✅ HÀM CHÍNH: Redz Fast Attack với hover optimization
 local function RedzFastAttack()
     local char = GetCharacter()
     if not char then return end
 
-    -- ✅ Đảm bảo có weapon equip
+    -- ✅ Force equip weapon
     local tool = char:FindFirstChildOfClass("Tool")
     if not tool then
         tool = EquipWeapon()
@@ -666,8 +661,35 @@ local function RedzFastAttack()
     local hrp = char.HumanoidRootPart
     if not hrp then return end
 
-    -- ✅ Thu thập TẤT CẢ enemy trong hitbox range
+    -- ✅ v5.3: Dùng HORIZONTAL distance (bỏ qua Y)
+    local myPos = hrp.Position
+
+    -- Thu thập TẤT CẢ enemy trong tầm
     local targets = {}
+
+    local function checkEnemy(enemy, eHum, eHrp, info)
+        if not eHum or not eHrp or eHum.Health <= 0 then return end
+
+        -- ✅ FIX: Check horizontal distance (X/Z)
+        local dx = myPos.X - eHrp.Position.X
+        local dz = myPos.Z - eHrp.Position.Z
+        local horizontalDist = math.sqrt(dx * dx + dz * dz)
+
+        -- ✅ FIX: Check vertical distance (Y)
+        local dy = math.abs(myPos.Y - eHrp.Position.Y)
+
+        -- ✅ Điều kiện: horizontal <= HitboxRange VÀ vertical <= VerticalRange
+        if horizontalDist <= Config.HitboxRange and dy <= Config.VerticalRange then
+            table.insert(targets, {
+                model = enemy,
+                hrp = eHrp,
+                hum = eHum,
+                dist = horizontalDist,  -- Dùng horizontal distance
+                verticalDist = dy,
+                info = info,
+            })
+        end
+    end
 
     -- Tìm enemy thường
     local enemiesFolder = workspace:FindFirstChild("Enemies")
@@ -675,34 +697,22 @@ local function RedzFastAttack()
         for _, enemy in ipairs(enemiesFolder:GetChildren()) do
             local eHum = enemy:FindFirstChildOfClass("Humanoid")
             local eHrp = enemy:FindFirstChild("HumanoidRootPart")
-            if eHum and eHrp and eHum.Health > 0 then
-                local dist = (hrp.Position - eHrp.Position).Magnitude
-                if dist <= Config.HitboxRange then
-                    table.insert(targets, { model = enemy, hrp = eHrp, hum = eHum, dist = dist })
-                end
-            end
+            checkEnemy(enemy, eHum, eHrp)
         end
     end
 
-    -- ✅ Nếu AutoBoss, ưu tiên thêm boss
+    -- Nếu AutoBoss, ưu tiên thêm boss
     if Config.AutoBoss then
         local allList = GetAllBossList()
         for _, info in ipairs(allList) do
             local found = FindBoss(info.name)
             for _, b in ipairs(found) do
-                local dist = (hrp.Position - b.hrp.Position).Magnitude
-                if dist <= Config.HitboxRange then
-                    -- Check trùng
-                    local dup = false
-                    for _, t in ipairs(targets) do
-                        if t.model == b.boss then dup = true; break end
-                    end
-                    if not dup then
-                        table.insert(targets, { 
-                            model = b.boss, hrp = b.hrp, hum = b.hum, 
-                            dist = dist, isBoss = true 
-                        })
-                    end
+                local dup = false
+                for _, t in ipairs(targets) do
+                    if t.model == b.boss then dup = true; break end
+                end
+                if not dup then
+                    checkEnemy(b.boss, b.hum, b.hrp, info)
                 end
             end
         end
@@ -710,15 +720,19 @@ local function RedzFastAttack()
 
     if #targets == 0 then return end
 
-    -- Sắp xếp theo khoảng cách
     table.sort(targets, function(a, b) return a.dist < b.dist end)
 
-    -- ✅ 1. Fire RE/RegisterAttack (báo server biết đang attack)
+    -- ✅ 1. Fire RE/RegisterAttack
     if Config.UseRegAttack then
         pcall(function() RegisterAttack:FireServer(0) end)
     end
 
-    -- ✅ 2. Fire LeftClickRemote (như player click chuột)
+    -- ✅ 2. Activate tool (trigger combo animation)
+    if Config.UseActivate and tool then
+        pcall(function() tool:Activate() end)
+    end
+
+    -- ✅ 3. Fire LeftClickRemote
     if Config.UseLCRemote and tool then
         local lcRemote = tool:FindFirstChild("LeftClickRemote")
             or tool:FindFirstChild("Remote")
@@ -731,19 +745,26 @@ local function RedzFastAttack()
         end
     end
 
-    -- ✅ 3. Fire RE/RegisterHit cho TẤT CẢ enemy trong tầm
+    -- ✅ 4. Fire RE/RegisterHit cho TẤT CẢ enemy (với fallback)
     if Config.UseRegHit then
         local hitList = Config.FireAllEnemies and targets or { targets[1] }
         for _, t in ipairs(hitList) do
+            -- Fire lần 1
             pcall(function()
                 RegisterHit:FireServer(t.hrp, { t.model })
+            end)
+            -- ✅ Fallback: Fire lần 2 sau delay cực ngắn
+            task.spawn(function()
+                task.wait(0.01)
+                pcall(function()
+                    RegisterHit:FireServer(t.hrp, { t.model })
+                end)
             end)
         end
         AttackState.HitCount = AttackState.HitCount + #hitList
     end
 end
 
--- ✅ Fallback: Nếu Redz không hoạt động, dùng cách cũ
 local function FallbackAttack()
     local char = GetCharacter()
     if not char then return end
@@ -782,7 +803,6 @@ local function FallbackAttack()
     end
 end
 
--- ✅ Hàm chính (dùng Redz)
 local function DoFastAttack()
     if Config.UseRegHit and Config.UseRegAttack then
         RedzFastAttack()
@@ -792,8 +812,21 @@ local function DoFastAttack()
 end
 
 -------------------------------------------------
--- HELPER: EQUIP LOOP (giữ tương thích)
+-- ✅ v5.3: HOVER POSITION HELPER
+-- Tính vị trí trên đầu quái với khoảng cách tối ưu để đánh
 -------------------------------------------------
+local function GetHoverCFrame(enemyHRP)
+    if not enemyHRP then return nil end
+    local ePos = enemyHRP.Position
+    
+    -- ✅ v5.3: Bay thấp hơn (FarmDistance studs trên đầu)
+    -- Nhưng horizontal distance = 0 (ngay trên đầu)
+    return CFrame.new(
+        ePos.X,
+        ePos.Y + Config.FarmDistance,
+        ePos.Z
+    )
+end
 
 -------------------------------------------------
 -- QUEST DETECTION
@@ -1201,7 +1234,8 @@ local function AutoQuestLoop()
                     if spawnCF then
                         local distToSpawn = (hrp.Position - spawnCF.Position).Magnitude
                         if distToSpawn > 15 then
-                            SetMoveTarget(spawnCF + Vector3.new(0, Config.FarmDistance, 0), 4)
+                            -- ✅ v5.3: Dùng HOVER CFrame
+                            SetMoveTarget(CFrame.new(spawnCF.X, spawnCF.Y + Config.FarmDistance, spawnCF.Z), 4)
                         else
                             SetMoveTarget(CFrame.new(hrp.Position), 4)
                         end
@@ -1209,8 +1243,11 @@ local function AutoQuestLoop()
                     return
                 end
                 local target = hits[1]
-                local pos = target.hrp.Position
-                SetMoveTarget(CFrame.new(pos + Vector3.new(0, Config.FarmDistance, 0), pos), 4)
+                -- ✅ v5.3: Dùng HOVER CFrame (bay thấp, ngay trên đầu)
+                local hoverCF = GetHoverCFrame(target.hrp)
+                if hoverCF then
+                    SetMoveTarget(hoverCF, 4)
+                end
                 if #hits < QuestState.LastEnemyCount then
                     QuestState.LastKillTime = now
                 end
@@ -1265,8 +1302,11 @@ local function AutoFarmLoop()
             local hits = GetClosestEnemies(math.huge)
             if #hits > 0 then
                 local target = hits[1]
-                local pos = target.hrp.Position
-                SetMoveTarget(CFrame.new(pos + Vector3.new(0, Config.FarmDistance, 0), pos), 5)
+                -- ✅ v5.3: HOVER CFrame
+                local hoverCF = GetHoverCFrame(target.hrp)
+                if hoverCF then
+                    SetMoveTarget(hoverCF, 5)
+                end
             end
         end)
     end
@@ -1292,10 +1332,13 @@ local function AutoSea3FarmLoop()
             local hits = GetClosestEnemies(Config.Sea3FarmRange)
             if #hits > 0 then
                 local target = hits[1]
-                local pos = target.hrp.Position
-                SetMoveTarget(CFrame.new(pos + Vector3.new(0, Config.FarmDistance, 0), pos), 3)
+                -- ✅ v5.3: HOVER CFrame
+                local hoverCF = GetHoverCFrame(target.hrp)
+                if hoverCF then
+                    SetMoveTarget(hoverCF, 3)
+                end
                 Sea3State.StuckCounter = 0
-                Sea3State.LastTargetPos = pos
+                Sea3State.LastTargetPos = target.hrp.Position
                 return
             end
             local currentPos = hrp.Position
@@ -1314,8 +1357,8 @@ local function AutoSea3FarmLoop()
             end
             local areaData = Sea3Enemies[Sea3State.CurrentIndex]
             if areaData then
-                local targetPos = areaData.pos + Vector3.new(0, Config.FarmDistance, 0)
-                SetMoveTarget(CFrame.new(targetPos), 3)
+                -- ✅ v5.3: Bay tới spawn point
+                SetMoveTarget(CFrame.new(areaData.pos.X, areaData.pos.Y + Config.FarmDistance, areaData.pos.Z), 3)
                 Sea3State.LastTargetPos = areaData.pos
             end
         end)
@@ -1418,7 +1461,9 @@ local function AutoBossLoop()
                         local distToSpawn = (hrp.Position - targetInfo.spawnPos).Magnitude
                         if distToSpawn > 20 then
                             SetMoveTarget(CFrame.new(
-                                targetInfo.spawnPos + Vector3.new(0, Config.FarmDistance, 0)
+                                targetInfo.spawnPos.X,
+                                targetInfo.spawnPos.Y + Config.FarmDistance,
+                                targetInfo.spawnPos.Z
                             ), 10)
                         else
                             SetMoveTarget(CFrame.new(hrp.Position), 10)
@@ -1433,9 +1478,11 @@ local function AutoBossLoop()
             local bossPos = targetBoss.hrp.Position
             local bossHum = targetBoss.hum
 
+            -- ✅ v5.3: HOVER CFrame cho boss
             SetMoveTarget(CFrame.new(
-                bossPos + Vector3.new(0, Config.BossDistance, 0),
-                bossPos
+                bossPos.X,
+                bossPos.Y + Config.BossDistance,
+                bossPos.Z
             ), 10)
 
             if bossHum.Health <= 0 then
@@ -1660,7 +1707,7 @@ local function FastAttackLoop()
 end
 
 local function EquipLoop()
-    while task.wait(0.5) do
+    while task.wait(0.3) do
         if Config.AutoQuest or Config.AutoFarm or Config.AutoSea3Farm or Config.AutoBoss then
             pcall(EquipWeapon)
         end
@@ -1966,15 +2013,24 @@ end
 Tabs.Main:AddSection("Cài đặt chung")
 
 Tabs.Main:AddSlider("FarmDistance", {
-    Title = "Độ cao lơ lửng", Default = 6, Min = 4, Max = 15, Rounding = 1,
+    Title = "Độ cao bay lơ lửng", 
+    Description = "Studs trên đầu quái (khuyên 2-4)",
+    Default = 3, Min = 1, Max = 10, Rounding = 1,
     Callback = function(v) Config.FarmDistance = v end,
 })
 
 Tabs.Main:AddSlider("HitboxRange", {
-    Title = "Tầm đánh (Hitbox)", 
-    Description = "Bán kính hit Redz (khuyên 40-70)",
+    Title = "Tầm đánh ngang (Hitbox)", 
+    Description = "Bán kính X/Z (khuyên 30-70)",
     Default = 55, Min = 15, Max = 150, Rounding = 0,
     Callback = function(v) Config.HitboxRange = v end,
+})
+
+Tabs.Main:AddSlider("VerticalRange", {
+    Title = "Tầm đánh dọc (Vertical)", 
+    Description = "Khoảng cách Y tối đa (khuyên 8-12)",
+    Default = 8, Min = 3, Max = 20, Rounding = 0,
+    Callback = function(v) Config.VerticalRange = v end,
 })
 
 Tabs.Main:AddSlider("AttackDelay", {
@@ -2086,8 +2142,8 @@ Tabs.Sea3:AddDropdown("Sea3AreaSelect", {
             Sea3State.StuckCounter = 0
             Sea3State.LastTargetPos = nil
             if Config.AutoSea3Farm then
-                local targetPos = Sea3Enemies[idx].pos + Vector3.new(0, Config.FarmDistance, 0)
-                SetMoveTarget(CFrame.new(targetPos), 3)
+                local pos = Sea3Enemies[idx].pos
+                SetMoveTarget(CFrame.new(pos.X, pos.Y + Config.FarmDistance, pos.Z), 3)
             end
         end
     end,
@@ -2100,7 +2156,9 @@ Tabs.Sea3:AddButton({
         if Sea3State.CurrentIndex > #Sea3Enemies then Sea3State.CurrentIndex = 1 end
         local areaData = Sea3Enemies[Sea3State.CurrentIndex]
         if areaData and Config.AutoSea3Farm then
-            SetMoveTarget(CFrame.new(areaData.pos + Vector3.new(0, Config.FarmDistance, 0)), 3)
+            SetMoveTarget(CFrame.new(
+                areaData.pos.X, areaData.pos.Y + Config.FarmDistance, areaData.pos.Z
+            ), 3)
         end
     end,
 })
@@ -2146,7 +2204,7 @@ Tabs.Boss:AddSlider("BossFarmRange", {
 })
 
 Tabs.Boss:AddSlider("BossDistance", {
-    Title = "Khoảng cách đánh boss", Default = 8, Min = 4, Max = 30, Rounding = 0,
+    Title = "Độ cao bay đánh boss", Default = 5, Min = 2, Max = 20, Rounding = 0,
     Callback = function(v) Config.BossDistance = v end,
 })
 
@@ -2193,12 +2251,15 @@ Tabs.Boss:AddDropdown("BossSelect", {
                     if #found > 0 then
                         local b = found[1]
                         SetMoveTarget(CFrame.new(
-                            b.hrp.Position + Vector3.new(0, Config.BossDistance, 0),
-                            b.hrp.Position
+                            b.hrp.Position.X,
+                            b.hrp.Position.Y + Config.BossDistance,
+                            b.hrp.Position.Z
                         ), 10)
                     elseif info.spawnPos then
                         SetMoveTarget(CFrame.new(
-                            info.spawnPos + Vector3.new(0, Config.FarmDistance, 0)
+                            info.spawnPos.X,
+                            info.spawnPos.Y + Config.FarmDistance,
+                            info.spawnPos.Z
                         ), 10)
                     end
                 end
@@ -2224,15 +2285,18 @@ Tabs.Boss:AddButton({
         if #found > 0 then
             local b = found[1]
             SetMoveTarget(CFrame.new(
-                b.hrp.Position + Vector3.new(0, Config.BossDistance, 0),
-                b.hrp.Position
+                b.hrp.Position.X,
+                b.hrp.Position.Y + Config.BossDistance,
+                b.hrp.Position.Z
             ), 10)
         else
             local allList = GetAllBossList()
             for _, info in ipairs(allList) do
                 if info.name == Config.BossSelected then
                     SetMoveTarget(CFrame.new(
-                        info.spawnPos + Vector3.new(0, Config.FarmDistance, 0)
+                        info.spawnPos.X,
+                        info.spawnPos.Y + Config.FarmDistance,
+                        info.spawnPos.Z
                     ), 10)
                     return
                 end
@@ -2256,7 +2320,7 @@ Tabs.HopBoss:AddSection("🌐 Auto Hop Boss - Hop vào server CÓ BOSS")
 
 Tabs.HopBoss:AddParagraph({
     Title = "Cách hoạt động",
-    Content = "Tool check boss trong server hiện tại. Nếu KHÔNG có boss → hop sang server khác. Sau khi hop → check lại. Lặp cho đến khi tìm được server có boss.",
+    Content = "Tool check boss trong server hiện tại. Nếu KHÔNG có boss → hop sang server khác.",
 })
 
 Tabs.HopBoss:AddToggle("AutoHopBossToggle", {
@@ -2274,7 +2338,6 @@ Tabs.HopBoss:AddToggle("AutoHopBossToggle", {
 
 Tabs.HopBoss:AddSlider("HopAfterNoSpawnSlider", {
     Title       = "Chờ trước khi hop (giây)",
-    Description = "Nếu không có boss sau X giây → hop",
     Default     = 15, Min = 5, Max = 120, Rounding = 0,
     Callback    = function(v) Config.HopAfterNoSpawn = v end,
 })
@@ -2341,18 +2404,6 @@ Tabs.HopBoss:AddButton({
             Title = "Hop Boss", Content = "Tìm thấy " .. #servers .. " server", Duration = 3,
         })
     end,
-})
-
-Tabs.HopBoss:AddSection("⚙️ Thông tin")
-
-Tabs.HopBoss:AddParagraph({
-    Title = "Flow",
-    Content = "1. Check boss\n2. Không có → chờ 15s → thử spawn\n3. Vẫn không có → Hop\n4. Chờ 8s sau hop → check lại\n5. Có boss → đánh | Không → tiếp tục",
-})
-
-Tabs.HopBoss:AddParagraph({
-    Title = "Mẹo",
-    Content = "• Bật Auto Spawn Boss + Auto Boss + Auto Hop Boss\n• HopAfterNoSpawn = 15s\n• HopCooldown = 12s\n• Queue mode = ưu tiên server ít người",
 })
 
 -------------------------------------------------
@@ -2536,7 +2587,7 @@ Tabs.Settings:AddSlider("MoveMaxVelocitySlider", {
 })
 
 Tabs.Settings:AddButton({
-    Title = "🔄 Reset về mặc định v5.2",
+    Title = "🔄 Reset về mặc định v5.3",
     Callback = function()
         Config.MoveSmoothSpeed = 5
         Config.MoveResponsiveness = 25
@@ -2553,7 +2604,7 @@ Tabs.Settings:AddButton({
             Move.AlignOri.MaxTorque = 60000
         end
         Fluent:Notify({
-            Title = "Datkits", Content = "Đã reset cấu hình v5.2", Duration = 3,
+            Title = "Datkits", Content = "Đã reset cấu hình v5.3", Duration = 3,
         })
     end,
 })
@@ -2596,40 +2647,36 @@ Tabs.Settings:AddButton({
     end,
 })
 
--- ✅ v5.2: Redz Fast Attack Settings
+-- ✅ v5.3: Hover Attack Settings
 Tabs.Settings:AddSection("⚔️ Cấu hình Fast Attack Redz")
 
 Tabs.Settings:AddToggle("UseRegAttackToggle", {
     Title       = "Fire RE/RegisterAttack",
-    Description = "Báo server đang attack (BẮT BUỘC cho Redz)",
     Default     = true,
     Callback    = function(v) Config.UseRegAttack = v end,
 })
 
 Tabs.Settings:AddToggle("UseRegHitToggle", {
     Title       = "Fire RE/RegisterHit",
-    Description = "Damage chính (BẮT BUỘC cho Redz)",
     Default     = true,
     Callback    = function(v) Config.UseRegHit = v end,
 })
 
 Tabs.Settings:AddToggle("UseLCRemoteToggle", {
     Title       = "Fire LeftClickRemote",
-    Description = "Gửi LeftClick để tăng damage",
     Default     = true,
     Callback    = function(v) Config.UseLCRemote = v end,
 })
 
 Tabs.Settings:AddToggle("UseActivateToggle", {
-    Title       = "Dùng tool:Activate() (Auto Click)",
-    Description = "❌ KHÔNG khuyên bật cho Redz - sẽ bị cooldown",
-    Default     = false,
+    Title       = "Dùng tool:Activate() (BẬT cho hover attack)",
+    Description = "Trigger combo animation - CẦN BẬT cho v5.3",
+    Default     = true,
     Callback    = function(v) Config.UseActivate = v end,
 })
 
 Tabs.Settings:AddButton({
     Title       = "🧪 Test Redz Attack ngay",
-    Description = "Test Fast Attack Redz 1 lần",
     Callback    = function()
         local char = GetCharacter()
         if not char then
@@ -2649,18 +2696,21 @@ Tabs.Settings:AddButton({
 })
 
 Tabs.Settings:AddButton({
-    Title       = "⚔️ Preset: Max Redz Speed",
-    Description = "Delay 0.03s, hitbox 70, hit all enemy",
+    Title       = "⚔️ Preset: Hover Attack tối ưu",
+    Description = "Bay 3 studs, hitbox 55, vertical 8, delay 0.05",
     Callback    = function()
-        Config.AttackDelay = 0.03
-        Config.HitboxRange = 70
+        Config.FarmDistance = 3
+        Config.BossDistance = 5
+        Config.HitboxRange = 55
+        Config.VerticalRange = 8
+        Config.AttackDelay = 0.05
         Config.FireAllEnemies = true
         Config.UseRegHit = true
         Config.UseRegAttack = true
         Config.UseLCRemote = true
-        Config.UseActivate = false
+        Config.UseActivate = true
         Fluent:Notify({
-            Title = "Datkits", Content = "⚔️ Đã bật preset Max Redz Speed", Duration = 3,
+            Title = "Datkits", Content = "⚔️ Đã bật preset Hover Attack tối ưu", Duration = 3,
         })
     end,
 })
@@ -2703,7 +2753,7 @@ end)
 
 Fluent:Notify({
     Title    = "Datkits Premium",
-    Content  = "v5.2 Fast Attack Redz Style đã sẵn sàng!",
+    Content  = "v5.3 Hover Attack Fix đã sẵn sàng!",
     Duration = 6,
 })
 
@@ -2728,4 +2778,4 @@ if Config.NoclipEnabled then
     EnableNoclip()
 end
 
-print("[Datkits] ✅ v5.2 Fast Attack Redz Style loaded successfully!")
+print("[Datkits] ✅ v5.3 Hover Attack Fix loaded successfully!")
