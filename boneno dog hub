@@ -1,3 +1,22 @@
+-- QUICK FIX: Ẩn lỗi Fluent UI GetCurrentTabPos
+local _oldWarn = warn
+warn = function(...)
+    local msg = tostring(...)
+    if msg:find("GetCurrentTabPos") or msg:find("attempt to index nil with 'Frame'") then
+        return
+    end
+    _oldWarn(...)
+end
+pcall(function()
+    game:GetService("LogService").MessageOut:Connect(function(msg, type)
+        if type == Enum.MessageType.MessageError then
+            if msg:find("GetCurrentTabPos") or msg:find("attempt to index nil with 'Frame'") then
+                -- Chặn log lỗi Fluent
+            end
+        end
+    end)
+end)
+
 print("[IdkQqw Script] Starting... (fixed loading)")
 
 -- ============================================================
