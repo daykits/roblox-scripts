@@ -11407,7 +11407,26 @@ Tabs.Settings:AddButton({
 -- SELECT DEFAULT TAB & NOTIFY
 -- ============================================================
 
-Window:SelectTab(1)
+task.spawn(function()
+    task.wait(0.5)
+    for attempt = 1, 5 do
+        pcall(function()
+            if Window and Window.SelectTab then
+                Window:SelectTab(1)
+            end
+        end)
+        task.wait(0.3)
+    end
+    pcall(function()
+        if Window and not Window.MainFrame then
+            task.wait(1)
+            pcall(function() Window:SelectTab(1) end)
+            task.wait(0.5)
+            pcall(function() Window:SelectTab(1) end)
+        end
+    end)
+    print("[IdkQqw] ✅ Fluent UI patch completed")
+end)
 
 Fluent:Notify({
     Title    = "Menu Loaded!",
