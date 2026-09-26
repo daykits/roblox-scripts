@@ -5766,19 +5766,31 @@ EyeStatus = L_1_[93]["Main"]:AddParagraph({
 })
 function Check_Eye()
 	local L_530_ = {}
-	L_530_[4] = workspace["Map"]["TikiOutpost"]["IslandModel"]
-	L_530_[1] = {
-		L_530_[4]["Eye1"];
-		L_530_[4]["Eye2"],
-		L_530_[4]["IslandChunks"]["E"]["Eye3"];
-		L_530_[4]["IslandChunks"]["E"]["Eye4"]
-	}
 	L_530_[3] = 0
-	for L_531_forvar0, L_532_forvar1 in ipairs(L_530_[1]) do
-		local L_533_ = {}
-		L_533_[2], L_533_[3] = L_531_forvar0, L_532_forvar1
-		if L_533_[3] and L_533_[3]["Transparency"] ~= 1 then
-			R_[3] += 1
+	L_530_[4] = workspace["Map"]:FindFirstChild("TikiOutpost")
+	if not L_530_[4] then
+		return 0, false
+	end
+	L_530_[4] = L_530_[4]:FindFirstChild("IslandModel")
+	if not L_530_[4] then
+		return 0, false
+	end
+	local eyes = {}
+	local e1 = L_530_[4]:FindFirstChild("Eye1")
+	local e2 = L_530_[4]:FindFirstChild("Eye2")
+	local chunks = L_530_[4]:FindFirstChild("IslandChunks")
+	local e3, e4
+	if chunks then
+		local eFolder = chunks:FindFirstChild("E")
+		if eFolder then
+			e3 = eFolder:FindFirstChild("Eye3")
+			e4 = eFolder:FindFirstChild("Eye4")
+		end
+	end
+	eyes = {e1, e2, e3, e4}
+	for _, eye in ipairs(eyes) do
+		if eye and eye:IsA("BasePart") and eye.Transparency ~= 1 then
+			L_530_[3] = L_530_[3] + 1
 		end
 	end
 	L_530_[2] = L_530_[3] == 4
@@ -10616,7 +10628,9 @@ spawn(function()
 	pcall(function()
 		while wait(.1) do
 			if _G["TPGEAR"] then
-				for L_1023_forvar0, L_1024_forvar1 in pairs((workspace["Map"]:FindFirstChild("MysticIsland")):GetChildren()) do
+				local _mystic = workspace["Map"]:FindFirstChild("MysticIsland")
+				if not _mystic then continue end
+				for L_1023_forvar0, L_1024_forvar1 in pairs(_mystic:GetChildren()) do
 					local L_1025_ = {}
 					L_1025_[2], L_1025_[1] = L_1023_forvar0, L_1024_forvar1
 					if L_1025_[1]["Name"] == "Part" then
@@ -12443,9 +12457,20 @@ spawn(function()
 	while wait(Sec) do
 		pcall(function()
 			if _G["Prehis_DE"] then
-				if workspace["Map"]["PrehistoricIsland"]["Core"]["SpawnedDragonEggs"]:FindFirstChild("DragonEgg") then
-					_tp((workspace["Map"]["PrehistoricIsland"]["Core"]["SpawnedDragonEggs"]:FindFirstChild("DragonEgg"))["Molten"]["CFrame"])
-					fireproximityprompt(workspace["Map"]["PrehistoricIsland"]["Core"]["SpawnedDragonEggs"]["DragonEgg"]["Molten"]["ProximityPrompt"], 30)
+				local prehis = workspace["Map"]:FindFirstChild("PrehistoricIsland")
+				if not prehis then return end
+				local core = prehis:FindFirstChild("Core")
+				if not core then return end
+				local spawnEggs = core:FindFirstChild("SpawnedDragonEggs")
+				if not spawnEggs then return end
+				local dragonEgg = spawnEggs:FindFirstChild("DragonEgg")
+				if not dragonEgg then return end
+				local molten = dragonEgg:FindFirstChild("Molten")
+				if not molten then return end
+				_tp(molten["CFrame"])
+				local prompt = molten:FindFirstChild("ProximityPrompt")
+				if prompt then
+					fireproximityprompt(prompt, 30)
 				end
 			end
 		end)
@@ -13794,7 +13819,9 @@ EventIslandEsp = function()
 	end
 end
 gearEsp = function()
-	for L_1347_forvar0, L_1348_forvar1 in pairs(workspace["Map"]["MysticIsland"]:GetDescendants()) do
+	local _mystic = workspace["Map"]:FindFirstChild("MysticIsland")
+	if not _mystic then return end
+	for L_1347_forvar0, L_1348_forvar1 in pairs(_mystic:GetDescendants()) do
 		local L_1349_ = {}
 		L_1349_[3], L_1349_[1] = L_1347_forvar0, L_1348_forvar1
 		pcall(function()
