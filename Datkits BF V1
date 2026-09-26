@@ -17381,16 +17381,16 @@ if getsenv then
 	end
 end
 L_1745_[15], L_1745_[16] = pcall(function()
-	return (require(L_1745_[5]["Flags"]))["COMBAT_REMOTE_THREAD"] or false
+    return (require(L_1745_[5]["Flags"]))["COMBAT_REMOTE_THREAD"] or false
 end)
-
-print("[FastAttack] COMBAT_REMOTE_THREAD:", L_1745_[16], "| SendHitsToServer:", L_1745_[9] ~= nil)
-
 if L_1745_[15] and (L_1745_[16] and L_1745_[9]) then
-	L_1745_[9](L_1745_[12], L_1745_[6])
+    pcall(function()
+        L_1745_[9](L_1745_[12], L_1745_[6])
+    end)
 else
-	-- Luôn fallback về FireServer nếu không có SendHitsToServer
-	L_1745_[2]:FireServer(L_1745_[12], L_1745_[6])
+    pcall(function()
+        L_1745_[2]:FireServer(L_1745_[12], L_1745_[6])
+    end)
 end
 CameraShakerR = require(game["ReplicatedStorage"]["Util"]["CameraShaker"])
 CameraShakerR:Stop()
