@@ -4636,13 +4636,13 @@ Setting:AddButton({
             
             -- Notificação Universal
             game.StarterGui:SetCore("SendNotification", {
-                Title = "chuongdz Hub",
+                Title = "datkits Hub",
                 Text = "Configurações resetadas! Re-execute o script.",
                 Duration = 5
             })
         else
             game.StarterGui:SetCore("SendNotification", {
-                Title = "chuongdz Hub",
+                Title = "datkits Hub",
                 Text = "Nenhum arquivo de save encontrado para apagar.",
                 Duration = 3
             })
@@ -12430,6 +12430,6 @@ end)
 _ENV.rz_FastAttack = FastAttack
 FastAttackModule.FastAttack = FastAttack
 
-NotificacaoNightMystic(" chuongdz Hub", "✅ Todos os sistemas carregados!")
+NotificacaoNightMystic(" datkits Hub", "✅ Todos os sistemas carregados!")
 
 return FastAttackModulem
