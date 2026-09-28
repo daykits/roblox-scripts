@@ -2718,18 +2718,18 @@ QuestNeta = function()
                     return lib
                 end
             else
-                warn("[chuongdz Hub] Erro loadstring UI:", loadErr)
+                warn("[datkits Hub] Erro loadstring UI:", loadErr)
             end
         end
     end
 
-    error("[chuongdz Hub] Não foi possível carregar a biblioteca da UI.")
+    error("[datkits Hub] Não foi possível carregar a biblioteca da UI.")
 end
 
 	local Library = LoadAnimeMobUILibrary():MakeWindow({
     Title = "datkits Hub premium",
     SubTitle = "by datdaykits",
-    SaveFolder = "chuongdz_hm_hub.json"
+    SaveFolder = "datkits_hm_hub.json"
 })
 -- Criar ScreenGui
 local screenGui = Instance.new("ScreenGui")
@@ -4615,7 +4615,7 @@ Setting:AddButton({
             
             -- Notificação Universal (Funciona sem a lib Fluent)
             game.StarterGui:SetCore("SendNotification", {
-                Title = "chuongdz Hub",
+                Title = "datkits Hub",
                 Text = "Configurações salvas com sucesso!",
                 Duration = 5
             })
