@@ -1,0 +1,607 @@
+-- ============================================================
+-- BANANA UI MENU HOÀN CHỈNH - TỔNG HỢP
+-- ============================================================
+
+-- ============================================================
+-- 1. LOAD THƯ VIỆN
+-- ============================================================
+local Library = loadstring(game:HttpGet(
+    "https://raw.githubusercontent.com/VTDROBLOX/Animehub/refs/heads/main/ui_BananaHub_final_lua.txt"
+))()
+
+-- ============================================================
+-- 2. TẠO WINDOW
+-- ============================================================
+local Window = Library:CreateWindow({
+    Title = "Menu Hoàn Chỉnh",
+    Desc = "- Tổng Hợp Banana UI",
+    Image = "rbxassetid://73966916440074"
+})
+
+-- ============================================================
+-- 3. HÀM WRAP TAB (tự động xen kẽ Left/Right + OnChanged)
+-- ============================================================
+local function makeProxy(obj, holder)
+    local proxy = {}
+    setmetatable(proxy, {
+        __index = function(_, k)
+            if k == "OnChanged" then
+                return function(_, fn)
+                    holder.extra = fn
+                    return proxy
+                end
+            end
+            if k == "SetStage" and obj.SetStage then
+                return function(_, v) pcall(obj.SetStage, v) end
+            end
+            if k == "SetValue" then
+                return function(_, v)
+                    if obj.SetValue then
+                        local ok = pcall(obj.SetValue, v)
+                        if not ok then pcall(function() obj:SetValue(v) end) end
+                    end
+                end
+            end
+            if k == "GetValue" then
+                return function(_)
+                    if obj.GetValue then
+                        local ok, val = pcall(obj.GetValue)
+                        if ok then return val end
+                        local ok2, val2 = pcall(function() return obj:GetValue() end)
+                        return val2
+                    end
+                end
+            end
+            if k == "SetText" or k == "SetDesc" then
+                return function(_, t)
+                    if obj.SetText then pcall(obj.SetText, obj, t)
+                    elseif obj.SetDesc then pcall(obj.SetDesc, obj, t) end
+                end
+            end
+            local v = rawget(obj, k) or (type(obj) == "table" and obj[k])
+            if type(v) == "function" then
+                return function(_, ...) return pcall(v, obj, ...) end
+            end
+            return v
+        end
+    })
+    return proxy
+end
+
+local function wrapTab(rawTab)
+    local _currentSection = nil
+    local _nextIsRight = false
+
+    local function ensureSection()
+        if not _currentSection then
+            _currentSection = rawTab:AddLeftGroupbox(" ")
+        end
+    end
+
+    local wrapped = {}
+
+    function wrapped:AddSection(name)
+        if _nextIsRight then
+            _currentSection = rawTab:AddRightGroupbox(name or " ")
+            _nextIsRight = false
+        else
+            _currentSection = rawTab:AddLeftGroupbox(name or " ")
+            _nextIsRight = true
+        end
+        return _currentSection
+    end
+
+    function wrapped:AddToggle(id, setting)
+        ensureSection()
+        local holder = { extra = nil }
+        local origCb = setting.Callback
+        setting.Callback = function(v)
+            if origCb then pcall(origCb, v) end
+            if holder.extra then pcall(holder.extra, v) end
+        end
+        setting.Description = nil
+        local obj = _currentSection:AddToggle(id, setting)
+        return makeProxy(obj, holder)
+    end
+
+    function wrapped:AddButton(setting, cb)
+        ensureSection()
+        if type(setting) == "table" then setting.Description = nil end
+        local proxy = _currentSection:AddButton(setting, cb)
+        if proxy then return makeProxy(proxy, {}) end
+    end
+
+    function wrapped:AddDropdown(id, setting)
+        ensureSection()
+        local holder = { extra = nil }
+        local origCb = setting.Callback
+        setting.Callback = function(v)
+            if origCb then pcall(origCb, v) end
+            if holder.extra then pcall(holder.extra, v) end
+        end
+        setting.Description = nil
+        local obj = _currentSection:AddDropdown(id, setting)
+        return makeProxy(obj, holder)
+    end
+
+    function wrapped:AddSlider(id, setting)
+        ensureSection()
+        local holder = { extra = nil }
+        local origCb = setting.Callback
+        setting.Callback = function(v)
+            if origCb then pcall(origCb, v) end
+            if holder.extra then pcall(holder.extra, v) end
+        end
+        setting.Description = nil
+        local obj = _currentSection:AddSlider(setting)
+        return makeProxy(obj, holder)
+    end
+
+    function wrapped:AddInput(id, setting)
+        ensureSection()
+        local holder = { extra = nil }
+        local origCb = setting.Callback
+        setting.Callback = function(v)
+            if origCb then pcall(origCb, v) end
+            if holder.extra then pcall(holder.extra, v) end
+        end
+        local obj = _currentSection:AddInput(id, setting)
+        return makeProxy(obj, holder)
+    end
+
+    function wrapped:AddParagraph(setting)
+        ensureSection()
+        local title = setting.Title or ""
+        local desc  = setting.Description or setting.Desc or ""
+        local txt   = desc ~= "" and (title .. "\n" .. desc) or title
+        local obj = _currentSection:AddLabel(txt)
+        return makeProxy(obj, {})
+    end
+
+    function wrapped:AddLabel(text)
+        ensureSection()
+        local obj = _currentSection:AddLabel(text)
+        return makeProxy(obj, {})
+    end
+
+    return wrapped
+end
+
+-- ============================================================
+-- 4. TẠO CÁC TAB
+-- ============================================================
+local Tabs = {
+    ["Info"]     = wrapTab(Window:AddTab("Thông Tin")),
+    ["Main"]     = wrapTab(Window:AddTab("Cày Cấp")),
+    ["Combat"]   = wrapTab(Window:AddTab("Chiến Đấu")),
+    ["Teleport"] = wrapTab(Window:AddTab("Dịch Chuyển")),
+    ["Player"]   = wrapTab(Window:AddTab("Người Chơi")),
+    ["Visual"]   = wrapTab(Window:AddTab("Hiển Thị")),
+    ["Setting"]  = wrapTab(Window:AddTab("Cài Đặt")),
+    ["Misc"]     = wrapTab(Window:AddTab("Khác")),
+}
+
+-- ============================================================
+-- 5. NOTIFY CHÀO MỪNG
+-- ============================================================
+task.wait(1)
+Library:Notify({
+    Title = "Menu Hoàn Chỉnh",
+    Description = "Đã load xong!\nBấm nút góc dưới trái để mở menu.",
+    Duration = 4
+})
+
+-- ============================================================
+-- 6. TAB THÔNG TIN
+-- ============================================================
+Tabs.Info:AddSection("Thông Tin")
+
+Tabs.Info:AddButton({
+    ["Title"] = "Discord",
+    ["Description"] = "Bấm để copy link",
+    ["Callback"] = function()
+        setclipboard("https://discord.gg/6udCyRdh6B")
+        Library:Notify({Title="Đã copy", Description="Discord link", Duration=2})
+    end
+})
+
+Tabs.Info:AddButton({
+    ["Title"] = "Youtube",
+    ["Callback"] = function()
+        setclipboard("https://youtube.com")
+        Library:Notify({Title="Đã copy", Description="Youtube link", Duration=2})
+    end
+})
+
+local executorName = "Unknown"
+if identifyexecutor then executorName = identifyexecutor()
+elseif getexecutorname then executorName = getexecutorname() end
+
+Tabs.Info:AddParagraph({
+    ["Title"] = "Client Đang Dùng",
+    ["Description"] = executorName
+})
+
+Tabs.Info:AddParagraph({
+    ["Title"] = "Phiên Bản",
+    ["Description"] = "v1.0 - Tổng hợp"
+})
+
+-- ============================================================
+-- 7. TAB CÀY CẤP
+-- ============================================================
+Tabs.Main:AddSection("Cày Cấp")
+
+-- Toggle đơn giản
+Tabs.Main:AddToggle("ToggleAutoFarm", {
+    ["Title"] = "Tự Động Cày Cấp",
+    ["Default"] = false,
+    ["Callback"] = function(v)
+        _G.AutoFarm = v
+        Library:Notify({
+            Title = "Auto Farm",
+            Description = v and "Đã BẬT" or "Đã TẮT",
+            Duration = 2
+        })
+    end
+}):OnChanged(function(v)
+    print("[OnChanged] AutoFarm =", v)
+end)
+
+-- Toggle dùng OnChanged
+local toggleFast = Tabs.Main:AddToggle("ToggleFastAttack", {
+    ["Title"] = "Đánh Nhanh",
+    ["Default"] = false
+})
+toggleFast:OnChanged(function(v)
+    _G.FastAttack = v
+end)
+
+-- Slider
+local sliderHP = Tabs.Main:AddSlider("SliderMonHP", {
+    ["Title"] = "Máu Quái (%)",
+    ["Default"] = 20,
+    ["Min"] = 0,
+    ["Max"] = 100,
+    ["Rounding"] = 1,
+    ["Callback"] = function(v)
+        _G.KillPercent = v
+    end
+})
+sliderHP:OnChanged(function(v)
+    print("HP Percent:", v)
+end)
+sliderHP:SetValue(20)
+
+-- Dropdown
+local dropWeapon = Tabs.Main:AddDropdown("DropdownWeapon", {
+    ["Title"] = "Chọn Vũ Khí",
+    ["Values"] = {"Melee", "Sword", "Blox Fruit", "Gun"},
+    ["Multi"] = false,
+    ["Default"] = 1,
+    ["Callback"] = function(v)
+        _G.SelectWeapon = v
+    end
+})
+dropWeapon:SetValue("Melee")
+dropWeapon:OnChanged(function(v)
+    print("Weapon:", v)
+end)
+
+-- Input
+Tabs.Main:AddInput("InputDelay", {
+    ["Title"] = "Delay (giây)",
+    ["Default"] = "0.1",
+    ["Placeholder"] = "Nhập delay...",
+    ["Numeric"] = true,
+    ["Callback"] = function(v)
+        _G.Delay = tonumber(v) or 0.1
+    end
+})
+
+-- Paragraph trạng thái
+local statusFarm = Tabs.Main:AddParagraph({
+    ["Title"] = "Trạng Thái",
+    ["Description"] = "Đang chờ..."
+})
+spawn(function()
+    while task.wait(1) do
+        pcall(function()
+            statusFarm:SetDesc(_G.AutoFarm and "Đang cày..." or "Đã tắt")
+        end)
+    end
+end)
+
+-- ============================================================
+-- 8. TAB CHIẾN ĐẤU
+-- ============================================================
+Tabs.Combat:AddSection("Chiến Đấu")
+
+Tabs.Combat:AddToggle("ToggleAimbot", {
+    ["Title"] = "Aimbot",
+    ["Default"] = false,
+    ["Callback"] = function(v) _G.Aimbot = v end
+})
+
+Tabs.Combat:AddToggle("ToggleKillAura", {
+    ["Title"] = "Kill Aura",
+    ["Default"] = false,
+    ["Callback"] = function(v) _G.KillAura = v end
+}):OnChanged(function(v)
+    if v then
+        Library:Notify({Title="Kill Aura", Description="Đã BẬT", Duration=2})
+    end
+end)
+
+Tabs.Combat:AddSection("Kỹ Năng")
+
+local skillZ = Tabs.Combat:AddToggle("SkillZ", {
+    ["Title"] = "Kỹ Năng Z",
+    ["Default"] = true,
+    ["Callback"] = function(v) _G.SkillZ = v end
+})
+skillZ:SetStage(true)
+
+local skillX = Tabs.Combat:AddToggle("SkillX", {
+    ["Title"] = "Kỹ Năng X",
+    ["Default"] = true,
+    ["Callback"] = function(v) _G.SkillX = v end
+})
+skillX:SetStage(true)
+
+local skillC = Tabs.Combat:AddToggle("SkillC", {
+    ["Title"] = "Kỹ Năng C",
+    ["Default"] = true,
+    ["Callback"] = function(v) _G.SkillC = v end
+})
+
+-- ============================================================
+-- 9. TAB DỊCH CHUYỂN
+-- ============================================================
+Tabs.Teleport:AddSection("Đảo")
+
+local dropIsland = Tabs.Teleport:AddDropdown("DropdownIsland", {
+    ["Title"] = "Chọn Đảo",
+    ["Values"] = {"Jungle", "Desert", "Snow", "Marine", "Sky", "Prison"},
+    ["Multi"] = false,
+    ["Default"] = 1
+})
+dropIsland:SetValue("Jungle")
+dropIsland:OnChanged(function(v)
+    _G.SelectIsland = v
+end)
+
+Tabs.Teleport:AddButton({
+    ["Title"] = "Bay Đến Đảo",
+    ["Callback"] = function()
+        Library:Notify({
+            Title = "Teleport",
+            Description = "Đang bay đến " .. tostring(_G.SelectIsland),
+            Duration = 2
+        })
+    end
+})
+
+Tabs.Teleport:AddSection("Người Chơi")
+Tabs.Teleport:AddButton({
+    ["Title"] = "Bay Đến Người Chơi",
+    ["Callback"] = function()
+        -- code teleport
+    end
+})
+
+-- ============================================================
+-- 10. TAB NGƯỜI CHƠI
+-- ============================================================
+Tabs.Player:AddSection("Người Chơi")
+
+-- Lấy danh sách player
+local playerList = {}
+for _, p in pairs(game:GetService("Players"):GetPlayers()) do
+    table.insert(playerList, p.Name)
+end
+
+local dropPlayer = Tabs.Player:AddDropdown("DropdownPlayer", {
+    ["Title"] = "Chọn Người Chơi",
+    ["Values"] = playerList,
+    ["Multi"] = false,
+    ["Default"] = 1
+})
+dropPlayer:SetValue(_G.SelectPly)
+dropPlayer:OnChanged(function(v)
+    _G.SelectPly = v
+end)
+
+Tabs.Player:AddButton({
+    ["Title"] = "Tải Lại Danh Sách",
+    ["Callback"] = function()
+        table.clear(playerList)
+        for _, p in pairs(game:GetService("Players"):GetPlayers()) do
+            table.insert(playerList, p.Name)
+        end
+        Library:Notify({Title="Đã tải lại", Description="#Players: "..#playerList, Duration=2})
+    end
+})
+
+Tabs.Player:AddToggle("ToggleWalkWater", {
+    ["Title"] = "Đi Trên Nước",
+    ["Default"] = true,
+    ["Callback"] = function(v) _G.WalkWater = v end
+})
+
+Tabs.Player:AddToggle("ToggleNoClip", {
+    ["Title"] = "Xuyên Tường",
+    ["Default"] = false,
+    ["Callback"] = function(v) _G.NoClip = v end
+})
+
+Tabs.Player:AddToggle("ToggleSpeed", {
+    ["Title"] = "Chạy Nhanh",
+    ["Default"] = false,
+    ["Callback"] = function(v) _G.Speed = v end
+})
+
+-- ============================================================
+-- 11. TAB HIỂN THỊ
+-- ============================================================
+Tabs.Visual:AddSection("ESP")
+
+Tabs.Visual:AddToggle("EspPlayer", {
+    ["Title"] = "ESP Người Chơi",
+    ["Default"] = false,
+    ["Callback"] = function(v) _G.ESPPlayer = v end
+})
+
+Tabs.Visual:AddToggle("EspMob", {
+    ["Title"] = "ESP Quái",
+    ["Default"] = false,
+    ["Callback"] = function(v) _G.ESPMob = v end
+})
+
+Tabs.Visual:AddToggle("EspChest", {
+    ["Title"] = "ESP Rương",
+    ["Default"] = false,
+    ["Callback"] = function(v) _G.ESPChest = v end
+})
+
+Tabs.Visual:AddSection("Hiệu Ứng")
+Tabs.Visual:AddButton({
+    ["Title"] = "Xóa Sương Mù",
+    ["Callback"] = function()
+        pcall(function()
+            game.Lighting.FogEnd = 100000
+            if game.Lighting:FindFirstChild("BaseAtmosphere") then
+                game.Lighting.BaseAtmosphere:Destroy()
+            end
+        end)
+        Library:Notify({Title="Đã xóa", Description="Sương mù", Duration=2})
+    end
+})
+
+-- ============================================================
+-- 12. TAB CÀI ĐẶT
+-- ============================================================
+Tabs.Setting:AddSection("Cài Đặt Chung")
+
+Tabs.Setting:AddToggle("ToggleAntiAFK", {
+    ["Title"] = "Chống AFK",
+    ["Default"] = true,
+    ["Callback"] = function(v) _G.AntiAFK = v end
+})
+
+Tabs.Setting:AddToggle("ToggleAutoRejoin", {
+    ["Title"] = "Tự Động Vào Lại",
+    ["Default"] = false,
+    ["Callback"] = function(v) _G.AutoRejoin = v end
+})
+
+Tabs.Setting:AddButton({
+    ["Title"] = "FPS Boost",
+    ["Callback"] = function()
+        pcall(function()
+            settings().Rendering.QualityLevel = "Level01"
+            for _, v in pairs(game:GetDescendants()) do
+                if v:IsA("Decal") or v:IsA("Texture") then v.Transparency = 1
+                elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
+                    v.Lifetime = NumberRange.new(0)
+                elseif v:IsA("Fire") or v:IsA("SpotLight") or v:IsA("Smoke") then
+                    v.Enabled = false
+                end
+            end
+        end)
+        Library:Notify({Title="FPS Boost", Description="Đã áp dụng", Duration=2})
+    end
+})
+
+-- Anti AFK thực thi
+spawn(function()
+    game:GetService("Players").LocalPlayer.Idled:Connect(function()
+        if _G.AntiAFK then
+            game:GetService("VirtualUser"):Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+            task.wait(1)
+            game:GetService("VirtualUser"):Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+        end
+    end)
+end)
+
+-- ============================================================
+-- 13. TAB KHÁC
+-- ============================================================
+Tabs.Misc:AddSection("Tiện Ích")
+
+Tabs.Misc:AddButton({
+    ["Title"] = "Vào Lại Server",
+    ["Callback"] = function()
+        game:GetService("TeleportService"):Teleport(game.PlaceId, game.Players.LocalPlayer)
+    end
+})
+
+Tabs.Misc:AddButton({
+    ["Title"] = "Đổi Server",
+    ["Callback"] = function()
+        -- hàm Hop() tự viết
+        Library:Notify({Title="Đang đổi", Description="Server...", Duration=2})
+    end
+})
+
+Tabs.Misc:AddButton({
+    ["Title"] = "Copy Job ID",
+    ["Callback"] = function()
+        setclipboard(tostring(game.JobId))
+        Library:Notify({Title="Đã copy", Description="Job ID", Duration=2})
+    end
+})
+
+Tabs.Misc:AddSection("Nhập Code")
+Tabs.Misc:AddButton({
+    ["Title"] = "Nhập Tất Cả Code",
+    ["Callback"] = function()
+        local codes = {"KITT_RESET","Sub2UncleKizaru","Sub2Fer999","Enyu_is_Pro","JCWK","StarcodeHEO","MagicBus","KittGaming"}
+        for _, code in ipairs(codes) do
+            pcall(function()
+                game:GetService("ReplicatedStorage").Remotes.Redeem:InvokeServer(code)
+            end)
+            task.wait(0.1)
+        end
+        Library:Notify({Title="Code", Description="Đã nhập xong", Duration=2})
+    end
+})
+
+-- ============================================================
+-- 14. VÒNG LẶP XỬ LÝ CHÍNH (ví dụ)
+-- ============================================================
+spawn(function()
+    while task.wait(0.1) do
+        pcall(function()
+            if _G.AutoFarm then
+                -- code auto farm
+            end
+        end)
+    end
+end)
+
+spawn(function()
+    while task.wait() do
+        pcall(function()
+            if _G.NoClip then
+                local char = game.Players.LocalPlayer.Character
+                if char then
+                    for _, v in pairs(char:GetDescendants()) do
+                        if v:IsA("BasePart") then v.CanCollide = false end
+                    end
+                end
+            end
+        end)
+    end
+end)
+
+-- ============================================================
+-- 15. THÔNG BÁO HOÀN TẤT
+-- ============================================================
+Library:Notify({
+    Title = "Hoàn Tất",
+    Description = "Menu đã sẵn sàng!\nBấm nút góc dưới trái.",
+    Duration = 3
+})
+
+print("[Menu] Loaded successfully!")
