@@ -435,7 +435,7 @@ local Root = HumanoidRootPart
 Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/VTDROBLOX/Animehub/refs/heads/main/ui_BananaHub_final_lua.txt"))()
 
 Window = Library:CreateWindow({
-    Title = "datkits Hub premiun",
+    Title = "datkits Hub",
     Desc = "- Blox Fruit",
     Image = "rbxassetid://73966916440074"
 })
