@@ -1,4 +1,4 @@
-local KavoLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/VTDROBLOX/Animehub/refs/heads/main/ui_BananaHub_final_lua.txt"))()
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/VTDROBLOX/Animehub/refs/heads/main/ui_BananaHub_final_lua.txt"))()
 local Window = KavoLib.CreateLib("datdaykits Premium Hub", "DarkTheme")
 
 local MainTab = Window:NewTab("Main")
