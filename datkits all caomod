@@ -116,7 +116,6 @@ local placeScripts = {
             loadstring(game:HttpGet("https://raw.githubusercontent.com/caomod2077/Script/refs/heads/main/FN_GAG2_skibidi.lua"))()
         end)
     end,
-}
 
     --Blox Fruit
     [2753915549] = function()
