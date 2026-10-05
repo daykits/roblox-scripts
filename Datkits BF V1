@@ -2699,38 +2699,16 @@ QuestNeta = function()
 			[6] = PosQ,
 		};
 	end;
-	local function LoadAnimeMobUILibrary()
-    local urls = {
-        "https://pastefy.app/SpJWRA2b/raw",
-        "https://pastefy.app/COIoTGZ4/raw",
-    }
+	local Library = loadstring(game:HttpGet(
+    "https://raw.githubusercontent.com/daykits/Ui-banana.lua/refs/heads/main/ui%20BananaHub.lua.txt"
+))()
 
-    for _, url in ipairs(urls) do
-        local okSource, source = pcall(function()
-            return game:HttpGet(url)
-        end)
-
-        if okSource and type(source) == "string" and #source > 1000 then
-            local loader, loadErr = loadstring(source)
-            if loader then
-                local okLib, lib = pcall(loader)
-                if okLib and lib and type(lib.MakeWindow) == "function" then
-                    return lib
-                end
-            else
-                warn("[datkits Hub] Erro loadstring UI:", loadErr)
-            end
-        end
-    end
-
-    error("[datkits Hub] Não foi possível carregar a biblioteca da UI.")
-end
-
-	local Library = LoadAnimeMobUILibrary():MakeWindow({
-    Title = "datkits Hub premium",
-    SubTitle = "by datdaykits",
-    SaveFolder = "datkits_hm_hub.json"
+local Window = Library:CreateWindow({
+    Title = "datkits Hub",
+    Desc  = "-- Blox Fruit",
+    Image = "rbxassetid://73966916440074"
 })
+local plr = game:GetService("Players").LocalPlayer
 -- Criar ScreenGui
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "ControlGUI"
