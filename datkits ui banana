@@ -432,7 +432,7 @@ local Root = HumanoidRootPart
 -- ==========================================
 -- LOAD UI LIBRARY (HDanh Hub)
 -- ==========================================
-Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/VTDROBLOX/Animehub/refs/heads/main/ui_BananaHub_final_lua.txt"))()
+Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/daykits/Ui-banana.lua/refs/heads/main/ui%20BananaHub.lua.txt"))()
 
 Window = Library:CreateWindow({
     Title = "datkits Hub",
