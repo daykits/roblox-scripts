@@ -1,96 +1,4 @@
 -- ==========================================
--- [FIX LAG SIÊU NHẸ + ANTI BAN VỪA] - DÁN ĐẦU FILE
--- ==========================================
-
--- ==========================================
--- SERVICES
--- ==========================================
-local Lighting = game:GetService("Lighting")
-local RunService = game:GetService("RunService")
-local Players = game:GetService("Players")
-local VirtualUser = game:GetService("VirtualUser")
-local UserInputService = game:GetService("UserInputService")
-local lp = Players.LocalPlayer
-
--- ==========================================
--- FIX LAG SIÊU NHẸ (CHỈ CLIENT)
--- ==========================================
-
--- Tắt shadow + fog (tiết kiệm GPU)
-pcall(function()
-    Lighting.GlobalShadows = false
-    Lighting.FogEnd = 100000
-    Lighting.Brightness = 1
-    Lighting.ClockTime = 12
-end)
-
--- Tắt hiệu ứng nước (giảm CPU)
-pcall(function()
-    local terrain = workspace:FindFirstChild("Terrain")
-    if terrain then
-        terrain.WaterWaveSize = 0
-        terrain.WaterWaveSpeed = 0
-        terrain.WaterReflectance = 0
-    end
-end)
-
--- Set chất lượng đồ họa thấp nhất
-pcall(function()
-    settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-end)
-
--- ==========================================
--- DỌN DẸP HIỆU ỨNG RÁC (CHẠY NGẦM)
--- ==========================================
-
-task.spawn(function()
-    while task.wait(5) do
-        pcall(function()
-            for _, v in pairs(workspace:GetDescendants()) do
-                if v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Sparkles") then
-                    v.Enabled = false
-                    v.Rate = 0
-                elseif v:IsA("Sound") and v.Parent ~= lp.Character then
-                    v.Volume = 0
-                    v.Playing = false
-                end
-            end
-        end)
-    end
-end)
-
--- ==========================================
--- TỐI ƯU CHO 32BIT / MÁY YẾU
--- ==========================================
-
--- Giới hạn FPS 40-60 cho chơi mượt
-local targetFPS = 60
-local lastTime = tick()
-RunService.RenderStepped:Connect(function()
-    local currentTime = tick()
-    local delta = currentTime - lastTime
-    
-    if delta < 1/targetFPS then
-        wait(1/targetFPS - delta)
-    end
-    
-    lastTime = currentTime
-end)
-
--- Giảm simulation radius (tránh load quá nhiều object)
-task.spawn(function()
-    while task.wait(2) do
-        pcall(function()
-            local char = lp.Character
-            if char and char:FindFirstChild("HumanoidRootPart") then
-                sethiddenproperty(lp, "SimulationRadius", 300)
-                sethiddenproperty(lp, "MaximumSimulationRadius", 300)
-            end
-        end)
-    end
-end)
-
--- ==========================================
 -- HOOK ANTI BAN VỪA PHẢI (KHÔNG DỄ VĂNG)
 -- ==========================================
 
@@ -432,10 +340,10 @@ local Root = HumanoidRootPart
 -- ==========================================
 -- LOAD UI LIBRARY (HDanh Hub)
 -- ==========================================
-Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/daykits/Ui-banana.lua/refs/heads/main/ui%20BananaHub.lua.txt"))()
+Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/vthangsitinhk/Ui-banana.lua/refs/heads/main/ui%20BananaHub.lua.txt"))()
 
 Window = Library:CreateWindow({
-    Title = "datkits Hub",
+    Title = "Tày Hub",
     Desc = "- Blox Fruit",
     Image = "rbxassetid://73966916440074"
 })
@@ -12336,7 +12244,3 @@ Tabs.Misc:AddButton({
         end
     end
 })
-
--- ===============================================================
-loadstring(game:HttpGet("https://raw.githubusercontent.com/Teddyseetink/Haidepzai/refs/heads/main/notify"))()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/VTDROBLOX/Animehub/refs/heads/main/fix%20lag.lua"))()
