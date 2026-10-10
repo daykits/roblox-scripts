@@ -1,7 +1,7 @@
 -- ================================================================
--- ONYX KEY SYSTEM - SIMPLE MENU
+-- ONYX KEY SYSTEM — KHÔNG CÓ MENU DEMO
 -- Key hợp lệ: DATKITS-VIP
--- Khi nhập đúng key -> Menu hiện lên
+-- Nhập đúng key -> gọi hàm menu của bạn
 -- ================================================================
 
 local Players = game:GetService("Players")
@@ -10,77 +10,53 @@ local UserInputService = game:GetService("UserInputService")
 local Player = Players.LocalPlayer
 local Mouse = Player:GetMouse()
 
--- === KEY HỢP LỆ ===
 local VALID_KEY = "DATKITS-VIP"
 
--- === XOÁ GUI CŨ NẾU CÓ ===
-for _, name in ipairs({"OnyxKeySystem", "OnyxMainMenu"}) do
+-- Xoá GUI cũ
+for _, name in ipairs({"DATKITS HUB KeySystem", "DATKITSMainMenu", "DATKITS Hub V0.1"}) do
     local old = game.CoreGui:FindFirstChild(name)
     if old then old:Destroy() end
 end
 
--- ================================================================
--- UTILITIES
--- ================================================================
-local function Tween(obj, props, duration, style, direction)
+-- === UTILITIES ===
+local function Tween(obj, props, dur, style, dir)
     if not obj or not obj.Parent then return end
     local tw = TweenService:Create(obj, TweenInfo.new(
-        duration or 0.3,
-        style or Enum.EasingStyle.Quint,
-        direction or Enum.EasingDirection.Out
+        dur or 0.3, style or Enum.EasingStyle.Quint, dir or Enum.EasingDirection.Out
     ), props)
-    tw:Play()
-    return tw
+    tw:Play(); return tw
 end
-
-local function Corner(parent, r)
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, r or 8)
-    c.Parent = parent
-    return c
+local function Corner(p, r)
+    local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, r or 8); c.Parent = p; return c
 end
-
-local function Stroke(parent, color, thickness, transparency)
+local function Stroke(p, col, th, tr)
     local s = Instance.new("UIStroke")
-    s.Color = color or Color3.fromRGB(60, 60, 90)
-    s.Thickness = thickness or 1
-    s.Transparency = transparency or 0.5
-    s.Parent = parent
-    return s
+    s.Color = col or Color3.fromRGB(60, 60, 90)
+    s.Thickness = th or 1; s.Transparency = tr or 0.5
+    s.Parent = p; return s
 end
-
-local function Padding(parent, t, b, l, r)
-    local p = Instance.new("UIPadding")
-    p.PaddingTop = UDim.new(0, t or 8)
-    p.PaddingBottom = UDim.new(0, b or 8)
-    p.PaddingLeft = UDim.new(0, l or 8)
-    p.PaddingRight = UDim.new(0, r or 8)
-    p.Parent = parent
-    return p
+local function Padding(p, t, b, l, r)
+    local u = Instance.new("UIPadding")
+    u.PaddingTop = UDim.new(0, t or 8); u.PaddingBottom = UDim.new(0, b or 8)
+    u.PaddingLeft = UDim.new(0, l or 8); u.PaddingRight = UDim.new(0, r or 8)
+    u.Parent = p; return u
 end
-
-local function Gradient(parent, c1, c2, rot)
+local function Gradient(p, c1, c2, rot)
     local g = Instance.new("UIGradient")
-    g.Color = ColorSequence.new(c1, c2)
-    g.Rotation = rot or 90
-    g.Parent = parent
-    return g
+    g.Color = ColorSequence.new(c1, c2); g.Rotation = rot or 90
+    g.Parent = p; return g
 end
-
-local function Shadow(parent, size, trans)
+local function Shadow(p, size, tr)
     local s = Instance.new("ImageLabel")
-    s.Name = "Shadow"
-    s.BackgroundTransparency = 1
+    s.Name = "Shadow"; s.BackgroundTransparency = 1
     s.Image = "rbxassetid://7912134082"
     s.ImageColor3 = Color3.fromRGB(0, 0, 0)
-    s.ImageTransparency = trans or 0.5
+    s.ImageTransparency = tr or 0.5
     s.ScaleType = Enum.ScaleType.Slice
     s.SliceCenter = Rect.new(49, 49, 450, 450)
     s.Size = UDim2.new(1, size or 30, 1, size or 30)
     s.Position = UDim2.new(0, -(size or 30)/2, 0, -(size or 30)/2)
-    s.ZIndex = parent.ZIndex - 1
-    s.Parent = parent
-    return s
+    s.ZIndex = p.ZIndex - 1; s.Parent = p; return s
 end
 
 -- ================================================================
@@ -95,59 +71,46 @@ local function ShowKeySystem(onSuccess)
     gui.IgnoreGuiInset = true
     gui.Parent = game.CoreGui
 
-    -- Nền
     local bg = Instance.new("Frame")
     bg.Size = UDim2.new(1, 0, 1, 0)
     bg.BackgroundColor3 = Color3.fromRGB(6, 6, 14)
-    bg.BorderSizePixel = 0
-    bg.ZIndex = 1
-    bg.Parent = gui
+    bg.BorderSizePixel = 0; bg.ZIndex = 1; bg.Parent = gui
     Gradient(bg, Color3.fromRGB(8, 8, 22), Color3.fromRGB(20, 12, 40), 135)
 
-    -- Card
     local card = Instance.new("Frame")
     card.Size = UDim2.new(0, 0, 0, 0)
     card.Position = UDim2.new(0.5, 0, 0.5, 0)
     card.AnchorPoint = Vector2.new(0.5, 0.5)
     card.BackgroundColor3 = Color3.fromRGB(18, 18, 32)
-    card.ZIndex = 5
-    card.ClipsDescendants = true
+    card.ZIndex = 5; card.ClipsDescendants = true
     card.Parent = bg
     Corner(card, 16)
     Stroke(card, Color3.fromRGB(88, 101, 242), 2, 0.3)
     Shadow(card, 60, 0.35)
-
     Tween(card, {Size = UDim2.new(0, 400, 0, 320)}, 0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 
-    -- Thanh sáng trên
     local topLine = Instance.new("Frame")
     topLine.Size = UDim2.new(1, 0, 0, 3)
     topLine.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
-    topLine.BorderSizePixel = 0
-    topLine.ZIndex = 6
-    topLine.Parent = card
+    topLine.BorderSizePixel = 0; topLine.ZIndex = 6; topLine.Parent = card
     Corner(topLine, 16)
     Gradient(topLine, Color3.fromRGB(88, 101, 242), Color3.fromRGB(114, 127, 255), 0)
 
-    -- Tiêu đề
     local title = Instance.new("TextLabel")
     title.Size = UDim2.new(1, 0, 0, 40)
     title.Position = UDim2.new(0, 0, 0, 25)
     title.BackgroundTransparency = 1
     title.Text = "ONYX HUB"
     title.TextColor3 = Color3.fromRGB(245, 245, 255)
-    title.TextSize = 28
-    title.Font = Enum.Font.GothamBlack
-    title.ZIndex = 6
-    title.Parent = card
-
-    local titleGrad = Instance.new("UIGradient")
-    titleGrad.Color = ColorSequence.new({
+    title.TextSize = 28; title.Font = Enum.Font.GothamBlack
+    title.ZIndex = 6; title.Parent = card
+    local tg = Instance.new("UIGradient")
+    tg.Color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(114, 127, 255)),
         ColorSequenceKeypoint.new(0.5, Color3.fromRGB(245, 245, 255)),
         ColorSequenceKeypoint.new(1, Color3.fromRGB(88, 101, 242)),
     })
-    titleGrad.Parent = title
+    tg.Parent = title
 
     local subtitle = Instance.new("TextLabel")
     subtitle.Size = UDim2.new(1, 0, 0, 18)
@@ -155,18 +118,14 @@ local function ShowKeySystem(onSuccess)
     subtitle.BackgroundTransparency = 1
     subtitle.Text = "🔐 KEY VERIFICATION"
     subtitle.TextColor3 = Color3.fromRGB(88, 101, 242)
-    subtitle.TextSize = 11
-    subtitle.Font = Enum.Font.GothamBold
-    subtitle.ZIndex = 6
-    subtitle.Parent = card
+    subtitle.TextSize = 11; subtitle.Font = Enum.Font.GothamBold
+    subtitle.ZIndex = 6; subtitle.Parent = card
 
-    -- Ô nhập key
     local inputBox = Instance.new("Frame")
     inputBox.Size = UDim2.new(0.85, 0, 0, 42)
     inputBox.Position = UDim2.new(0.075, 0, 0, 105)
     inputBox.BackgroundColor3 = Color3.fromRGB(12, 12, 22)
-    inputBox.ZIndex = 6
-    inputBox.Parent = card
+    inputBox.ZIndex = 6; inputBox.Parent = card
     Corner(inputBox, 10)
     Stroke(inputBox, Color3.fromRGB(52, 52, 78), 1, 0.3)
 
@@ -178,11 +137,9 @@ local function ShowKeySystem(onSuccess)
     keyInput.PlaceholderText = "Nhập key tại đây..."
     keyInput.TextColor3 = Color3.fromRGB(245, 245, 255)
     keyInput.PlaceholderColor3 = Color3.fromRGB(88, 94, 108)
-    keyInput.TextSize = 13
-    keyInput.Font = Enum.Font.GothamBold
+    keyInput.TextSize = 13; keyInput.Font = Enum.Font.GothamBold
     keyInput.ClearTextOnFocus = false
-    keyInput.ZIndex = 7
-    keyInput.Parent = inputBox
+    keyInput.ZIndex = 7; keyInput.Parent = inputBox
     Padding(keyInput, 0, 0, 4, 4)
 
     keyInput.Focused:Connect(function()
@@ -196,27 +153,21 @@ local function ShowKeySystem(onSuccess)
         if s then Tween(s, {Color = Color3.fromRGB(52, 52, 78), Transparency = 0.3}, 0.2) end
     end)
 
-    -- Status
     local status = Instance.new("TextLabel")
     status.Size = UDim2.new(0.85, 0, 0, 20)
     status.Position = UDim2.new(0.075, 0, 0, 152)
     status.BackgroundTransparency = 1
     status.Text = ""
     status.TextColor3 = Color3.fromRGB(237, 66, 69)
-    status.TextSize = 11
-    status.Font = Enum.Font.GothamBold
-    status.ZIndex = 6
-    status.Parent = card
+    status.TextSize = 11; status.Font = Enum.Font.GothamBold
+    status.ZIndex = 6; status.Parent = card
 
-    -- Nút xác nhận
     local verifyBtn = Instance.new("TextButton")
     verifyBtn.Size = UDim2.new(0.85, 0, 0, 44)
     verifyBtn.Position = UDim2.new(0.075, 0, 0, 180)
     verifyBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
-    verifyBtn.Text = ""
-    verifyBtn.AutoButtonColor = false
-    verifyBtn.ZIndex = 6
-    verifyBtn.Parent = card
+    verifyBtn.Text = ""; verifyBtn.AutoButtonColor = false
+    verifyBtn.ZIndex = 6; verifyBtn.Parent = card
     Corner(verifyBtn, 10)
     Gradient(verifyBtn, Color3.fromRGB(88, 101, 242), Color3.fromRGB(114, 127, 255), 0)
 
@@ -225,10 +176,8 @@ local function ShowKeySystem(onSuccess)
     verifyText.BackgroundTransparency = 1
     verifyText.Text = "🔓 XÁC NHẬN KEY"
     verifyText.TextColor3 = Color3.fromRGB(245, 245, 255)
-    verifyText.TextSize = 14
-    verifyText.Font = Enum.Font.GothamBold
-    verifyText.ZIndex = 7
-    verifyText.Parent = verifyBtn
+    verifyText.TextSize = 14; verifyText.Font = Enum.Font.GothamBold
+    verifyText.ZIndex = 7; verifyText.Parent = verifyBtn
 
     verifyBtn.MouseEnter:Connect(function()
         Tween(verifyBtn, {Size = UDim2.new(0.87, 0, 0, 46), Position = UDim2.new(0.065, 0, 0, 179)}, 0.15, Enum.EasingStyle.Back)
@@ -237,40 +186,31 @@ local function ShowKeySystem(onSuccess)
         Tween(verifyBtn, {Size = UDim2.new(0.85, 0, 0, 44), Position = UDim2.new(0.075, 0, 0, 180)}, 0.15)
     end)
 
-    -- Ghi chú
     local hint = Instance.new("TextLabel")
     hint.Size = UDim2.new(0.85, 0, 0, 30)
     hint.Position = UDim2.new(0.075, 0, 0, 235)
     hint.BackgroundTransparency = 1
-    hint.Text = "💡 Key demo: DATKITS-VIP\nNhập đúng key để mở menu."
+    hint.Text = "💡 Key demo: DATKITS-VIP"
     hint.TextColor3 = Color3.fromRGB(120, 126, 145)
-    hint.TextSize = 10
-    hint.Font = Enum.Font.Gotham
+    hint.TextSize = 10; hint.Font = Enum.Font.Gotham
     hint.TextWrapped = true
     hint.TextXAlignment = Enum.TextXAlignment.Left
-    hint.ZIndex = 6
-    hint.Parent = card
+    hint.ZIndex = 6; hint.Parent = card
 
-    -- Credits
     local credits = Instance.new("TextLabel")
     credits.Size = UDim2.new(1, 0, 0, 16)
     credits.Position = UDim2.new(0, 0, 1, -22)
     credits.BackgroundTransparency = 1
     credits.Text = "OnyxHub © 2025"
     credits.TextColor3 = Color3.fromRGB(60, 60, 80)
-    credits.TextSize = 9
-    credits.Font = Enum.Font.Gotham
-    credits.ZIndex = 6
-    credits.Parent = card
+    credits.TextSize = 9; credits.Font = Enum.Font.Gotham
+    credits.ZIndex = 6; credits.Parent = card
 
-    -- === LOGIC XÁC NHẬN ===
     local function TryVerify()
         local input = keyInput.Text
-
         if input == "" then
             status.Text = "❌ Vui lòng nhập key!"
             status.TextColor3 = Color3.fromRGB(237, 66, 69)
-            -- Shake
             for _, off in ipairs({8, -8, 4, -4, 0}) do
                 Tween(inputBox, {Position = UDim2.new(0.075, off, 0, 105)}, 0.04)
                 task.wait(0.04)
@@ -283,16 +223,13 @@ local function ShowKeySystem(onSuccess)
             status.TextColor3 = Color3.fromRGB(87, 242, 135)
             verifyText.Text = "✅ THÀNH CÔNG"
             Tween(verifyBtn, {BackgroundColor3 = Color3.fromRGB(87, 242, 135)}, 0.3)
-
             task.wait(0.8)
 
-            -- Hiệu ứng flash rồi đóng
             local flash = Instance.new("Frame")
             flash.Size = UDim2.new(1, 0, 1, 0)
             flash.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
             flash.BackgroundTransparency = 1
-            flash.BorderSizePixel = 0
-            flash.ZIndex = 50
+            flash.BorderSizePixel = 0; flash.ZIndex = 50
             flash.Parent = bg
             Tween(flash, {BackgroundTransparency = 0.4}, 0.2)
             task.wait(0.2)
@@ -300,24 +237,20 @@ local function ShowKeySystem(onSuccess)
 
             Tween(card, {Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1}, 0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In)
             Tween(bg, {BackgroundTransparency = 1}, 0.5)
-
             task.wait(0.5)
             gui:Destroy()
 
-            -- Gọi callback mở menu
+            -- 🔥 GỌI MENU CỦA BẠN Ở ĐÂY
             if onSuccess then onSuccess() end
         else
             status.Text = "❌ Key không đúng! Thử lại."
             status.TextColor3 = Color3.fromRGB(237, 66, 69)
             verifyText.Text = "❌ SAI KEY"
             Tween(verifyBtn, {BackgroundColor3 = Color3.fromRGB(180, 40, 40)}, 0.3)
-
-            -- Shake
             for _, off in ipairs({10, -10, 6, -6, 3, -3, 0}) do
                 Tween(inputBox, {Position = UDim2.new(0.075, off, 0, 105)}, 0.04)
                 task.wait(0.04)
             end
-
             task.wait(1.2)
             verifyText.Text = "🔓 XÁC NHẬN KEY"
             Tween(verifyBtn, {BackgroundColor3 = Color3.fromRGB(88, 101, 242)}, 0.3)
@@ -330,3 +263,15 @@ local function ShowKeySystem(onSuccess)
         if enter then TryVerify() end
     end)
 end
+
+-- ================================================================
+-- 🚀 KHỞI CHẠY
+-- ================================================================
+ShowKeySystem(function()
+    -- 👇👇👇 DÁN MENU CỦA BẠN VÀO ĐÂY 👇👇👇
+    -- Ví dụ:
+    --   OpenMainMenu()
+    --   BuildMainGUI()
+    --   loadstring(game:HttpGet("link_menu_cua_ban"))()
+    print("✅ Key hợp lệ! Bắt đầu mở menu...")
+end)
