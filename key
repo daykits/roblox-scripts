@@ -268,10 +268,16 @@ end
 -- 🚀 KHỞI CHẠY
 -- ================================================================
 ShowKeySystem(function()
-    -- 👇👇👇 DÁN MENU CỦA BẠN VÀO ĐÂY 👇👇👇
-    -- Ví dụ:
-    --   OpenMainMenu()
-    --   BuildMainGUI()
-    --   loadstring(game:HttpGet("link_menu_cua_ban"))()
-    print("✅ Key hợp lệ! Bắt đầu mở menu...")
+    -- 👇 LOAD MENU CHÍNH CỦA BẠN TỪ RAW LINK
+    local MENU_URL = "https://pastefy.app/i42S1cU6/raw"-- 🔴 LINK MENU CHÍNH CỦA BẠN
+    
+    local ok, err = pcall(function()
+        loadstring(game:HttpGet(MENU_URL))()
+    end)
+    
+    if not ok then
+        warn("[DATKITS] Lỗi load menu: " .. tostring(err))
+    else
+        print("✅ Menu DATKITS đã load!")
+    end
 end)
