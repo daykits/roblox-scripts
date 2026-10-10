@@ -1,0 +1,629 @@
+-- ================================================
+-- ONYX HUB – KEY SYSTEM ONLY (đã lược bỏ phần không liên quan)
+-- ================================================
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local Player = Players.LocalPlayer
+local Mouse = Player:GetMouse()
+
+-- === DESTROY OLD KEY GUI ===
+if game.CoreGui:FindFirstChild("OnyxKeySystem") then
+    game.CoreGui.OnyxKeySystem:Destroy()
+end
+
+-- === KEY DATABASE ===
+local ValidKeys = {
+    Owner = {
+        "sm*A3(N7P<3n7h^MzAko%Q:S!c2*3*W=Q!YS:tFDx_)3#n%/2f",
+        "Bt>(={v3u4q$/.]Q/s(j97+]DDv_E^yz3!;pRMn?;5rC@Ts,$\\"
+    },
+    Player = {
+        "WNL5-yg6A-Xxwc-Jn23"
+    }
+}
+
+local DiscordLink = "https://discord.gg/2vfu98RMqg"
+local UserRole = nil
+local KeyVerified = false
+
+local function VerifyKey(inputKey)
+    for _, key in ipairs(ValidKeys.Owner) do
+        if inputKey == key then return "Owner" end
+    end
+    for _, key in ipairs(ValidKeys.Player) do
+        if inputKey == key then return "Player" end
+    end
+    return nil
+end
+
+local SavedKeyFile = "OnyxHub/SavedKey.txt"
+local function LoadSavedKey()
+    if not readfile or not isfile then return nil end
+    if isfile and isfile(SavedKeyFile) then
+        local s, key = pcall(function() return readfile(SavedKeyFile) end)
+        if s and key then
+            local role = VerifyKey(key)
+            if role then return key, role end
+        end
+    end
+    return nil, nil
+end
+
+local function SaveKey(key)
+    if not writefile then return end
+    if not isfolder then return end
+    if not isfolder("OnyxHub") then makefolder("OnyxHub") end
+    pcall(function() writefile(SavedKeyFile, key) end)
+end
+
+-- === UTILITIES ===
+local function Tween(obj, props, duration, style, direction)
+    if not obj or not obj.Parent then return end
+    local tween = TweenService:Create(obj, TweenInfo.new(
+        duration or 0.3,
+        style or Enum.EasingStyle.Quint,
+        direction or Enum.EasingDirection.Out
+    ), props)
+    tween:Play()
+    return tween
+end
+
+local function CreateCorner(parent, radius)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, radius or 8)
+    c.Parent = parent
+    return c
+end
+
+local function CreateStroke(parent, color, thickness, transparency)
+    local s = Instance.new("UIStroke")
+    s.Color = color or Color3.fromRGB(38, 38, 62)
+    s.Thickness = thickness or 1
+    s.Transparency = transparency or 0.5
+    s.Parent = parent
+    return s
+end
+
+local function CreatePadding(parent, top, bottom, left, right)
+    local p = Instance.new("UIPadding")
+    p.PaddingTop = UDim.new(0, top or 8)
+    p.PaddingBottom = UDim.new(0, bottom or 8)
+    p.PaddingLeft = UDim.new(0, left or 8)
+    p.PaddingRight = UDim.new(0, right or 8)
+    p.Parent = parent
+    return p
+end
+
+local function CreateGradient(parent, c1, c2, rotation)
+    local g = Instance.new("UIGradient")
+    g.Color = ColorSequence.new(c1, c2)
+    g.Rotation = rotation or 90
+    g.Parent = parent
+    return g
+end
+
+local function CreateShadow(parent, size, transparency)
+    local s = Instance.new("ImageLabel")
+    s.Name = "Shadow"
+    s.BackgroundTransparency = 1
+    s.Image = "rbxassetid://7912134082"
+    s.ImageColor3 = Color3.fromRGB(0, 0, 0)
+    s.ImageTransparency = transparency or 0.6
+    s.ScaleType = Enum.ScaleType.Slice
+    s.SliceCenter = Rect.new(49, 49, 450, 450)
+    s.Size = UDim2.new(1, size or 30, 1, size or 30)
+    s.Position = UDim2.new(0, -(size or 30)/2, 0, -(size or 30)/2)
+    s.ZIndex = parent.ZIndex - 1
+    s.Parent = parent
+    return s
+end
+
+local function RippleEffect(button, x, y)
+    local ripple = Instance.new("Frame")
+    ripple.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    ripple.BackgroundTransparency = 0.8
+    ripple.BorderSizePixel = 0
+    ripple.ZIndex = button.ZIndex + 5
+    ripple.AnchorPoint = Vector2.new(0.5, 0.5)
+    local absPos = button.AbsolutePosition
+    ripple.Position = UDim2.new(0, x - absPos.X, 0, y - absPos.Y)
+    ripple.Size = UDim2.new(0, 0, 0, 0)
+    ripple.Parent = button
+    CreateCorner(ripple, 100)
+    local maxSize = math.max(button.AbsoluteSize.X, button.AbsoluteSize.Y) * 2.5
+    Tween(ripple, {Size = UDim2.new(0, maxSize, 0, maxSize), BackgroundTransparency = 1}, 0.6)
+    task.delay(0.6, function() if ripple then ripple:Destroy() end end)
+end
+
+-- ================================================================
+-- === KEY SYSTEM GUI ===
+-- ================================================================
+local function ShowKeySystem(callback)
+    local savedKey, savedRole = LoadSavedKey()
+    if savedKey and savedRole then
+        UserRole = savedRole; KeyVerified = true; callback(); return
+    end
+
+    local KeyGui = Instance.new("ScreenGui")
+    KeyGui.Name = "OnyxKeySystem"
+    KeyGui.ResetOnSpawn = false
+    KeyGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    KeyGui.DisplayOrder = 1000
+    KeyGui.IgnoreGuiInset = true
+    KeyGui.Parent = game.CoreGui
+
+    local keyBg = Instance.new("Frame")
+    keyBg.Size = UDim2.new(1, 0, 1, 0)
+    keyBg.BackgroundColor3 = Color3.fromRGB(6, 6, 14)
+    keyBg.ZIndex = 200
+    keyBg.Parent = KeyGui
+    CreateGradient(keyBg, Color3.fromRGB(6, 6, 20), Color3.fromRGB(15, 10, 35), 135)
+
+    -- Particles
+    local particleHolder = Instance.new("Frame")
+    particleHolder.Size = UDim2.new(1, 0, 1, 0)
+    particleHolder.BackgroundTransparency = 1
+    particleHolder.ZIndex = 201
+    particleHolder.ClipsDescendants = true
+    particleHolder.Parent = keyBg
+
+    for i = 1, 25 do
+        local p = Instance.new("Frame")
+        local s = math.random(2, 5)
+        p.Size = UDim2.new(0, s, 0, s)
+        p.Position = UDim2.new(math.random() * 1.2 - 0.1, 0, math.random() * 1.2 - 0.1, 0)
+        p.BackgroundColor3 = i % 2 == 0 and Color3.fromRGB(88, 101, 242) or Color3.fromRGB(114, 127, 255)
+        p.BackgroundTransparency = math.random(50, 85) / 100
+        p.ZIndex = 201; p.BorderSizePixel = 0; p.Parent = particleHolder
+        CreateCorner(p, 100)
+        spawn(function()
+            while p and p.Parent do
+                Tween(p, {Position = UDim2.new(math.random()*1.2-0.1,0,math.random()*1.2-0.1,0), BackgroundTransparency = math.random(40,90)/100}, math.random(40,80)/10, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+                wait(math.random(40,80)/10)
+            end
+        end)
+    end
+
+    -- Key Card
+    local keyCard = Instance.new("Frame")
+    keyCard.Size = UDim2.new(0, 0, 0, 0)
+    keyCard.Position = UDim2.new(0.5, 0, 0.5, 0)
+    keyCard.AnchorPoint = Vector2.new(0.5, 0.5)
+    keyCard.BackgroundColor3 = Color3.fromRGB(18, 18, 32)
+    keyCard.ZIndex = 210; keyCard.ClipsDescendants = true
+    keyCard.Parent = keyBg
+    CreateCorner(keyCard, 16)
+    CreateStroke(keyCard, Color3.fromRGB(88, 101, 242), 2, 0.3)
+    CreateShadow(keyCard, 60, 0.35)
+
+    Tween(keyCard, {Size = UDim2.new(0, 420, 0, 530)}, 0.7, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+    wait(0.4)
+
+    -- Top glow
+    local topLine = Instance.new("Frame")
+    topLine.Size = UDim2.new(1, 0, 0, 3)
+    topLine.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+    topLine.ZIndex = 215; topLine.Parent = keyCard
+    CreateCorner(topLine, 16)
+    CreateGradient(topLine, Color3.fromRGB(88, 101, 242), Color3.fromRGB(114, 127, 255), 0)
+
+    -- Lock diamond
+    local lockContainer = Instance.new("Frame")
+    lockContainer.Size = UDim2.new(0, 60, 0, 60)
+    lockContainer.Position = UDim2.new(0.5, -30, 0, 25)
+    lockContainer.BackgroundTransparency = 1
+    lockContainer.ZIndex = 215; lockContainer.Rotation = 45
+    lockContainer.Parent = keyCard
+
+    local lockDiamond = Instance.new("Frame")
+    lockDiamond.Size = UDim2.new(0, 0, 0, 0)
+    lockDiamond.Position = UDim2.new(0.5, 0, 0.5, 0)
+    lockDiamond.AnchorPoint = Vector2.new(0.5, 0.5)
+    lockDiamond.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+    lockDiamond.BackgroundTransparency = 0.1
+    lockDiamond.ZIndex = 216; lockDiamond.Parent = lockContainer
+    CreateCorner(lockDiamond, 10)
+    CreateStroke(lockDiamond, Color3.fromRGB(114, 127, 255), 2, 0.2)
+
+    Tween(lockDiamond, {Size = UDim2.new(1, 0, 1, 0)}, 0.5, Enum.EasingStyle.Back)
+
+    local lockIcon = Instance.new("TextLabel")
+    lockIcon.Size = UDim2.new(1, 0, 1, 0)
+    lockIcon.BackgroundTransparency = 1; lockIcon.Text = "🔒"
+    lockIcon.TextSize = 24; lockIcon.Rotation = -45
+    lockIcon.ZIndex = 217; lockIcon.Parent = lockDiamond
+
+    spawn(function()
+        while lockContainer and lockContainer.Parent do
+            Tween(lockContainer, {Rotation = lockContainer.Rotation + 360}, 8, Enum.EasingStyle.Linear)
+            wait(8)
+        end
+    end)
+
+    -- Title
+    local keyTitle = Instance.new("TextLabel")
+    keyTitle.Size = UDim2.new(1, 0, 0, 40)
+    keyTitle.Position = UDim2.new(0, 0, 0, 95)
+    keyTitle.BackgroundTransparency = 1; keyTitle.Text = "ONYX HUB"
+    keyTitle.TextColor3 = Color3.fromRGB(245, 245, 255)
+    keyTitle.TextSize = 32; keyTitle.Font = Enum.Font.GothamBlack
+    keyTitle.ZIndex = 215; keyTitle.TextTransparency = 1
+    keyTitle.Parent = keyCard
+
+    local keyTitleGrad = Instance.new("UIGradient")
+    keyTitleGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(114, 127, 255)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(245, 245, 255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(88, 101, 242)),
+    })
+    keyTitleGrad.Parent = keyTitle
+
+    Tween(keyTitle, {TextTransparency = 0}, 0.5)
+
+    local keySubtitle = Instance.new("TextLabel")
+    keySubtitle.Size = UDim2.new(1, 0, 0, 20)
+    keySubtitle.Position = UDim2.new(0, 0, 0, 133)
+    keySubtitle.BackgroundTransparency = 1
+    keySubtitle.Text = "🔐 KEY VERIFICATION SYSTEM"
+    keySubtitle.TextColor3 = Color3.fromRGB(88, 101, 242)
+    keySubtitle.TextSize = 12; keySubtitle.Font = Enum.Font.GothamBold
+    keySubtitle.ZIndex = 215; keySubtitle.TextTransparency = 1
+    keySubtitle.Parent = keyCard
+    Tween(keySubtitle, {TextTransparency = 0}, 0.5)
+
+    local keyDesc = Instance.new("TextLabel")
+    keyDesc.Size = UDim2.new(0.85, 0, 0, 30)
+    keyDesc.Position = UDim2.new(0.075, 0, 0, 158)
+    keyDesc.BackgroundTransparency = 1
+    keyDesc.Text = "Wpisz klucz dostępu lub pobierz go z naszego Discorda."
+    keyDesc.TextColor3 = Color3.fromRGB(148, 155, 170)
+    keyDesc.TextSize = 10; keyDesc.Font = Enum.Font.Gotham
+    keyDesc.TextWrapped = true; keyDesc.ZIndex = 215; keyDesc.TextTransparency = 1
+    keyDesc.Parent = keyCard
+    Tween(keyDesc, {TextTransparency = 0}, 0.5)
+
+    -- Input field
+    local inputContainer = Instance.new("Frame")
+    inputContainer.Size = UDim2.new(0.85, 0, 0, 44)
+    inputContainer.Position = UDim2.new(0.075, 0, 0, 198)
+    inputContainer.BackgroundColor3 = Color3.fromRGB(12, 12, 20)
+    inputContainer.ZIndex = 215; inputContainer.Parent = keyCard
+    CreateCorner(inputContainer, 10)
+    CreateStroke(inputContainer, Color3.fromRGB(52, 52, 78), 1, 0.3)
+
+    local inputIcon = Instance.new("TextLabel")
+    inputIcon.Size = UDim2.new(0, 35, 1, 0)
+    inputIcon.Position = UDim2.new(0, 5, 0, 0)
+    inputIcon.BackgroundTransparency = 1; inputIcon.Text = "🔑"
+    inputIcon.TextSize = 16; inputIcon.ZIndex = 216
+    inputIcon.Parent = inputContainer
+
+    local keyInput = Instance.new("TextBox")
+    keyInput.Size = UDim2.new(1, -50, 1, 0)
+    keyInput.Position = UDim2.new(0, 40, 0, 0)
+    keyInput.BackgroundTransparency = 1; keyInput.Text = ""
+    keyInput.PlaceholderText = "Wpisz klucz dostępu..."
+    keyInput.TextColor3 = Color3.fromRGB(245, 245, 255)
+    keyInput.PlaceholderColor3 = Color3.fromRGB(88, 94, 108)
+    keyInput.TextSize = 11; keyInput.Font = Enum.Font.GothamBold
+    keyInput.ClearTextOnFocus = false; keyInput.ZIndex = 216
+    keyInput.Parent = inputContainer
+    CreatePadding(keyInput, 0, 0, 4, 8)
+
+    keyInput.Focused:Connect(function()
+        Tween(inputContainer, {BackgroundColor3 = Color3.fromRGB(18, 18, 35)}, 0.2)
+        local stroke = inputContainer:FindFirstChildOfClass("UIStroke")
+        if stroke then Tween(stroke, {Color = Color3.fromRGB(88, 101, 242), Transparency = 0}, 0.2) end
+    end)
+    keyInput.FocusLost:Connect(function()
+        Tween(inputContainer, {BackgroundColor3 = Color3.fromRGB(12, 12, 20)}, 0.2)
+        local stroke = inputContainer:FindFirstChildOfClass("UIStroke")
+        if stroke then Tween(stroke, {Color = Color3.fromRGB(52, 52, 78), Transparency = 0.3}, 0.2) end
+    end)
+
+    -- Status label
+    local statusLabel = Instance.new("TextLabel")
+    statusLabel.Size = UDim2.new(0.85, 0, 0, 20)
+    statusLabel.Position = UDim2.new(0.075, 0, 0, 248)
+    statusLabel.BackgroundTransparency = 1; statusLabel.Text = ""
+    statusLabel.TextColor3 = Color3.fromRGB(237, 66, 69)
+    statusLabel.TextSize = 10; statusLabel.Font = Enum.Font.GothamBold
+    statusLabel.ZIndex = 215; statusLabel.Parent = keyCard
+
+    -- === VERIFY BUTTON ===
+    local verifyBtn = Instance.new("TextButton")
+    verifyBtn.Size = UDim2.new(0.85, 0, 0, 42)
+    verifyBtn.Position = UDim2.new(0.075, 0, 0, 273)
+    verifyBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+    verifyBtn.Text = ""; verifyBtn.ZIndex = 215
+    verifyBtn.ClipsDescendants = true; verifyBtn.Parent = keyCard
+    CreateCorner(verifyBtn, 10)
+    CreateGradient(verifyBtn, Color3.fromRGB(88, 101, 242), Color3.fromRGB(114, 127, 255), 0)
+
+    local verifyText = Instance.new("TextLabel")
+    verifyText.Size = UDim2.new(1, 0, 1, 0)
+    verifyText.BackgroundTransparency = 1
+    verifyText.Text = "🔓 WERYFIKUJ KLUCZ"
+    verifyText.TextColor3 = Color3.fromRGB(245, 245, 255)
+    verifyText.TextSize = 14; verifyText.Font = Enum.Font.GothamBold
+    verifyText.ZIndex = 216; verifyText.Parent = verifyBtn
+
+    local btnGlow = Instance.new("Frame")
+    btnGlow.Size = UDim2.new(1, 6, 1, 6)
+    btnGlow.Position = UDim2.new(0, -3, 0, -3)
+    btnGlow.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+    btnGlow.BackgroundTransparency = 0.8; btnGlow.ZIndex = 214
+    btnGlow.Parent = verifyBtn
+    CreateCorner(btnGlow, 12)
+
+    spawn(function()
+        while btnGlow and btnGlow.Parent do
+            Tween(btnGlow, {BackgroundTransparency = 0.6}, 1.5, Enum.EasingStyle.Sine)
+            wait(1.5)
+            Tween(btnGlow, {BackgroundTransparency = 0.85}, 1.5, Enum.EasingStyle.Sine)
+            wait(1.5)
+        end
+    end)
+
+    verifyBtn.MouseEnter:Connect(function()
+        Tween(verifyBtn, {Size = UDim2.new(0.87, 0, 0, 44), Position = UDim2.new(0.065, 0, 0, 272)}, 0.15, Enum.EasingStyle.Back)
+    end)
+    verifyBtn.MouseLeave:Connect(function()
+        Tween(verifyBtn, {Size = UDim2.new(0.85, 0, 0, 42), Position = UDim2.new(0.075, 0, 0, 273)}, 0.15)
+    end)
+
+    -- === GET KEY BUTTON ===
+    local getKeyBtn = Instance.new("TextButton")
+    getKeyBtn.Size = UDim2.new(0.85, 0, 0, 38)
+    getKeyBtn.Position = UDim2.new(0.075, 0, 0, 322)
+    getKeyBtn.BackgroundColor3 = Color3.fromRGB(87, 242, 135)
+    getKeyBtn.Text = ""; getKeyBtn.ZIndex = 215
+    getKeyBtn.ClipsDescendants = true; getKeyBtn.Parent = keyCard
+    CreateCorner(getKeyBtn, 10)
+    CreateGradient(getKeyBtn, Color3.fromRGB(87, 242, 135), Color3.fromRGB(50, 200, 100), 0)
+
+    local getKeyText = Instance.new("TextLabel")
+    getKeyText.Size = UDim2.new(1, 0, 1, 0)
+    getKeyText.BackgroundTransparency = 1
+    getKeyText.Text = "🔗 GET KEY (Kopiuj link Discord)"
+    getKeyText.TextColor3 = Color3.fromRGB(0, 40, 20)
+    getKeyText.TextSize = 13; getKeyText.Font = Enum.Font.GothamBold
+    getKeyText.ZIndex = 216; getKeyText.Parent = getKeyBtn
+
+    getKeyBtn.MouseEnter:Connect(function()
+        Tween(getKeyBtn, {Size = UDim2.new(0.87, 0, 0, 40), Position = UDim2.new(0.065, 0, 0, 321)}, 0.15, Enum.EasingStyle.Back)
+    end)
+    getKeyBtn.MouseLeave:Connect(function()
+        Tween(getKeyBtn, {Size = UDim2.new(0.85, 0, 0, 38), Position = UDim2.new(0.075, 0, 0, 322)}, 0.15)
+    end)
+
+    getKeyBtn.MouseButton1Click:Connect(function()
+        RippleEffect(getKeyBtn, Mouse.X, Mouse.Y)
+        if setclipboard then
+            setclipboard(DiscordLink)
+            getKeyText.Text = "✅ Skopiowano link do schowka!"
+            statusLabel.Text = "📋 Link skopiowany: " .. DiscordLink
+            statusLabel.TextColor3 = Color3.fromRGB(87, 242, 135)
+            wait(2)
+            getKeyText.Text = "🔗 GET KEY (Kopiuj link Discord)"
+        elseif pcall(function() toclipboard(DiscordLink) end) then
+            getKeyText.Text = "✅ Skopiowano link do schowka!"
+            statusLabel.Text = "📋 Link skopiowany: " .. DiscordLink
+            statusLabel.TextColor3 = Color3.fromRGB(87, 242, 135)
+            wait(2)
+            getKeyText.Text = "🔗 GET KEY (Kopiuj link Discord)"
+        else
+            statusLabel.Text = "📋 Discord: " .. DiscordLink
+            statusLabel.TextColor3 = Color3.fromRGB(254, 231, 92)
+        end
+    end)
+
+    -- Remember key checkbox
+    local rememberFrame = Instance.new("Frame")
+    rememberFrame.Size = UDim2.new(0.85, 0, 0, 28)
+    rememberFrame.Position = UDim2.new(0.075, 0, 0, 368)
+    rememberFrame.BackgroundTransparency = 1; rememberFrame.ZIndex = 215
+    rememberFrame.Parent = keyCard
+
+    local rememberCheck = Instance.new("Frame")
+    rememberCheck.Size = UDim2.new(0, 18, 0, 18)
+    rememberCheck.Position = UDim2.new(0, 0, 0.5, -9)
+    rememberCheck.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+    rememberCheck.ZIndex = 216; rememberCheck.Parent = rememberFrame
+    CreateCorner(rememberCheck, 4)
+    CreateStroke(rememberCheck, Color3.fromRGB(88, 101, 242), 1, 0.5)
+
+    local checkMark = Instance.new("TextLabel")
+    checkMark.Size = UDim2.new(1, 0, 1, 0)
+    checkMark.BackgroundTransparency = 1; checkMark.Text = "✓"
+    checkMark.TextColor3 = Color3.fromRGB(245, 245, 255)
+    checkMark.TextSize = 12; checkMark.Font = Enum.Font.GothamBold
+    checkMark.ZIndex = 217; checkMark.Parent = rememberCheck
+
+    local rememberLabel = Instance.new("TextLabel")
+    rememberLabel.Size = UDim2.new(1, -28, 1, 0)
+    rememberLabel.Position = UDim2.new(0, 25, 0, 0)
+    rememberLabel.BackgroundTransparency = 1; rememberLabel.Text = "Zapamiętaj klucz"
+    rememberLabel.TextColor3 = Color3.fromRGB(148, 155, 170)
+    rememberLabel.TextSize = 10; rememberLabel.Font = Enum.Font.Gotham
+    rememberLabel.TextXAlignment = Enum.TextXAlignment.Left
+    rememberLabel.ZIndex = 216; rememberLabel.Parent = rememberFrame
+
+    local rememberState = true
+
+    local rememberBtn = Instance.new("TextButton")
+    rememberBtn.Size = UDim2.new(1, 0, 1, 0)
+    rememberBtn.BackgroundTransparency = 1; rememberBtn.Text = ""
+    rememberBtn.ZIndex = 218; rememberBtn.Parent = rememberFrame
+    rememberBtn.MouseButton1Click:Connect(function()
+        rememberState = not rememberState
+        checkMark.Text = rememberState and "✓" or ""
+        Tween(rememberCheck, {BackgroundColor3 = rememberState and Color3.fromRGB(88, 101, 242) or Color3.fromRGB(48, 48, 68)}, 0.2)
+    end)
+
+    -- Attempts
+    local attempts = 0
+    local maxAttempts = 5
+    local cooldown = false
+
+    local attemptsLabel = Instance.new("TextLabel")
+    attemptsLabel.Size = UDim2.new(0.85, 0, 0, 15)
+    attemptsLabel.Position = UDim2.new(0.075, 0, 0, 400)
+    attemptsLabel.BackgroundTransparency = 1
+    attemptsLabel.Text = "Próby: 0/" .. maxAttempts
+    attemptsLabel.TextColor3 = Color3.fromRGB(88, 94, 108)
+    attemptsLabel.TextSize = 9; attemptsLabel.Font = Enum.Font.Gotham
+    attemptsLabel.ZIndex = 215; attemptsLabel.Parent = keyCard
+
+    -- Info
+    local infoFrame = Instance.new("Frame")
+    infoFrame.Size = UDim2.new(0.85, 0, 0, 50)
+    infoFrame.Position = UDim2.new(0.075, 0, 0, 420)
+    infoFrame.BackgroundColor3 = Color3.fromRGB(24, 24, 42)
+    infoFrame.BackgroundTransparency = 0.3; infoFrame.ZIndex = 215
+    infoFrame.Parent = keyCard
+    CreateCorner(infoFrame, 8)
+
+    local infoText = Instance.new("TextLabel")
+    infoText.Size = UDim2.new(1, -16, 1, 0)
+    infoText.Position = UDim2.new(0, 8, 0, 0)
+    infoText.BackgroundTransparency = 1
+    infoText.Text = "🔐 Klucze Owner: pełne uprawnienia + RGB\n🔑 Klucz Player: standardowy dostęp\n🔗 Dołącz na Discord po klucz!"
+    infoText.TextColor3 = Color3.fromRGB(88, 94, 108)
+    infoText.TextSize = 9; infoText.Font = Enum.Font.Gotham
+    infoText.TextWrapped = true; infoText.TextXAlignment = Enum.TextXAlignment.Left
+    infoText.ZIndex = 216; infoText.Parent = infoFrame
+
+    -- Discord link at bottom
+    local dcLabel = Instance.new("TextLabel")
+    dcLabel.Size = UDim2.new(1, 0, 0, 18)
+    dcLabel.Position = UDim2.new(0, 0, 1, -40)
+    dcLabel.BackgroundTransparency = 1
+    dcLabel.Text = "🔗 Discord: " .. DiscordLink
+    dcLabel.TextColor3 = Color3.fromRGB(88, 101, 242)
+    dcLabel.TextSize = 10; dcLabel.Font = Enum.Font.GothamBold
+    dcLabel.ZIndex = 215; dcLabel.Parent = keyCard
+
+    local credits = Instance.new("TextLabel")
+    credits.Size = UDim2.new(1, 0, 0, 15)
+    credits.Position = UDim2.new(0, 0, 1, -20)
+    credits.BackgroundTransparency = 1
+    credits.Text = "OnyxHub © 2025 • Ventreeexx & KitsuneeO"
+    credits.TextColor3 = Color3.fromRGB(48, 48, 68)
+    credits.TextSize = 8; credits.Font = Enum.Font.Gotham
+    credits.ZIndex = 215; credits.Parent = keyCard
+
+    -- === VERIFY LOGIC ===
+    local function DoVerify()
+        if cooldown then
+            statusLabel.Text = "⏳ Poczekaj przed kolejną próbą..."
+            statusLabel.TextColor3 = Color3.fromRGB(254, 231, 92)
+            return
+        end
+
+        local inputKey = keyInput.Text
+        if inputKey == "" then
+            statusLabel.Text = "❌ Wpisz klucz!"
+            Tween(statusLabel, {TextColor3 = Color3.fromRGB(237, 66, 69)}, 0.2)
+            for _, offset in ipairs({8, -8, 4, -4, 0}) do
+                Tween(inputContainer, {Position = UDim2.new(0.075, offset, 0, 198)}, 0.04)
+                wait(0.04)
+            end
+            return
+        end
+
+        local role = VerifyKey(inputKey)
+        if role then
+            UserRole = role; KeyVerified = true
+            if rememberState then SaveKey(inputKey) end
+
+            statusLabel.Text = "✅ Klucz prawidłowy! Rola: " .. role:upper()
+            statusLabel.TextColor3 = Color3.fromRGB(87, 242, 135)
+            Tween(inputContainer, {BackgroundColor3 = Color3.fromRGB(20, 60, 30)}, 0.3)
+            lockIcon.Text = "🔓"
+            Tween(lockDiamond, {BackgroundColor3 = Color3.fromRGB(87, 242, 135)}, 0.3)
+            verifyText.Text = "✅ ZWERYFIKOWANO • " .. role:upper()
+            Tween(verifyBtn, {BackgroundColor3 = Color3.fromRGB(87, 242, 135)}, 0.3)
+
+            wait(1.2)
+
+            local flash = Instance.new("Frame")
+            flash.Size = UDim2.new(1, 0, 1, 0)
+            flash.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+            flash.BackgroundTransparency = 1; flash.ZIndex = 250
+            flash.Parent = keyBg
+            Tween(flash, {BackgroundTransparency = 0.5}, 0.2)
+            wait(0.2)
+            Tween(flash, {BackgroundTransparency = 1}, 0.3)
+            Tween(keyCard, {Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1}, 0.5, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+            Tween(keyBg, {BackgroundTransparency = 1}, 0.6)
+
+            for _, child in pairs(particleHolder:GetChildren()) do
+                if child:IsA("Frame") then Tween(child, {BackgroundTransparency = 1}, 0.4) end
+            end
+
+            wait(0.7)
+            KeyGui:Destroy()
+            callback()
+        else
+            attempts = attempts + 1
+            attemptsLabel.Text = "Próby: " .. attempts .. "/" .. maxAttempts
+
+            if attempts >= maxAttempts then
+                statusLabel.Text = "🚫 Zbyt wiele prób! Zablokowano na 30s"
+                statusLabel.TextColor3 = Color3.fromRGB(237, 66, 69)
+                cooldown = true; verifyBtn.Active = false
+                verifyText.Text = "🔒 ZABLOKOWANE"
+                Tween(verifyBtn, {BackgroundColor3 = Color3.fromRGB(60, 20, 20)}, 0.3)
+
+                spawn(function()
+                    for i = 30, 0, -1 do
+                        if not keyCard or not keyCard.Parent then return end
+                        statusLabel.Text = "🚫 Zablokowano! Odczekaj: " .. i .. "s"
+                        wait(1)
+                    end
+                    cooldown = false; attempts = 0
+                    attemptsLabel.Text = "Próby: 0/" .. maxAttempts
+                    statusLabel.Text = "Spróbuj ponownie"
+                    statusLabel.TextColor3 = Color3.fromRGB(148, 155, 170)
+                    verifyBtn.Active = true
+                    verifyText.Text = "🔓 WERYFIKUJ KLUCZ"
+                    Tween(verifyBtn, {BackgroundColor3 = Color3.fromRGB(88, 101, 242)}, 0.3)
+                end)
+            else
+                statusLabel.Text = "❌ Nieprawidłowy klucz! (" .. (maxAttempts - attempts) .. " prób)"
+                statusLabel.TextColor3 = Color3.fromRGB(237, 66, 69)
+                for _, offset in ipairs({10, -10, 6, -6, 3, -3, 0}) do
+                    Tween(inputContainer, {Position = UDim2.new(0.075, offset, 0, 198)}, 0.04)
+                    wait(0.04)
+                end
+                local iStroke = inputContainer:FindFirstChildOfClass("UIStroke")
+                if iStroke then
+                    Tween(iStroke, {Color = Color3.fromRGB(237, 66, 69), Transparency = 0}, 0.1)
+                    wait(0.5)
+                    Tween(iStroke, {Color = Color3.fromRGB(52, 52, 78), Transparency = 0.3}, 0.3)
+                end
+                cooldown = true; wait(1.5); cooldown = false
+            end
+        end
+    end
+
+    verifyBtn.MouseButton1Click:Connect(function()
+        RippleEffect(verifyBtn, Mouse.X, Mouse.Y)
+        DoVerify()
+    end)
+
+    keyInput.FocusLost:Connect(function(enterPressed)
+        if enterPressed then DoVerify() end
+    end)
+end
+
+-- ================================================================
+-- === START ===
+-- ================================================================
+ShowKeySystem(function()
+    print("✅ Key hợp lệ! Role: " .. (UserRole or "Player"))
+    -- Ở đây bạn có thể gọi BuildMainGUI() nếu muốn, nhưng script này đã xoá GUI chính.
+end)
