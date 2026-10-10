@@ -268,12 +268,45 @@ end
 -- 🚀 KHỞI CHẠY
 -- ================================================================
 ShowKeySystem(function()
-    -- 👇 LOAD MENU CHÍNH CỦA BẠN TỪ RAW LINK
+    -- 👇 LOAD MENU CHÍNH TỪ RAW LINK
+    local MENU_URL = "ShowKeySystem(function()
     local MENU_URL = "https://raw.githubusercontent.com/daykits/roblox-scripts/refs/heads/main/Datkits%20BF%20V1"
+
     local ok, err = pcall(function()
-        loadstring(game:HttpGet(cc))()
+        local src = game:HttpGet(MENU_URL)
+        -- Nếu GitHub trả 404 thì nội dung sẽ chứa "404: Not Found"
+        if typeof(src) == "string" and src:find("404: Not Found") then
+            error("Link raw trả về 404 — kiểm tra lại URL: " .. MENU_URL)
+        end
+        loadstring(src)()
     end)
-    
+
+    if not ok then
+        warn("[DATKITS] Lỗi load menu: " .. tostring(err))
+        -- Thông báo cho người dùng biết
+        local Players = game:GetService("Players")
+        local plr = Players.LocalPlayer
+        if plr then
+            local gui = Instance.new("ScreenGui")
+            gui.Parent = plr:WaitForChild("PlayerGui")
+            local lbl = Instance.new("TextLabel")
+            lbl.Size = UDim2.new(0, 400, 0, 80)
+            lbl.Position = UDim2.new(0.5, -200, 0, 20)
+            lbl.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+            lbl.TextColor3 = Color3.fromRGB(255, 80, 80)
+            lbl.TextSize = 14
+            lbl.Font = Enum.Font.GothamBold
+            lbl.Text = "❌ Không load được menu!\n" .. tostring(err)
+            lbl.TextWrapped = true
+            lbl.Parent = gui
+            task.delay(6, function() gui:Destroy() end)
+        end
+    end
+end)"
+    local ok, err = pcall(function()
+        loadstring(game:HttpGet(MENU_URL))()
+    end)
+
     if not ok then
         warn("[DATKITS] Lỗi load menu: " .. tostring(err))
     else
