@@ -1,5 +1,5 @@
 -- ================================================
--- ONYX HUB – KEY SYSTEM ONLY (đã lược bỏ phần không liên quan)
+-- ONYX HUB - KEY SYSTEM (FIXED - LUÔN HIỆN UI)
 -- ================================================
 
 local Players = game:GetService("Players")
@@ -8,10 +8,12 @@ local UserInputService = game:GetService("UserInputService")
 local Player = Players.LocalPlayer
 local Mouse = Player:GetMouse()
 
--- === DESTROY OLD KEY GUI ===
-if game.CoreGui:FindFirstChild("OnyxKeySystem") then
-    game.CoreGui.OnyxKeySystem:Destroy()
-end
+-- === XOÁ KEY GUI CŨ NẾU CÓ ===
+pcall(function()
+    if game.CoreGui:FindFirstChild("OnyxKeySystem") then
+        game.CoreGui.OnyxKeySystem:Destroy()
+    end
+end)
 
 -- === KEY DATABASE ===
 local ValidKeys = {
@@ -38,24 +40,27 @@ local function VerifyKey(inputKey)
     return nil
 end
 
+-- === LƯU KEY (nếu executor hỗ trợ) ===
 local SavedKeyFile = "OnyxHub/SavedKey.txt"
 local function LoadSavedKey()
     if not readfile or not isfile then return nil end
-    if isfile and isfile(SavedKeyFile) then
-        local s, key = pcall(function() return readfile(SavedKeyFile) end)
-        if s and key then
-            local role = VerifyKey(key)
-            if role then return key, role end
-        end
+    local ok, key = pcall(function()
+        if isfile(SavedKeyFile) then return readfile(SavedKeyFile) end
+        return nil
+    end)
+    if ok and key then
+        local role = VerifyKey(key)
+        if role then return key, role end
     end
     return nil, nil
 end
 
 local function SaveKey(key)
-    if not writefile then return end
-    if not isfolder then return end
-    if not isfolder("OnyxHub") then makefolder("OnyxHub") end
-    pcall(function() writefile(SavedKeyFile, key) end)
+    if not writefile or not isfolder then return end
+    pcall(function()
+        if not isfolder("OnyxHub") then makefolder("OnyxHub") end
+        writefile(SavedKeyFile, key)
+    end)
 end
 
 -- === UTILITIES ===
@@ -141,10 +146,13 @@ end
 -- === KEY SYSTEM GUI ===
 -- ================================================================
 local function ShowKeySystem(callback)
-    local savedKey, savedRole = LoadSavedKey()
-    if savedKey and savedRole then
-        UserRole = savedRole; KeyVerified = true; callback(); return
-    end
+
+    -- ❌ KHÔNG tự động skip nữa, luôn hiện UI
+    -- (nếu muốn auto load key cũ, bỏ comment 4 dòng dưới)
+    -- local savedKey, savedRole = LoadSavedKey()
+    -- if savedKey and savedRole then
+    --     UserRole = savedRole; KeyVerified = true; callback(); return
+    -- end
 
     local KeyGui = Instance.new("ScreenGui")
     KeyGui.Name = "OnyxKeySystem"
@@ -401,19 +409,23 @@ local function ShowKeySystem(callback)
 
     getKeyBtn.MouseButton1Click:Connect(function()
         RippleEffect(getKeyBtn, Mouse.X, Mouse.Y)
+        local copied = false
         if setclipboard then
-            setclipboard(DiscordLink)
+            pcall(function() setclipboard(DiscordLink) end)
+            copied = true
+        elseif toclipboard then
+            pcall(function() toclipboard(DiscordLink) end)
+            copied = true
+        end
+
+        if copied then
             getKeyText.Text = "✅ Skopiowano link do schowka!"
             statusLabel.Text = "📋 Link skopiowany: " .. DiscordLink
             statusLabel.TextColor3 = Color3.fromRGB(87, 242, 135)
-            wait(2)
-            getKeyText.Text = "🔗 GET KEY (Kopiuj link Discord)"
-        elseif pcall(function() toclipboard(DiscordLink) end) then
-            getKeyText.Text = "✅ Skopiowano link do schowka!"
-            statusLabel.Text = "📋 Link skopiowany: " .. DiscordLink
-            statusLabel.TextColor3 = Color3.fromRGB(87, 242, 135)
-            wait(2)
-            getKeyText.Text = "🔗 GET KEY (Kopiuj link Discord)"
+            task.wait(2)
+            if getKeyText and getKeyText.Parent then
+                getKeyText.Text = "🔗 GET KEY (Kopiuj link Discord)"
+            end
         else
             statusLabel.Text = "📋 Discord: " .. DiscordLink
             statusLabel.TextColor3 = Color3.fromRGB(254, 231, 92)
@@ -496,7 +508,6 @@ local function ShowKeySystem(callback)
     infoText.TextWrapped = true; infoText.TextXAlignment = Enum.TextXAlignment.Left
     infoText.ZIndex = 216; infoText.Parent = infoFrame
 
-    -- Discord link at bottom
     local dcLabel = Instance.new("TextLabel")
     dcLabel.Size = UDim2.new(1, 0, 0, 18)
     dcLabel.Position = UDim2.new(0, 0, 1, -40)
@@ -529,7 +540,7 @@ local function ShowKeySystem(callback)
             Tween(statusLabel, {TextColor3 = Color3.fromRGB(237, 66, 69)}, 0.2)
             for _, offset in ipairs({8, -8, 4, -4, 0}) do
                 Tween(inputContainer, {Position = UDim2.new(0.075, offset, 0, 198)}, 0.04)
-                wait(0.04)
+                task.wait(0.04)
             end
             return
         end
@@ -547,7 +558,7 @@ local function ShowKeySystem(callback)
             verifyText.Text = "✅ ZWERYFIKOWANO • " .. role:upper()
             Tween(verifyBtn, {BackgroundColor3 = Color3.fromRGB(87, 242, 135)}, 0.3)
 
-            wait(1.2)
+            task.wait(1.2)
 
             local flash = Instance.new("Frame")
             flash.Size = UDim2.new(1, 0, 1, 0)
@@ -555,7 +566,7 @@ local function ShowKeySystem(callback)
             flash.BackgroundTransparency = 1; flash.ZIndex = 250
             flash.Parent = keyBg
             Tween(flash, {BackgroundTransparency = 0.5}, 0.2)
-            wait(0.2)
+            task.wait(0.2)
             Tween(flash, {BackgroundTransparency = 1}, 0.3)
             Tween(keyCard, {Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1}, 0.5, Enum.EasingStyle.Back, Enum.EasingDirection.In)
             Tween(keyBg, {BackgroundTransparency = 1}, 0.6)
@@ -564,7 +575,7 @@ local function ShowKeySystem(callback)
                 if child:IsA("Frame") then Tween(child, {BackgroundTransparency = 1}, 0.4) end
             end
 
-            wait(0.7)
+            task.wait(0.7)
             KeyGui:Destroy()
             callback()
         else
@@ -582,11 +593,10 @@ local function ShowKeySystem(callback)
                     for i = 30, 0, -1 do
                         if not keyCard or not keyCard.Parent then return end
                         statusLabel.Text = "🚫 Zablokowano! Odczekaj: " .. i .. "s"
-                        wait(1)
+                        task.wait(1)
                     end
                     cooldown = false; attempts = 0
-                    attemptsLabel.Text = "Próby: 0/" .. maxAttempts
-                    statusLabel.Text = "Spróbuj ponownie"
+                    attemptsLabel.Text = "Próby: 0/" .. maxAttempts                    statusLabel.Text = "Spróbuj ponownie"
                     statusLabel.TextColor3 = Color3.fromRGB(148, 155, 170)
                     verifyBtn.Active = true
                     verifyText.Text = "🔓 WERYFIKUJ KLUCZ"
@@ -597,15 +607,15 @@ local function ShowKeySystem(callback)
                 statusLabel.TextColor3 = Color3.fromRGB(237, 66, 69)
                 for _, offset in ipairs({10, -10, 6, -6, 3, -3, 0}) do
                     Tween(inputContainer, {Position = UDim2.new(0.075, offset, 0, 198)}, 0.04)
-                    wait(0.04)
+                    task.wait(0.04)
                 end
                 local iStroke = inputContainer:FindFirstChildOfClass("UIStroke")
                 if iStroke then
                     Tween(iStroke, {Color = Color3.fromRGB(237, 66, 69), Transparency = 0}, 0.1)
-                    wait(0.5)
+                    task.wait(0.5)
                     Tween(iStroke, {Color = Color3.fromRGB(52, 52, 78), Transparency = 0.3}, 0.3)
                 end
-                cooldown = true; wait(1.5); cooldown = false
+                cooldown = true; task.wait(1.5); cooldown = false
             end
         end
     end
@@ -625,5 +635,5 @@ end
 -- ================================================================
 ShowKeySystem(function()
     print("✅ Key hợp lệ! Role: " .. (UserRole or "Player"))
-    -- Ở đây bạn có thể gọi BuildMainGUI() nếu muốn, nhưng script này đã xoá GUI chính.
+    -- Thêm GUI chính của bạn ở đây nếu muốn
 end)
