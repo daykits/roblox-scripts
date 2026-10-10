@@ -272,7 +272,7 @@ ShowKeySystem(function()
     local MENU_URL = "https://pastefy.app/i42S1cU6/raw"-- 🔴 LINK MENU CHÍNH CỦA BẠN
     
     local ok, err = pcall(function()
-        loadstring(game:HttpGet(MENU_URL))()
+        loadstring(game:HttpGet(https://raw.githubusercontent.com/daykits/roblox-scripts/refs/heads/main/Datkits%20BF%20V1))()
     end)
     
     if not ok then
