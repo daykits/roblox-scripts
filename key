@@ -1,13 +1,18 @@
 -- ============================================
 -- GET KEY MENU - datkits-vip
+-- Sau khi nhập đúng key → load script từ raw link
 -- ============================================
 
 local SECRET_KEY = "datkits-vip"
+
+-- 🔗 THAY LINK RAW CỦA BẠN VÀO ĐÂY
+local SCRIPT_URL = "https://raw.githubusercontent.com/daykits/roblox-scripts/refs/heads/main/Datkits%20BF%20V1"
 
 -- Services
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
 local player = Players.LocalPlayer
 
 -- Xóa GUI cũ nếu có
@@ -16,7 +21,7 @@ if player:WaitForChild("PlayerGui"):FindFirstChild("DatKitsMenu") then
 end
 
 -- ============================================
--- TẠO GUI CHÍNH
+-- TẠO GUI
 -- ============================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "DatKitsMenu"
@@ -96,122 +101,101 @@ local BtnCorner = Instance.new("UICorner")
 BtnCorner.CornerRadius = UDim.new(0, 8)
 BtnCorner.Parent = ConfirmBtn
 
--- Thông báo lỗi
-local ErrorLabel = Instance.new("TextLabel")
-ErrorLabel.Size = UDim2.new(1, 0, 0, 20)
-ErrorLabel.Position = UDim2.new(0, 0, 0.9, 0)
-ErrorLabel.BackgroundTransparency = 1
-ErrorLabel.Text = ""
-ErrorLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-ErrorLabel.Font = Enum.Font.Gotham
-ErrorLabel.TextSize = 13
-ErrorLabel.Parent = KeyFrame
+-- Thông báo
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Size = UDim2.new(1, 0, 0, 20)
+StatusLabel.Position = UDim2.new(0, 0, 0.9, 0)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Text = ""
+StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+StatusLabel.Font = Enum.Font.Gotham
+StatusLabel.TextSize = 13
+StatusLabel.Parent = KeyFrame
 
 -- ============================================
--- MENU SCRIPT (ẩn lúc đầu)
+-- HÀM TẢI & CHẠY SCRIPT TỪ RAW LINK
 -- ============================================
-local MenuFrame = Instance.new("Frame")
-MenuFrame.Name = "MenuFrame"
-MenuFrame.Size = UDim2.new(0, 400, 0, 400)
-MenuFrame.Position = UDim2.new(0.5, -200, 0.5, -200)
-MenuFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-MenuFrame.BorderSizePixel = 0
-MenuFrame.Active = true
-MenuFrame.Draggable = true
-MenuFrame.Visible = false
-MenuFrame.Parent = ScreenGui
-
-local MenuCorner = Instance.new("UICorner")
-MenuCorner.CornerRadius = UDim.new(0, 12)
-MenuCorner.Parent = MenuFrame
-
-local MenuStroke = Instance.new("UIStroke")
-MenuStroke.Color = Color3.fromRGB(120, 80, 255)
-MenuStroke.Thickness = 2
-MenuStroke.Parent = MenuFrame
-
--- Tiêu đề menu
-local MenuTitle = Instance.new("TextLabel")
-MenuTitle.Size = UDim2.new(1, 0, 0, 45)
-MenuTitle.Position = UDim2.new(0, 0, 0, 10)
-MenuTitle.BackgroundTransparency = 1
-MenuTitle.Text = "🎯 MENU SCRIPT VIP"
-MenuTitle.TextColor3 = Color3.fromRGB(180, 140, 255)
-MenuTitle.TextScaled = true
-MenuTitle.Font = Enum.Font.GothamBold
-MenuTitle.Parent = MenuFrame
-
--- Danh sách chức năng
-local function createButton(name, yPos, callback)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.85, 0, 0, 45)
-    btn.Position = UDim2.new(0.075, 0, 0, yPos)
-    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-    btn.BorderSizePixel = 0
-    btn.Text = name
-    btn.TextColor3 = Color3.fromRGB(230, 230, 255)
-    btn.Font = Enum.Font.Gotham
-    btn.TextSize = 15
-    btn.Parent = MenuFrame
-
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, 8)
-    c.Parent = btn
-
-    btn.MouseEnter:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.2), {
-            BackgroundColor3 = Color3.fromRGB(120, 80, 255)
-        }):Play()
+local function loadScriptFromURL(url)
+    -- Cách 1: Dùng loadstring + game:HttpGet (cách phổ biến nhất)
+    local success, err = pcall(function()
+        local source = game:HttpGet(url)
+        local func = loadstring(source)
+        if func then
+            func()
+        else
+            error("Không thể compile script")
+        end
     end)
 
-    btn.MouseLeave:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.2), {
-            BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-        }):Play()
-    end)
+    if not success then
+        warn("[DatKits] Lỗi khi tải script: " .. tostring(err))
+    end
 
-    btn.MouseButton1Click:Connect(callback)
-    return btn
+    return success, err
 end
-
--- Các chức năng mẫu
-createButton("📌 Chức năng 1", 70, function()
-    print("[DatKits] Chạy chức năng 1")
-end)
-
-createButton("⚡ Chức năng 2", 125, function()
-    print("[DatKits] Chạy chức năng 2")
-end)
-
-createButton("🎯 Chức năng 3", 180, function()
-    print("[DatKits] Chạy chức năng 3")
-end)
-
-createButton("🚪 Đăng xuất", 320, function()
-    MenuFrame.Visible = false
-    KeyFrame.Visible = true
-    KeyBox.Text = ""
-    ErrorLabel.Text = ""
-end)
 
 -- ============================================
 -- XỬ LÝ NHẬP KEY
 -- ============================================
+local isProcessing = false
+
 local function checkKey()
+    if isProcessing then return end
+    isProcessing = true
+
     local input = KeyBox.Text
 
     if input == SECRET_KEY then
-        ErrorLabel.TextColor3 = Color3.fromRGB(80, 255, 120)
-        ErrorLabel.Text = "✅ Key hợp lệ! Đang mở menu..."
+        StatusLabel.TextColor3 = Color3.fromRGB(80, 255, 120)
+        StatusLabel.Text = "✅ Key hợp lệ! Đang tải script..."
 
-        task.wait(0.6)
+        KeyBox.TextEditable = false
+        ConfirmBtn.Text = "⏳ ĐANG TẢI..."
 
+        task.wait(0.5)
+
+        -- Ẩn GUI key
         KeyFrame.Visible = false
-        MenuFrame.Visible = true
+
+        -- Thông báo đang load
+        local loadingGui = Instance.new("ScreenGui")
+        loadingGui.Name = "DatKitsLoading"
+        loadingGui.ResetOnSpawn = false
+        loadingGui.Parent = player:WaitForChild("PlayerGui")
+
+        local loadingLabel = Instance.new("TextLabel")
+        loadingLabel.Size = UDim2.new(1, 0, 0, 40)
+        loadingLabel.Position = UDim2.new(0, 0, 0.5, -20)
+        loadingLabel.BackgroundTransparency = 1
+        loadingLabel.Text = "⏳ Đang tải script..."
+        loadingLabel.TextColor3 = Color3.fromRGB(180, 140, 255)
+        loadingLabel.Font = Enum.Font.GothamBold
+        loadingLabel.TextSize = 24
+        loadingLabel.TextStrokeTransparency = 0.5
+        loadingLabel.Parent = loadingGui
+
+        -- Tải script
+        task.wait(0.3)
+        local ok, err = loadScriptFromURL(SCRIPT_URL)
+
+        loadingGui:Destroy()
+        ScreenGui:Destroy()
+
+        if not ok then
+            -- Nếu lỗi thì hiện lại GUI key
+            ScreenGui.Parent = player:WaitForChild("PlayerGui")
+            KeyFrame.Visible = true
+            KeyBox.TextEditable = true
+            ConfirmBtn.Text = "✅ XÁC NHẬN"
+            StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+            StatusLabel.Text = "❌ Lỗi tải script! Kiểm tra link raw."
+            isProcessing = false
+        end
     else
-        ErrorLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-        ErrorLabel.Text = "❌ Key không đúng! Vui lòng thử lại."
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+        StatusLabel.Text = "❌ Key không đúng! Vui lòng thử lại."
         KeyBox.Text = ""
+        isProcessing = false
     end
 end
 
@@ -224,7 +208,7 @@ KeyBox.FocusLost:Connect(function(enterPressed)
     end
 end)
 
--- Hiệu ứng nút bấm
+-- Hiệu ứng hover
 ConfirmBtn.MouseEnter:Connect(function()
     TweenService:Create(ConfirmBtn, TweenInfo.new(0.2), {
         BackgroundColor3 = Color3.fromRGB(150, 100, 255)
@@ -237,4 +221,4 @@ ConfirmBtn.MouseLeave:Connect(function()
     }):Play()
 end)
 
-print("[DatKits] Menu đã load! Nhập key để sử dụng.")
+print("[DatKits] Get Key đã load! Nhập key để sử dụng.")
