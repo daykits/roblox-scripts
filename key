@@ -1,6 +1,6 @@
 -- ============================================
 -- GET KEY MENU - datkits-vip
--- Sau khi nhập đúng key → load script từ raw link
+-- Nhập đúng key → chạy script từ raw link
 -- ============================================
 
 local SECRET_KEY = "datkits-vip"
@@ -10,18 +10,15 @@ local SCRIPT_URL = "https://raw.githubusercontent.com/daykits/roblox-scripts/ref
 
 -- Services
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
-local HttpService = game:GetService("HttpService")
 local player = Players.LocalPlayer
 
 -- Xóa GUI cũ nếu có
-if player:WaitForChild("PlayerGui"):FindFirstChild("DatKitsMenu") then
-    player.PlayerGui.DatKitsMenu:Destroy()
-end
+local oldGui = player:WaitForChild("PlayerGui"):FindFirstChild("DatKitsMenu")
+if oldGui then oldGui:Destroy() end
 
 -- ============================================
--- TẠO GUI
+-- TẠO GUI GET KEY
 -- ============================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "DatKitsMenu"
@@ -29,9 +26,7 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = player:WaitForChild("PlayerGui")
 
--- ============================================
--- MÀN HÌNH NHẬP KEY
--- ============================================
+-- Frame chính
 local KeyFrame = Instance.new("Frame")
 KeyFrame.Name = "KeyFrame"
 KeyFrame.Size = UDim2.new(0, 400, 0, 250)
@@ -113,25 +108,28 @@ StatusLabel.TextSize = 13
 StatusLabel.Parent = KeyFrame
 
 -- ============================================
--- HÀM TẢI & CHẠY SCRIPT TỪ RAW LINK
+-- HÀM TẢI SCRIPT TỪ RAW LINK
 -- ============================================
 local function loadScriptFromURL(url)
-    -- Cách 1: Dùng loadstring + game:HttpGet (cách phổ biến nhất)
-    local success, err = pcall(function()
-        local source = game:HttpGet(url)
-        local func = loadstring(source)
-        if func then
-            func()
-        else
-            error("Không thể compile script")
-        end
+    local success, source = pcall(function()
+        return game:HttpGet(url, true)
     end)
 
-    if not success then
-        warn("[DatKits] Lỗi khi tải script: " .. tostring(err))
+    if not success or not source or #source < 10 then
+        return false, "Không tải được script từ link"
     end
 
-    return success, err
+    local func, err = loadstring(source)
+    if not func then
+        return false, "Lỗi compile: " .. tostring(err)
+    end
+
+    local runOk, runErr = pcall(func)
+    if not runOk then
+        return false, "Lỗi runtime: " .. tostring(runErr)
+    end
+
+    return true
 end
 
 -- ============================================
@@ -152,12 +150,12 @@ local function checkKey()
         KeyBox.TextEditable = false
         ConfirmBtn.Text = "⏳ ĐANG TẢI..."
 
-        task.wait(0.5)
+        task.wait(0.3)
 
         -- Ẩn GUI key
         KeyFrame.Visible = false
 
-        -- Thông báo đang load
+        -- Thông báo loading
         local loadingGui = Instance.new("ScreenGui")
         loadingGui.Name = "DatKitsLoading"
         loadingGui.ResetOnSpawn = false
@@ -174,21 +172,25 @@ local function checkKey()
         loadingLabel.TextStrokeTransparency = 0.5
         loadingLabel.Parent = loadingGui
 
-        -- Tải script
         task.wait(0.3)
+
+        -- ✅ Tải và chạy raw script
         local ok, err = loadScriptFromURL(SCRIPT_URL)
 
+        -- Xoá loading
         loadingGui:Destroy()
-        ScreenGui:Destroy()
 
-        if not ok then
-            -- Nếu lỗi thì hiện lại GUI key
+        if ok then
+            -- Thành công → xoá luôn GUI key
+            ScreenGui:Destroy()
+        else
+            -- Lỗi → hiện lại GUI key
             ScreenGui.Parent = player:WaitForChild("PlayerGui")
             KeyFrame.Visible = true
             KeyBox.TextEditable = true
             ConfirmBtn.Text = "✅ XÁC NHẬN"
             StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-            StatusLabel.Text = "❌ Lỗi tải script! Kiểm tra link raw."
+            StatusLabel.Text = "❌ " .. tostring(err)
             isProcessing = false
         end
     else
@@ -201,14 +203,13 @@ end
 
 ConfirmBtn.MouseButton1Click:Connect(checkKey)
 
--- Nhấn Enter để xác nhận
 KeyBox.FocusLost:Connect(function(enterPressed)
     if enterPressed then
         checkKey()
     end
 end)
 
--- Hiệu ứng hover
+-- Hover effect
 ConfirmBtn.MouseEnter:Connect(function()
     TweenService:Create(ConfirmBtn, TweenInfo.new(0.2), {
         BackgroundColor3 = Color3.fromRGB(150, 100, 255)
