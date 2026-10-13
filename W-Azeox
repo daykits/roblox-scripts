@@ -1388,7 +1388,7 @@ Fluent:RegisterCustomTheme("Dark", {
         }),
     },
 
-    Background = "rbxassetid://89833510731367",
+    Background = "rbxassetid://107588437129083",
     BackgroundTransparency = 0,
     ThemeAccentColors = { Color3.fromRGB(255, 255, 255) },
 })
