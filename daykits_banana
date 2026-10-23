@@ -1340,7 +1340,7 @@ local function CreateQuangHuyStopTweenPanel()
 	qhTitle.Size = UDim2.new(1, -80, 1, 0)
 	qhTitle.Position = UDim2.new(0, 14, 0, 0)
 	qhTitle.BackgroundTransparency = 1
-	qhTitle.Text = "QH DEV STOP TWEEN"
+	qhTitle.Text = "DAYKIYS STOP TWEEN"
 	qhTitle.TextColor3 = Color3.fromRGB(240, 243, 250)
 	qhTitle.TextSize = 12
 	qhTitle.Font = Enum.Font.GothamBold
