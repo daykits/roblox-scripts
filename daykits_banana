@@ -1540,11 +1540,11 @@ local function RemoveQuangHuyStopTweenPanel()
 end
 
 -- ==================== TẠO TOGGLE TRONG HUB (KHÔNG TRÙNG MÃ) ====================
-local SectionStopTweenUI = PageStatusAndServer.CreateSection("QH DEV Stop Tween Control")
+local SectionStopTweenUI = PageStatusAndServer.CreateSection("datkits Stop Tween Control")
 
 SectionStopTweenUI.CreateToggle({
-	Title = "Show QH DEV Stop Tween Panel",
-	Desc = "Hiển thị menu stop tween(dừng bay; di chuyển) By QH DEV",
+	Title = "Show datkits Stop Tween Panel",
+	Desc = "Hiển thị menu stop tween(dừng bay; di chuyển) By datkits",
 	Default = Settings[TWEEN_TOGGLE_KEY] ~= false,
 }, function(state)
 	if SaveSettings then
