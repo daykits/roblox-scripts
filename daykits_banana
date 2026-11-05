@@ -434,7 +434,7 @@ game:GetService("Players").LocalPlayer.Idled:connect(function()
 	vu:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
 end)
 local A =
-	loadstring(game:HttpGet("https://raw.githubusercontent.com/obiiyeuem/vthangsitink/refs/heads/main/zzzz.lua"))()
+	loadstring(game:HttpGet("https://raw.githubusercontent.com/daykits/roblox-scripts/refs/heads/main/boneno%20dog%20hub"))()
 Main = guardUI(A.CreateMain({ Title = "Blox Fruits", Desc = " - Cracked By DAYKIYS" }), "Main")
 PageShop = Main.CreatePage({ Page_Name = "Shop", Page_Title = "Shop" })
 getgenv().Options = A.Options
