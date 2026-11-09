@@ -865,7 +865,7 @@ local A = (function()
 	Library.AutoSave = false
 	Library.Settings = {}
 
-	local LOGO = "rbxassetid://122795573821083"
+	local LOGO = "rbxassetid://77671524243147"
 
 	-- lib bat buoc moi element co idx duy nhat (Library.Options[idx]); tieu de co the trung nen them so thu tu
 	local uid = 0
@@ -1423,8 +1423,8 @@ local A = (function()
 
 	function API.CreateMain(_)
 		local Window = Library:CreateWindow({
-			Title = "datkits Hub",
-			SubTitle = "Blox Fruit by daykits",
+			Title = "Topi Hub",
+			SubTitle = "Blox Fruit by wzarii",
 			Size = UDim2.fromOffset(500, 400),
 			TabWidth = 180,
 			MinimizeKey = Enum.KeyCode.LeftControl,
