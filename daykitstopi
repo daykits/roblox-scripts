@@ -1424,7 +1424,7 @@ local A = (function()
 	function API.CreateMain(_)
 		local Window = Library:CreateWindow({
 			Title = "Topi Hub",
-			SubTitle = "Blox Fruit by wzarii",
+			SubTitle = "cracked by deobt",
 			Size = UDim2.fromOffset(500, 400),
 			TabWidth = 180,
 			MinimizeKey = Enum.KeyCode.LeftControl,
