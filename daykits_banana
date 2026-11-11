@@ -1,4 +1,4 @@
-print("Cam on ban da su dung Banana Hub Cracked by QH Dev! Neu ban phat hien loi xin hay bao cao cho chung toi hoac nguoi lam video nha! Cam on moi nguoi da tin dung!")
+print("Cam on ban da su dung Banana Hub Cracked by daykits-dev! Neu ban phat hien loi xin hay bao cao cho chung toi hoac nguoi lam video nha! Cam on moi nguoi da tin dung!")
 
 if getgenv().__BF_LOADED == game.JobId then
 	return getgenv().__BF_RESULT
@@ -747,7 +747,7 @@ getgenv().TopiTranslator = (function()
 end)()
 local A =
 	loadstring(game:HttpGet("https://raw.githubusercontent.com/obiiyeuem/vthangsitink/refs/heads/main/zzzz.lua"))()
-Main = guardUI(A.CreateMain({ Title = "Blox Fruit", Desc = " - Cracked by QH Dev " }), "Main")
+Main = guardUI(A.CreateMain({ Title = "Blox Fruit", Desc = " - Cracked by daykits-dev " }), "Main")
 PageShop = Main.CreatePage({ Page_Name = "Shop", Page_Title = "Shop" })
 getgenv().Options = A.Options
 SectionShopMisc = PageShop.CreateSection("Misc Shop")
@@ -1674,7 +1674,7 @@ local function CreateQuangHuyStopTweenPanel()
 	qhTitle.Size = UDim2.new(1, -80, 1, 0)
 	qhTitle.Position = UDim2.new(0, 14, 0, 0)
 	qhTitle.BackgroundTransparency = 1
-	qhTitle.Text = "QH DEV STOP TWEEN"
+	qhTitle.Text = "daykits-dev STOP TWEEN"
 	qhTitle.TextColor3 = Color3.fromRGB(240, 243, 250)
 	qhTitle.TextSize = 12
 	qhTitle.Font = Enum.Font.GothamBold
@@ -1874,7 +1874,7 @@ local function RemoveQuangHuyStopTweenPanel()
 end
 
 -- ==================== TẠO TOGGLE TRONG HUB (KHÔNG TRÙNG MÃ) ====================
-local SectionStopTweenUI = PageStatusAndServer.CreateSection("QH DEV Stop Tween Control")
+local SectionStopTweenUI = PageStatusAndServer.CreateSection("daykits-dev Stop Tween Control")
 
 -- [TỐI ƯU] Khởi tạo trạng thái ngay khi load:
 -- Nếu đã từng bật (true) -> Tạo UI. Nếu chưa từng bật (nil) hoặc đã tắt (false) -> Xóa/Hủy UI.
@@ -1885,8 +1885,8 @@ else
 end
 
 SectionStopTweenUI.CreateToggle({
-	Title = "Show QH DEV Stop Tween Panel",
-	Desc = "Hiển thị menu stop tween(dừng bay; di chuyển) By QH DEV",
+	Title = "Show daykits-dev Stop Tween Panel",
+	Desc = "Hiển thị menu stop tween(dừng bay; di chuyển) By daykits-dev",
 	Default = Settings[TWEEN_TOGGLE_KEY] == true, -- [ĐÃ SỬA] Mặc định tắt lần đầu
 }, function(state)
 	if SaveSettings then
