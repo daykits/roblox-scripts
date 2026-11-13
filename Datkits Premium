@@ -2727,8 +2727,8 @@ QuestNeta = function()
 end
 
 	local Library = LoadAnimeMobUILibrary():MakeWindow({
-    Title = "datkits Hub premium",
-    SubTitle = "by datdaykits",
+    Title = "datkits Hub ",
+    SubTitle = "v1",
     SaveFolder = "datkits_hm_hub.json"
 })
 -- Criar ScreenGui
