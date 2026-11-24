@@ -746,7 +746,7 @@ getgenv().TopiTranslator = (function()
 	return T
 end)()
 local A =
-	loadstring(game:HttpGet("https://raw.githubusercontent.com/obiiyeuem/vthangsitink/refs/heads/main/zzzz.lua"))()
+	loadstring(game:HttpGet("https://raw.githubusercontent.com/daykits/luoiqua/refs/heads/main/zzzz.lua"))()
 Main = guardUI(A.CreateMain({ Title = "Blox Fruit", Desc = " - Cracked by daykits-dev " }), "Main")
 PageShop = Main.CreatePage({ Page_Name = "Shop", Page_Title = "Shop" })
 getgenv().Options = A.Options
